@@ -21,6 +21,8 @@ npm run dev
 | `npm run build` | Production build |
 | `npm run lint` | ESLint, including slice-boundary rules |
 | `npm run typecheck` | TypeScript, no emit |
+| `npm test` | Vitest unit tests |
+| `npm run test:e2e` | Playwright e2e (first run: `npx playwright install chromium`) |
 | `npm run format` | Prettier |
 
 ## Structure

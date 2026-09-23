@@ -57,7 +57,7 @@ All values live in `src/shared/config/plans.ts`. `TODO(owner)`: confirm final pr
 | Plan | Price (draft) | Ad credits / month | Brand kits | Seats | Notes |
 |---|---|---|---|---|---|
 | **Free** | $0 | **2 watermarked previews** (720p) | 1 | 1 | No HD export, stock presenters only |
-| **Starter** | ~$29/mo | **10 HD ads** | 1 | 1 | Founder avatar, rollover |
+| **Starter** | ~$29/mo | **10 HD ads** | 1 | 1 | Rollover; founder avatar in V1.1 |
 | **Growth** | ~$79/mo | **30 HD ads** | 3 | 3 | Priority render queue; ad-account connection in V2 |
 | **Agency** | ~$199/mo | **100 HD ads** | 10 client workspaces | 5 (+$15/extra seat) | Review links for clients, bulk render |
 
@@ -81,10 +81,10 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 - Marketing site: landing, pricing, legal pages.
 - **Try-it flow:** URL → brief + 10 hooks + 1 watermarked preview, no account (rate-limited).
 - Auth: Better Auth with Google, GitHub, email magic link.
-- Workspaces (personal by default), basic team invites with roles (owner, editor, viewer).
+- Workspaces: one personal workspace per user. Roles (owner, editor, viewer) exist in the model; team invites are `[V1.1]`.
 - **Brand kit:** URL extraction, brief editing, allowed claims, logo/colors/fonts, multiple kits per plan limit.
 - **Footage:** upload or in-browser screen recording, auto-detected key moments, manual markers.
-- **Presenters:** stock presenter library + founder avatar creation with recorded consent.
+- **Presenters:** stock presenter library — a still portrait paired with a stock voice. Lip-synced avatar video and founder avatars are `[V1.1]`.
 - **Campaign wizard:** goal & platform → angles → script matrix → presenter/voice/layout/captions → preview → render.
 - **Compliance guard** inline in the script matrix; blocking rules on render.
 - **Render pipeline:** background jobs, progress, email on completion, automatic refunds on failure.
@@ -95,6 +95,9 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 
 ### 3.2 `[V1.1]` — Fast follows ("tomorrow")
 - Hook library: save and reuse best hooks across campaigns.
+- Team invites, role changes and member removal.
+- **Founder avatar + lip-synced presenter video** (consent flow in 7.5, `AvatarProvider` in Section 10).
+- Founder voice cloning (needs a provider with consent support; Kokoro has no cloning).
 - Music library with auto-ducking under voice.
 - More caption styles and layout templates.
 - Brand kit auto-refresh when the site changes.
@@ -129,15 +132,15 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 | Auth | **Better Auth** | Google, GitHub, magic link; organization/workspace support |
 | Styling | **Tailwind CSS** + **shadcn/ui** primitives, restyled to the ReelPilot design system | Tokens in Section 12 |
 | AI text | **Vercel AI SDK** with a provider registry | Model-agnostic; no vendor lock-in |
-| Background jobs | **Trigger.dev** (or Inngest) | `TODO(owner)`: pick one; code against `src/shared/jobs` wrapper |
+| Background jobs | **pg-boss** (job queue stored in Neon Postgres), run by our own worker in `src/worker` | No extra service; code against the `src/shared/jobs` wrapper. Worker connects via `DATABASE_URL_UNPOOLED` |
 | Video composition | **Remotion** (compositions in `src/remotion`) | Captions, overlays, zooms, layouts. `TODO(owner)`: review Remotion's license terms for commercial use |
-| Render infra | Remotion Lambda or a dedicated render worker | `TODO(owner)` |
-| Avatar / lip-sync video | Provider adapter (Section 10) | Evaluate 2–3 providers on quality, API, cost |
-| Voice | Provider adapter (TTS + voice clone with consent) | |
-| Storage | S3-compatible (Cloudflare R2 recommended) | Signed URLs only |
+| Render infra | Remotion renderer inside the same worker (one Docker image) | `TODO(owner)`: worker host (Railway, Fly.io or a VPS) |
+| Avatar / lip-sync video | `[V1.1]` provider adapter (Section 10) | Not in V1: ads use presenter stills + voiceover |
+| Voice | **Kokoro** (open-source TTS, Apache-2.0) self-hosted in the worker via `kokoro-js`, behind the `VoiceProvider` adapter | No API key, no per-ad cost; stock voices only |
+| Storage | **Neon Object Storage** (S3-compatible, branches with the database) via the Files SDK `neon` adapter | Signed URLs only; credentials come from `neon env pull` |
 | Payments | **Stripe** (Billing + Checkout + Customer Portal) | |
 | Email | Resend + React Email | |
-| Rate limiting / cache | Upstash Redis | Try-it flow, API abuse |
+| Rate limiting | Postgres (Neon) table in `src/shared/rate-limit`; Better Auth's database rate-limit storage | No Redis service |
 | Validation | Zod | All inputs at the boundary |
 | Testing | Vitest (unit), Playwright (e2e) | |
 | Observability | Sentry + structured logs; per-render cost logging | |
@@ -226,16 +229,14 @@ reelpilot/
 │   │   ├── review/[shareToken]/page.tsx  # public review link
 │   │   └── api/
 │   │       ├── auth/[...all]/route.ts    # Better Auth
-│   │       ├── webhooks/stripe/route.ts
-│   │       ├── webhooks/providers/[provider]/route.ts
-│   │       └── jobs/route.ts             # job runner endpoint if needed
+│   │       └── webhooks/stripe/route.ts
 │   ├── features/
 │   │   ├── try-it/           # anonymous URL → brief, hooks, preview
 │   │   ├── auth/             # session helpers, guards, workspace context
 │   │   ├── workspaces/       # workspaces, members, roles, invites
 │   │   ├── brand-kits/       # extraction, brief, claims, visual identity
 │   │   ├── footage/          # upload, screen recording, key-moment detection
-│   │   ├── presenters/       # stock library, founder avatars, consent
+│   │   ├── presenters/       # stock library (founder avatars + consent in V1.1)
 │   │   ├── campaigns/        # wizard state, angles, variant matrix
 │   │   ├── scripts/          # AI script generation (hooks/bodies/CTAs)
 │   │   ├── compliance/       # rules engine, disclosure, flags
@@ -245,6 +246,7 @@ reelpilot/
 │   │   ├── billing/          # plans, Stripe, credit ledger, rollover
 │   │   ├── notifications/    # emails, in-app toasts
 │   │   └── admin/            # users, costs, moderation, render health
+│   ├── worker/               # our own job worker: pg-boss + Remotion + Kokoro (own Dockerfile)
 │   ├── remotion/
 │   │   ├── Root.tsx
 │   │   ├── compositions/
@@ -261,7 +263,7 @@ reelpilot/
 │       │   └── env.ts        # typed, validated env vars
 │       ├── db/               # Prisma client
 │       ├── ai/               # AI SDK provider registry
-│       ├── providers/        # avatar, voice, storage adapters (Section 10)
+│       ├── providers/        # voice (Kokoro) and storage (Neon) adapters (Section 10)
 │       ├── jobs/             # job client wrapper
 │       ├── storage/          # signed URL helpers
 │       ├── rate-limit/
@@ -284,7 +286,7 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **Routes:** `(marketing)/page.tsx` input, `(marketing)/try/[trialId]`.
 - **Flow:** validate URL → fetch page server-side → AI extracts brief → generate 10 hooks → build 1 preview animatic (stock presenter still + TTS + site screenshots) → watermark.
 - **Actions/jobs:** `startTrial(url)`, job `buildTrialPreview`.
-- **Limits:** 3 trials per IP per day (Upstash). Trials expire after 7 days. On sign-up, the trial converts into the user's first brand kit.
+- **Limits:** 3 trials per IP per day (Postgres rate-limit table). Trials expire after 7 days. On sign-up, the trial converts into the user's first brand kit.
 - **Acceptance:** A valid URL produces a brief, 10 hooks, and a playable watermarked preview in under ~60s; invalid/blocked URLs show a clear error; rate limit enforced.
 
 ### 7.2 auth + workspaces
@@ -305,10 +307,12 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **Acceptance:** Upload and recording both produce a playable clip with thumbnails and at least auto-detected markers; users can add/remove markers.
 
 ### 7.5 presenters
-- **Purpose:** Stock presenters and founder avatars.
+- **Purpose:** Stock presenters: a licensed still portrait paired with a Kokoro stock voice. `TODO(owner)`: source of the portraits (licensed stock photos or generated faces).
+- **`[V1.1]` — everything below in this section.**
 - **Founder avatar flow:** record ~2-minute video following on-screen script → record spoken consent statement → submit → provider training job → admin moderation check (face in consent video matches training video) → available.
 - **Rules:** Only the person themselves can create their avatar. Owner can revoke/delete anytime; deletion removes provider-side data via adapter.
-- **Acceptance:** Stock library browsable with preview clips; founder avatar goes through consent → processing → approved → usable; revoke works end to end.
+- **Acceptance (V1):** Stock library browsable; each presenter plays a short voice sample.
+- **Acceptance (V1.1):** founder avatar goes through consent → processing → approved → usable; revoke works end to end.
 
 ### 7.6 campaigns + scripts
 - **Wizard steps:**
@@ -333,11 +337,11 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **Purpose:** Turn a variant into video.
 - **Pipeline (per variant):**
   1. Split script into segments (hook, body beats, CTA).
-  2. Per segment: TTS/voice → avatar lip-sync video (HD only) → store.
+  2. Per segment: TTS (Kokoro) → store audio. (`[V1.1]`: avatar lip-sync video for HD.)
   3. Remotion composition assembles segments + footage + captions + overlays + disclosure label.
   4. Render 9:16, then derive 4:5 and 1:1 (smart reframing rules per layout).
   5. Upload outputs, update status, log cost, notify.
-- **Preview vs HD:** preview skips avatar video (uses presenter still + TTS), renders at 720p with watermark.
+- **Preview vs HD:** both use the presenter still + TTS in V1. Preview renders at 720p with a watermark; HD renders at 1080p without one.
 - **Idempotency:** each segment keyed by a hash of (script text, voice, presenter, settings) so unchanged segments are reused on edits.
 - **Credits:** reserve on confirm → capture on success → release/refund on failure.
 - **Acceptance:** Batch renders complete in the background with live status; a failed provider call retries then refunds; unchanged segments are never regenerated.
@@ -530,7 +534,7 @@ model AuditLog { id String @id @default(cuid()) actorId String action String tar
 ## 9. Rendering pipeline notes
 
 - All heavy work runs in background jobs; the UI polls or subscribes to status.
-- **Job graph per HD variant:** `prepareSegments` → fan-out `generateSegmentAudio` + `generateSegmentAvatar` (skip if `contentHash` exists) → `composeVariant` (Remotion) → `deriveAspectRatios` → `finalizeRender` (store outputs, capture credits, log cost, notify).
+- **Job graph per HD variant:** `prepareSegments` → fan-out `generateSegmentAudio` (skip if `contentHash` exists; `generateSegmentAvatar` joins in V1.1) → `composeVariant` (Remotion) → `deriveAspectRatios` → `finalizeRender` (store outputs, capture credits, log cost, notify).
 - Retries: 3 attempts with backoff per provider call; after that, mark failed and refund.
 - Concurrency limits per workspace by plan (Growth/Agency get priority queue).
 - Log `providerCostUsd` per step; admin cost monitor aggregates it.
@@ -561,7 +565,7 @@ export interface AvatarProvider {
 export interface TextModel { /* via Vercel AI SDK registry in src/shared/ai */ }
 ```
 
-`TODO(owner)`: choose the initial voice and avatar providers after a short bake-off (quality, API stability, per-second cost, commercial terms, deletion support). Record the choice in `docs/decisions.md`.
+V1 voice: Kokoro, self-hosted (no `cloneVoice`/`deleteVoice`). `AvatarProvider` is `[V1.1]`: don't build it in V1. When avatars start, run the bake-off (quality, API stability, per-second cost, commercial terms, deletion support) and record the choice in `docs/decisions.md`.
 
 ---
 
@@ -691,7 +695,7 @@ Radius: 6px controls, 10px panels, 18px phone frames — radius follows hierarch
 | M0 | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied |
 | M1 | Brand kit | brand-kits (+ URL extraction) | Create and edit a kit from a URL |
 | M2 | Footage | footage | Upload/record footage with markers |
-| M3 | Presenters | presenters (stock first, founder avatar second) | Choose a stock presenter; create a founder avatar with consent |
+| M3 | Presenters | presenters (stock), Kokoro voice in the worker | Choose a stock presenter and hear its voice |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
 | M6 | Billing | billing, plans, ledger, Stripe | Subscribe, get credits, see balance |
@@ -719,35 +723,42 @@ Radius: 6px controls, 10px panels, 18px phone frames — radius follows hierarch
 ## 15. Environment variables (`.env.example`)
 
 ```
+# Neon: pooled (-pooler host) for the app, direct for migrations and the worker
 DATABASE_URL=
+DATABASE_URL_UNPOOLED=
+
+# Better Auth. Secret: min 32 chars, generate with: openssl rand -base64 32
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GITHUB_CLIENT_ID=
 GITHUB_CLIENT_SECRET=
+
+# Resend. Sender on a domain verified in Resend, e.g. ReelPilot <hello@yourdomain.com>
 RESEND_API_KEY=
+EMAIL_FROM=
+
+# Stripe
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_STARTER=
 STRIPE_PRICE_GROWTH=
 STRIPE_PRICE_AGENCY=
 STRIPE_PRICE_TOPUP_5=
-AI_TEXT_PROVIDER=          # key into AI SDK registry
+
+# AI text via the Vercel AI SDK. Provider name (e.g. anthropic), model id,
+# and that provider's own key variable
+AI_TEXT_PROVIDER=
 AI_TEXT_MODEL=
-# provider keys for the chosen text/voice/avatar vendors
-VOICE_PROVIDER=
-VOICE_API_KEY=
-AVATAR_PROVIDER=
-AVATAR_API_KEY=
-STORAGE_ENDPOINT=
-STORAGE_BUCKET=
-STORAGE_ACCESS_KEY_ID=
-STORAGE_SECRET_ACCESS_KEY=
-UPSTASH_REDIS_REST_URL=
-UPSTASH_REDIS_REST_TOKEN=
-JOBS_SECRET_KEY=
-REMOTION_RENDER_CONFIG=
+ANTHROPIC_API_KEY=
+
+# Neon Object Storage (from M2). Don't fill by hand: `neon env pull` writes these
+AWS_ACCESS_KEY_ID=
+AWS_SECRET_ACCESS_KEY=
+AWS_ENDPOINT_URL_S3=
+AWS_REGION=
+
 SENTRY_DSN=
 NEXT_PUBLIC_APP_URL=
 ```
@@ -769,9 +780,12 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 ## 17. Open decisions (owner)
 - [ ] Final product name, domain, logo. `TODO(owner)`
 - [ ] Final prices and top-up price. `TODO(owner)`
-- [ ] Jobs platform: Trigger.dev vs Inngest. `TODO(owner)`
-- [ ] Render infra: Remotion Lambda vs render worker; Remotion license. `TODO(owner)`
-- [ ] Voice and avatar providers (bake-off). `TODO(owner)`
+- [x] Jobs platform: own worker + pg-boss on Neon (2026-09-23).
+- [x] Render infra: Remotion in the same worker (2026-09-23).
+- [ ] Worker host (Railway, Fly.io or VPS) and Remotion company-license check. `TODO(owner)`
+- [x] Voice: self-hosted Kokoro (2026-09-23).
+- [ ] Avatar provider bake-off — `[V1.1]`.
+- [ ] Stock presenter portrait source. `TODO(owner)`
 - [ ] Footage size/length caps per plan. `TODO(owner)`
 - [ ] Legal review of Terms, Privacy, AI disclosure. `TODO(owner)`
 - [ ] Typeface confirmation and color tuning. `TODO(owner)`
