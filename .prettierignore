@@ -5,3 +5,4 @@ node_modules/
 coverage/
 pnpm-lock.yaml
 .pnpm-store/
+src/shared/db/generated/

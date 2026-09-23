@@ -8,8 +8,9 @@ Turn your app into scroll-stopping video ads in minutes.
 ## Getting started
 
 ```bash
-cp .env.example .env.local   # fill in values
-npm install
+cp .env.example .env         # fill in values
+npm install                  # also generates the Prisma client
+npm run db:deploy            # apply migrations
 npm run dev
 ```
 
@@ -21,7 +22,10 @@ npm run dev
 | `npm run build` | Production build |
 | `npm run lint` | ESLint, including slice-boundary rules |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit tests |
+| `npm test` | Vitest tests (database tests run only when `.env` exists) |
+| `npm run db:migrate` | Create and apply a migration (development) |
+| `npm run db:deploy` | Apply existing migrations |
+| `npm run db:studio` | Browse the database |
 | `npm run test:e2e` | Playwright e2e (first run: `npx playwright install chromium`) |
 | `npm run format` | Prettier |
 
@@ -34,6 +38,7 @@ src/
 ├── app/        # thin routes only
 ├── features/   # one folder per slice; import only via its index.ts
 └── shared/     # feature-agnostic: ui, config, db, lib, styles
+prisma/         # schema.prisma + migrations
 ```
 
 Add shadcn components with `npx shadcn@latest add <name>` — they land in `src/shared/ui`.

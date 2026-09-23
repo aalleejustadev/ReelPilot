@@ -20,3 +20,11 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-23 — Background jobs run in our own worker with pg-boss (queue in Neon Postgres), and Remotion renders in the same Docker image — replaces Trigger.dev/Inngest and Remotion Lambda/AWS. Neon Functions ruled out: the neon-functions skill says they're request/response only, not a job runner.
 - 2026-09-23 — Rate limiting uses a Postgres table, not Upstash Redis — 3 trials/IP/day doesn't need Redis.
 - 2026-09-23 — AI text stays on a direct provider (Anthropic, `ANTHROPIC_API_KEY`) through the Vercel AI SDK; Neon AI Gateway not used because it needs a paid Neon plan.
+- 2026-09-23 — Prisma pinned to 7.10.0 (CLI and client) — `npm install prisma` resolved to an 8.0 release candidate; the plan specifies Prisma 7 and the CLI must match the client.
+- 2026-09-23 — `prisma.config.ts` points migrations at `DATABASE_URL_UNPOOLED`; the app uses the pooled `DATABASE_URL` through `@prisma/adapter-pg` — Neon: PgBouncer breaks migrations. Read via `process.env` so `prisma generate` works in CI without a database.
+- 2026-09-23 — The app creates its own `pg.Pool` (max 5) and registers it with `attachDatabasePool` from `@vercel/functions` — neon-postgres skill guidance for Vercel Fluid compute.
+- 2026-09-23 — Generated Prisma client lives in `src/shared/db/generated` (gitignored, built by `postinstall`); import it only through `@/shared/db`.
+- 2026-09-23 — Better Auth's four core tables were written by hand in Part B; `npx auth@latest generate` must confirm them in Part D — the CLI needs the auth config, which doesn't exist yet.
+- 2026-09-23 — Tables use lowercase plural names via `@@map`; columns keep Better Auth's camelCase names.
+- 2026-09-23 — Migrated on the Neon main branch (no real data yet); switch development to a `dev` branch at M2, when the Neon CLI is installed.
+- 2026-09-23 — Database tests run against the real database when `.env` exists and skip otherwise (CI).
