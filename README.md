@@ -1,21 +1,37 @@
-# Next.js template
+# ReelPilot
 
-This is a Next.js template with shadcn/ui.
+Turn your app into scroll-stopping video ads in minutes.
 
-## Adding components
+- **Build plan (source of truth):** [docs/build-plan.md](docs/build-plan.md)
+- **Decisions log:** [docs/decisions.md](docs/decisions.md)
 
-To add components to your app, run the following command:
+## Getting started
 
 ```bash
-npx shadcn@latest add button
+cp .env.example .env.local   # fill in values
+npm install
+npm run dev
 ```
 
-This will place the ui components in the `components` directory.
+## Scripts
 
-## Using components
+| Command | What it does |
+|---|---|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run lint` | ESLint, including slice-boundary rules |
+| `npm run typecheck` | TypeScript, no emit |
+| `npm run format` | Prettier |
 
-To use the components in your app, import them as follows:
+## Structure
 
-```tsx
-import { Button } from "@/components/ui/button";
+Organized by feature (vertical slices), not by layer — see build plan §5–6.
+
 ```
+src/
+├── app/        # thin routes only
+├── features/   # one folder per slice; import only via its index.ts
+└── shared/     # feature-agnostic: ui, config, db, lib, styles
+```
+
+Add shadcn components with `npx shadcn@latest add <name>` — they land in `src/shared/ui`.
