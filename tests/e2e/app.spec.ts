@@ -20,7 +20,7 @@ test("dashboard shows the welcome, workspace and empty state", async ({
   ).toBeVisible()
   await expect(
     // Scoped to <main>: Next streaming keeps a hidden copy outside it.
-    page.getByRole("main").getByText("Your workspace is ready")
+    page.getByRole("main").getByText("Start with your brand kit")
   ).toBeVisible()
   const overflow = await page.evaluate(
     () => document.documentElement.scrollWidth - window.innerWidth

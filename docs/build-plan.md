@@ -623,7 +623,7 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
-- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (M0: Dashboard, Settings) — add Campaigns, Library, Brand kits and Presenters as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher). Credit balance joins the top bar in M6; a workspace switcher arrives with teams (V1.1).
+- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (M0: Dashboard, Settings; M1: Brand kits) — add Campaigns, Library and Presenters as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher). Credit balance joins the top bar in M6; a workspace switcher arrives with teams (V1.1).
 - **Campaign page:** a **contact sheet** — a Card grid of 9:16 frames, each with a checkbox, hook text, status badge and angle; selected frames get a primary outline.
 - **Editor:** player on top (on `--projector`), segment timeline below, inspector on the right.
 - **Landing:** left-aligned hero with the URL input; to the right, a phone-frame player looping real example ads; below, one before/after (raw screen recording → finished ad).
@@ -712,7 +712,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | # | Milestone | Slices | Outcome |
 |---|---|---|---|
 | M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
-| M1 | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo |
+| M1 ✅ | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo — **done 2026-09-25** (see 14.3) |
 | M2 | Footage | footage (reuses M1 storage) | Upload/record footage with markers |
 | M3 | Presenters | presenters (stock), Kokoro voice in the worker | Choose a stock presenter and hear its voice |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
@@ -757,6 +757,24 @@ How M0 meets each Definition of Done item — use the same bar for every later m
 | CI | lint, types, format, unit, build, e2e against a `postgres:17` service on every push |
 
 Still manual (can't be automated without real provider accounts): sign-in with Google, GitHub and a real magic-link email.
+
+### 14.3 M1 completion record (2026-09-25)
+Brand kits, built in parts A–F (A: storage + AI setup, B: data model, C: URL extraction, D: actions, E: UI, F: Definition of Done).
+
+| Item | Evidence |
+|---|---|
+| Prisma models + migration | `brand_kits`, `allowed_claims` (M1), `rate_limit_buckets`; 5 migrations on the Neon `dev` branch and from scratch in CI |
+| Zod schemas | every kit field with limits (`brandKitLimits`), website URL normalization, claim links, hex colours; action inputs; AI draft schema; AI and storage env |
+| Service logic with unit tests | race-safe plan limit (workspace row lock), workspace-scoped CRUD, SSRF-safe fetch, page reader, AI draft + partial fallback, logo sniffing, rate limiter — 220 unit/integration tests |
+| Server actions validated, authorized, scoped | `createBrandKitFromUrl`, `createBrandKitManually`, `saveBrandKit`, `uploadBrandKitLogo`, `removeBrandKitLogo`, `deleteBrandKit`; tested against a real database incl. viewer refusal, plan and daily AI limits, cross-workspace NOT_FOUND and redirect pass-through |
+| UI from `shared/ui` + tokens | shadcn `base-vega` defaults; added `textarea` and `alert-dialog` unchanged |
+| Loading, empty, error states | brand kit empty state with the create form, per-failure URL messages with a "Fill it in myself" fallback, field-level save errors, partial-draft alert, plan-limit alert, not-found for unknown kits |
+| Accessible | axe WCAG 2.2 A/AA on the list, editor, validation errors and delete dialog (scans wait for animations to settle); labelled controls, `aria-invalid` on the exact failing field |
+| Responsive to 375px | every brand-kit e2e test runs on desktop and 375px mobile; no horizontal scroll checks |
+| Playwright happy path | create (by hand) → fix a field error → save → reload → list and plan limit → delete; private address refused; logo upload/remove against the real bucket (local); disguised logo refused (94 e2e checks) |
+| Decisions logged | `docs/decisions.md` |
+
+Checked by hand with the real model: linear.app and resend.com drafts (≈7s each, pricing page, real logo). Still manual: the AI path in the browser (e2e never calls the AI or the network).
 
 ## 15. Environment variables (`.env.example`)
 

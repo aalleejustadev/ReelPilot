@@ -2,11 +2,17 @@ import AxeBuilder from "@axe-core/playwright"
 import type { Page } from "@playwright/test"
 
 import { expect, hasDatabase, test } from "./fixtures"
+import { createKitByHand } from "./helpers/brand-kits"
 
 // WCAG 2.2 A and AA (build plan §14.1: accessible).
 const wcag = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]
 
 async function expectNoViolations(page: Page) {
+  // Scan settled UI: mid-fade toasts and dialogs are partly transparent,
+  // which axe reports as low contrast.
+  await page.waitForFunction(() =>
+    document.getAnimations().every((a) => a.playState !== "running")
+  )
   const results = await new AxeBuilder({ page }).withTags(wcag).analyze()
   const summary = results.violations.map(
     (v) =>
@@ -38,6 +44,7 @@ test.describe("signed in", () => {
 
   for (const path of [
     "/dashboard",
+    "/brand-kits",
     "/settings/profile",
     "/settings/workspace",
   ]) {
@@ -68,6 +75,35 @@ test.describe("signed in", () => {
     await page.getByRole("textbox", { name: "Name", exact: true }).fill("   ")
     await page.getByRole("button", { name: "Save" }).click()
     await expect(page.getByText("Enter your name.")).toBeVisible()
+    await expectNoViolations(page)
+  })
+
+  test("no accessibility violations in the brand kit editor, with errors and the delete dialog", async ({
+    page,
+    signedInUser: _user,
+  }) => {
+    await createKitByHand(page)
+    await expectNoViolations(page)
+
+    await page.getByRole("button", { name: "Add claim" }).click()
+    await page.getByRole("textbox", { name: "Source link" }).fill("nope")
+    await page.getByRole("button", { name: "Save changes" }).first().click()
+    await expect(
+      page.getByText("Use a full link starting with https://.")
+    ).toBeVisible()
+    await expectNoViolations(page)
+
+    await page.getByRole("button", { name: "Delete", exact: true }).click()
+    await expect(page.getByRole("alertdialog")).toBeVisible()
+    await expectNoViolations(page)
+  })
+
+  test("no accessibility violations on the brand kit list and create error", async ({
+    page,
+    signedInUser: _user,
+  }) => {
+    await createKitByHand(page)
+    await page.goto("/brand-kits")
     await expectNoViolations(page)
   })
 })
