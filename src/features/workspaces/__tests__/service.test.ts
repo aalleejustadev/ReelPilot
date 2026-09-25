@@ -1,12 +1,21 @@
 import { randomUUID } from "node:crypto"
 
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-// Runs against the real database; skipped in CI, where no .env exists.
-describe.skipIf(!process.env.DATABASE_URL)("personal workspaces", async () => {
-  const { db } = await import("@/shared/db")
-  const { ensurePersonalWorkspace, renameWorkspace } =
-    await import("../service")
+// Needs a database; skipped when DATABASE_URL is unset. App modules are
+// imported in beforeAll so a skipped suite never loads them (env
+// validation would fail at collection time otherwise).
+const hasDatabase = Boolean(process.env.DATABASE_URL)
+
+describe.runIf(hasDatabase)("personal workspaces", () => {
+  let db: typeof import("@/shared/db").db
+  let ensurePersonalWorkspace: typeof import("../service").ensurePersonalWorkspace
+  let renameWorkspace: typeof import("../service").renameWorkspace
+
+  beforeAll(async () => {
+    ;({ db } = await import("@/shared/db"))
+    ;({ ensurePersonalWorkspace, renameWorkspace } = await import("../service"))
+  })
 
   const userIds: string[] = []
 

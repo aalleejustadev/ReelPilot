@@ -1,9 +1,16 @@
-import { afterAll, describe, expect, it } from "vitest"
+import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-// Needs a real database; skipped in CI, where no DATABASE_URL is set.
-describe.skipIf(!process.env.DATABASE_URL)("db client (Neon)", async () => {
-  const { db } = await import("../client")
+// Needs a database; skipped when DATABASE_URL is unset. App modules are
+// imported in beforeAll so a skipped suite never loads them (env
+// validation would fail at collection time otherwise).
+const hasDatabase = Boolean(process.env.DATABASE_URL)
 
+describe.runIf(hasDatabase)("db client", () => {
+  let db: typeof import("../client").db
+
+  beforeAll(async () => {
+    ;({ db } = await import("../client"))
+  })
   afterAll(() => db.$disconnect())
 
   it("connects through the pooled URL", async () => {

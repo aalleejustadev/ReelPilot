@@ -1,15 +1,32 @@
 import { randomUUID } from "node:crypto"
 
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest"
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
 
 // Capture the email instead of sending it; everything else is real.
 const sendEmail = vi.fn()
 vi.mock("@/shared/email", () => ({ sendEmail }))
 
-// Runs against the real database; skipped in CI, where no .env exists.
-describe.skipIf(!process.env.DATABASE_URL)("magic link sign-in", async () => {
-  const { auth } = await import("../lib/auth")
-  const { db } = await import("@/shared/db")
+// Needs a database; skipped when DATABASE_URL is unset. App modules are
+// imported in beforeAll so a skipped suite never loads them (env
+// validation would fail at collection time otherwise).
+const hasDatabase = Boolean(process.env.DATABASE_URL)
+
+describe.runIf(hasDatabase)("magic link sign-in", () => {
+  let auth: typeof import("../lib/auth").auth
+  let db: typeof import("@/shared/db").db
+
+  beforeAll(async () => {
+    ;({ auth } = await import("../lib/auth"))
+    ;({ db } = await import("@/shared/db"))
+  })
 
   const email = `magic-link-test-${randomUUID()}@example.com`
 
