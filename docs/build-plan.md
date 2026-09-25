@@ -379,7 +379,7 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 
 ## 8. Data model (Prisma sketch)
 
-This is the original sketch. Implemented models live in `prisma/schema.prisma`, which is the source of truth for them (M0: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, plus `Workspace` and `Membership`). Each later slice expands its models from this sketch; keep the names.
+This is the original sketch. Implemented models live in `prisma/schema.prisma`, which is the source of truth for them (M0: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, plus `Workspace` and `Membership`; M1: `BrandKit`, `AllowedClaim`). Each later slice expands its models from this sketch; keep the names.
 
 ```prisma
 model User {

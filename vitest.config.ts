@@ -22,5 +22,9 @@ export default defineConfig({
     include: ["src/**/*.test.{ts,tsx}"],
     environment: "node",
     env,
+    // Database tests make several round trips to Neon per test (~300ms each
+    // from a laptop); 5s was too tight. CI's local Postgres is much faster.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
   },
 })

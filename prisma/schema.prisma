@@ -1,4 +1,5 @@
-// M0 models only. Each later slice adds its own models in its own migration.
+// Each slice adds its own models in its own migration (M0: auth, workspaces;
+// M1: brand kits).
 // Models are PascalCase; tables are lowercase plurals via @@map.
 
 generator client {
@@ -123,6 +124,7 @@ model Workspace {
 
   personalOwner User?        @relation("PersonalWorkspace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
   memberships   Membership[]
+  brandKits     BrandKit[]
 
   @@map("workspaces")
 }
@@ -140,4 +142,52 @@ model Membership {
   @@unique([userId, workspaceId])
   @@index([workspaceId])
   @@map("memberships")
+}
+
+// ─── Brand kits ─────────────────────────────────────────────────────────────
+// Everything the AI needs to know about a product (build plan §7.3). Field
+// shapes and limits are validated by features/brand-kits/schema.ts.
+
+model BrandKit {
+  id             String   @id @default(cuid())
+  workspaceId    String
+  name           String
+  url            String
+  // One-line description.
+  description    String   @default("")
+  audience       String   @default("")
+  features       String[]
+  pricingSummary String?
+  bannedWords    String[]
+  // Object key in the private media bucket; signed on read, never a URL.
+  logoKey        String?
+  // BrandColors: { primary?, secondary?, accent? } as #rrggbb.
+  colors         Json     @default("{}")
+  // BrandFonts: { heading?, body? } font family names.
+  fonts          Json     @default("{}")
+  tone           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  claims    AllowedClaim[]
+
+  @@index([workspaceId, createdAt])
+  @@map("brand_kits")
+}
+
+// A claim the product may make in ads. Numeric or guaranteed claims in
+// scripts must match one of these (compliance, M4).
+model AllowedClaim {
+  id         String  @id @default(cuid())
+  brandKitId String
+  // Order in the editor, from 0.
+  position   Int
+  text       String
+  sourceUrl  String?
+
+  brandKit BrandKit @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+
+  @@unique([brandKitId, position])
+  @@map("allowed_claims")
 }

@@ -2,6 +2,7 @@ export type AppErrorCode =
   | "NOT_FOUND"
   | "FORBIDDEN"
   | "INSUFFICIENT_CREDITS"
+  | "PLAN_LIMIT"
   | "COMPLIANCE_BLOCKED"
   | "PROVIDER_FAILED"
   | "RATE_LIMITED"

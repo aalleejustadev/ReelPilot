@@ -1,0 +1,44 @@
+import "server-only"
+
+import { db } from "@/shared/db"
+
+import { parseStoredColors, parseStoredFonts } from "./lib/kit-record"
+
+/** The workspace's kits, oldest first (the order they were created). */
+export async function listBrandKits(workspaceId: string) {
+  return db.brandKit.findMany({
+    where: { workspaceId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      id: true,
+      name: true,
+      url: true,
+      description: true,
+      logoKey: true,
+      updatedAt: true,
+    },
+  })
+}
+
+/** One kit with its claims in editor order, or null if not in this workspace. */
+export async function getBrandKit(workspaceId: string, kitId: string) {
+  const kit = await db.brandKit.findFirst({
+    where: { id: kitId, workspaceId },
+    include: {
+      claims: {
+        orderBy: { position: "asc" },
+        select: { text: true, sourceUrl: true },
+      },
+    },
+  })
+  if (!kit) return null
+  return {
+    ...kit,
+    colors: parseStoredColors(kit.colors),
+    fonts: parseStoredFonts(kit.fonts),
+  }
+}
+
+export type BrandKitDetail = NonNullable<
+  Awaited<ReturnType<typeof getBrandKit>>
+>
