@@ -55,6 +55,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Kokoro voice model (~90 MB), downloaded on first use.
+      - uses: actions/cache@v4
+        with:
+          path: .cache/models
+          key: kokoro-q8-v1
       - name: Start S3 server (SeaweedFS)
         run: |
           docker run -d --name s3 -p 8333:8333 \
@@ -96,6 +101,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Kokoro voice model (~90 MB), downloaded on first use.
+      - uses: actions/cache@v4
+        with:
+          path: .cache/models
+          key: kokoro-q8-v1
       - name: Start S3 server (SeaweedFS)
         run: |
           docker run -d --name s3 -p 8333:8333 \
