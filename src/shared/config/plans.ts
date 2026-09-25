@@ -21,7 +21,16 @@ export type PlanConfig = {
   extraSeatCentsPerMonth: number | null
   hdExport: boolean
   priorityQueue: boolean
+  footage: {
+    /** Largest file a user may upload or record. */
+    maxBytes: number
+    /** Longest clip, checked again on the real file by the worker. */
+    maxDurationSeconds: number
+    clipsPerBrandKit: number
+  }
 }
+
+const MB = 1024 * 1024
 
 export const plans = {
   FREE: {
@@ -34,6 +43,11 @@ export const plans = {
     extraSeatCentsPerMonth: null,
     hdExport: false,
     priorityQueue: false,
+    footage: {
+      maxBytes: 200 * MB,
+      maxDurationSeconds: 3 * 60,
+      clipsPerBrandKit: 5,
+    },
   },
   STARTER: {
     name: "Starter",
@@ -45,6 +59,11 @@ export const plans = {
     extraSeatCentsPerMonth: null,
     hdExport: true,
     priorityQueue: false,
+    footage: {
+      maxBytes: 500 * MB,
+      maxDurationSeconds: 5 * 60,
+      clipsPerBrandKit: 20,
+    },
   },
   GROWTH: {
     name: "Growth",
@@ -56,6 +75,11 @@ export const plans = {
     extraSeatCentsPerMonth: null,
     hdExport: true,
     priorityQueue: true,
+    footage: {
+      maxBytes: 1024 * MB,
+      maxDurationSeconds: 10 * 60,
+      clipsPerBrandKit: 50,
+    },
   },
   AGENCY: {
     name: "Agency",
@@ -67,6 +91,11 @@ export const plans = {
     extraSeatCentsPerMonth: 1500,
     hdExport: true,
     priorityQueue: true,
+    footage: {
+      maxBytes: 1024 * MB,
+      maxDurationSeconds: 10 * 60,
+      clipsPerBrandKit: 50,
+    },
   },
 } as const satisfies Record<PlanKey, PlanConfig>
 

@@ -1,5 +1,5 @@
 // Each slice adds its own models in its own migration (M0: auth, workspaces;
-// M1: brand kits, rate limit buckets).
+// M1: brand kits, rate limit buckets; M2: footage).
 // Models are PascalCase; tables are lowercase plurals via @@map.
 
 generator client {
@@ -125,6 +125,7 @@ model Workspace {
   personalOwner User?        @relation("PersonalWorkspace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
   memberships   Membership[]
   brandKits     BrandKit[]
+  footage       Footage[]
 
   @@map("workspaces")
 }
@@ -171,6 +172,7 @@ model BrandKit {
 
   workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   claims    AllowedClaim[]
+  footage   Footage[]
 
   @@index([workspaceId, createdAt])
   @@map("brand_kits")
@@ -203,4 +205,80 @@ model RateLimitBucket {
   windowStart DateTime
 
   @@map("rate_limit_buckets")
+}
+
+// ─── Footage ────────────────────────────────────────────────────────────────
+// Real product footage for ads (build plan §7.4). Files live in the media
+// bucket under workspaces/<workspaceId>/brand-kits/<brandKitId>/footage/<id>/.
+
+enum FootageStatus {
+  // Row created, file on its way from the browser to storage.
+  UPLOADING
+  // In storage; the worker is converting it and finding key moments.
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum FootageSource {
+  UPLOAD
+  RECORDING
+}
+
+enum MarkerSource {
+  // Found by scene detection.
+  AUTO
+  // Added by the user (in the editor, or "Mark moment" while recording).
+  MANUAL
+}
+
+model Footage {
+  id                  String        @id @default(cuid())
+  workspaceId         String
+  brandKitId          String
+  name                String
+  source              FootageSource
+  status              FootageStatus @default(UPLOADING)
+  // The file as uploaded, and what the worker makes from it.
+  originalKey         String
+  contentType         String
+  sizeBytes           Int
+  videoKey            String?
+  posterKey           String?
+  // One image with `thumbnailCount` frames side by side, one every
+  // `thumbnailIntervalMs`, for the marker timeline.
+  thumbnailsKey       String?
+  thumbnailCount      Int?
+  thumbnailIntervalMs Int?
+  durationMs          Int?
+  width               Int?
+  height              Int?
+  // User-safe reason when status is FAILED.
+  errorMessage        String?
+  processedAt         DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandKit  BrandKit        @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+  markers   FootageMarker[]
+
+  @@index([brandKitId, createdAt])
+  @@index([workspaceId])
+  @@index([status, createdAt])
+  @@map("footage")
+}
+
+model FootageMarker {
+  id        String       @id @default(cuid())
+  footageId String
+  atMs      Int
+  label     String?
+  source    MarkerSource
+  createdAt DateTime     @default(now())
+
+  footage Footage @relation(fields: [footageId], references: [id], onDelete: Cascade)
+
+  @@index([footageId, atMs])
+  @@map("footage_markers")
 }

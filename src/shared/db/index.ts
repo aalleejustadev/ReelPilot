@@ -1,9 +1,19 @@
 export { db } from "./client"
-export { MemberRole, Plan, UserRole, Prisma } from "./generated/client"
+export {
+  FootageSource,
+  FootageStatus,
+  MarkerSource,
+  MemberRole,
+  Plan,
+  Prisma,
+  UserRole,
+} from "./generated/client"
 export type {
   Account,
   AllowedClaim,
   BrandKit,
+  Footage,
+  FootageMarker,
   Membership,
   Session,
   User,
