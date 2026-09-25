@@ -841,7 +841,7 @@ Footage motion (§7.4a), owner-requested after M3.
 | Responsive | inspector stacks under the editor on narrow screens; checked at 375px |
 | Playwright | upload → Ready → select the cut → Dramatic → stage transform really turned → Solid background → reload keeps both → axe (112 e2e checks) |
 
-Not yet: the AI direction was tested with a mocked model only (no live run), and rendering the motion into the final video arrives with the Remotion compositions in M5 (they use the same `cameraTimeline`).
+Checked live with the real model: "Direct with AI" returned in 7.5s, chose a zoom-out intro and aimed a 2.2× zoom at a marker labelled "Export button (top right)" (focus 0.85, 0.15). Not yet: rendering the motion into the final video arrives with the Remotion compositions in M5 (they use the same `cameraTimeline`).
 
 ## 15. Environment variables (`.env.example`)
 
