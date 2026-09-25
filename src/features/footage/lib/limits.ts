@@ -41,3 +41,10 @@ export function tooLongMessage(plan: PlanKey) {
   const { maxDurationSeconds } = footageLimitsFor(plan)
   return `Your footage is longer than ${formatMinutes(maxDurationSeconds)}. Trim it or upload a shorter clip.`
 }
+
+/** "2 of 5 clips on the Free plan, up to 200 MB and 3 minutes each." */
+export function footageUsage(plan: PlanKey, clipCount: number) {
+  const { clipsPerBrandKit, maxBytes, maxDurationSeconds } =
+    footageLimitsFor(plan)
+  return `${clipCount} of ${clipsPerBrandKit} clips on the ${plans[plan].name} plan, up to ${formatBytes(maxBytes)} and ${formatMinutes(maxDurationSeconds)} each.`
+}

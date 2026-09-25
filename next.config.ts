@@ -12,11 +12,11 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   // Send only the origin to other sites, never full URLs.
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  // Features the app doesn't use yet. Screen recording (M2) will need
-  // display-capture=(self) and microphone=(self) added here.
+  // Only our own pages may capture the screen (footage recording, M2).
+  // Camera and microphone stay off: recordings have no sound.
   {
     key: "Permissions-Policy",
-    value: "camera=(), microphone=(), geolocation=(), display-capture=()",
+    value: "camera=(), microphone=(), geolocation=(), display-capture=(self)",
   },
 ]
 

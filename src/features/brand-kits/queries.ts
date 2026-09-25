@@ -1,5 +1,7 @@
 import "server-only"
 
+import { cache } from "react"
+
 import { db } from "@/shared/db"
 import { signedFileUrl } from "@/shared/storage"
 
@@ -21,8 +23,11 @@ export async function listBrandKits(workspaceId: string) {
   })
 }
 
-/** One kit with its claims in editor order, or null if not in this workspace. */
-export async function getBrandKit(workspaceId: string, kitId: string) {
+/**
+ * One kit with its claims in editor order, or null if not in this workspace.
+ * Cached per request: the kit layout and its pages both read it.
+ */
+export const getBrandKit = cache(async (workspaceId: string, kitId: string) => {
   const kit = await db.brandKit.findFirst({
     where: { id: kitId, workspaceId },
     include: {
@@ -38,7 +43,7 @@ export async function getBrandKit(workspaceId: string, kitId: string) {
     colors: parseStoredColors(kit.colors),
     fonts: parseStoredFonts(kit.fonts),
   }
-}
+})
 
 export type BrandKitDetail = NonNullable<
   Awaited<ReturnType<typeof getBrandKit>>

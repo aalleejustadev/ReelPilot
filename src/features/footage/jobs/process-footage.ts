@@ -62,15 +62,23 @@ export async function processFootage(
     if (!info) throw new UnusableFootage(messages.notVideo)
     const { maxDurationSeconds } = footageLimitsFor(clip.workspace.plan)
     // A second of slack for container rounding.
-    if (info.durationMs > maxDurationSeconds * 1000 + 1000) {
+    const isTooLong = (ms: number) => ms > maxDurationSeconds * 1000 + 1000
+    // Browser recordings (MediaRecorder WebM) often carry no duration, so
+    // the length is checked again on the converted file below.
+    if (isTooLong(info.durationMs)) {
       throw new UnusableFootage(tooLongMessage(clip.workspace.plan))
     }
-    if (info.durationMs < 1000) throw new UnusableFootage(messages.tooShort)
 
     const video = join(dir, "video.mp4")
     await convert(transcodeArgs(original, video), minutes(25), signal)
     const converted = await probeVideo(video, { signal })
     if (!converted) throw new UnusableFootage(messages.convertFailed)
+    if (isTooLong(converted.durationMs)) {
+      throw new UnusableFootage(tooLongMessage(clip.workspace.plan))
+    }
+    if (converted.durationMs < 1000) {
+      throw new UnusableFootage(messages.tooShort)
+    }
 
     const poster = join(dir, "poster.jpg")
     const strip = join(dir, "thumbnails.jpg")

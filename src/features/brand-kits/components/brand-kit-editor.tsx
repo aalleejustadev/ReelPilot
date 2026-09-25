@@ -133,18 +133,13 @@ export function BrandKitEditor({
   )
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 flex-col gap-2">
-          <h1 className="truncate text-2xl font-semibold tracking-tight md:text-3xl">
-            {kit.name}
-          </h1>
-          <p className="text-muted-foreground">
-            {readOnly
-              ? "You can view this brand kit. Ask an owner for editor access to change it."
-              : "What ReelPilot knows about your product. Every ad is written from this."}
-          </p>
-        </div>
+    <div className="flex max-w-3xl flex-col gap-8">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="text-muted-foreground">
+          {readOnly
+            ? "You can view this brand kit. Ask an owner for editor access to change it."
+            : "What ReelPilot knows about your product. Every ad is written from this."}
+        </p>
         {!readOnly && (
           <div className="flex gap-2">
             <DeleteKitButton kitId={kit.id} kitName={kit.name} />
