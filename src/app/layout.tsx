@@ -16,7 +16,7 @@ const fontMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: site.name,
+  title: { default: site.name, template: `%s · ${site.name}` },
   description: site.description,
 }
 

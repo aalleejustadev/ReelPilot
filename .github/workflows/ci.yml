@@ -19,7 +19,20 @@ jobs:
       - run: npm run typecheck
       - run: npx prettier --check "src/**/*.{ts,tsx}"
       - run: npm test
+      # Placeholder env: validation passes, nothing is secret or reachable.
+      # Deliberately not set on `npm test`, so database tests skip in CI.
       - run: npm run build
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          BETTER_AUTH_SECRET: ci-only-4f9c2a7e1b8d3c6f0a5e9b2d7c1f4a8e
+          BETTER_AUTH_URL: http://localhost:3100
+          GOOGLE_CLIENT_ID: ci
+          GOOGLE_CLIENT_SECRET: ci
+          GITHUB_CLIENT_ID: ci
+          GITHUB_CLIENT_SECRET: ci
+          RESEND_API_KEY: re_ci
+          EMAIL_FROM: ReelPilot <ci@example.com>
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
 
   e2e:
     runs-on: ubuntu-latest
@@ -32,6 +45,17 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: npm run test:e2e
+        env:
+          DATABASE_URL: postgresql://ci:ci@127.0.0.1:5432/ci
+          BETTER_AUTH_SECRET: ci-only-4f9c2a7e1b8d3c6f0a5e9b2d7c1f4a8e
+          BETTER_AUTH_URL: http://localhost:3100
+          GOOGLE_CLIENT_ID: ci
+          GOOGLE_CLIENT_SECRET: ci
+          GITHUB_CLIENT_ID: ci
+          GITHUB_CLIENT_SECRET: ci
+          RESEND_API_KEY: re_ci
+          EMAIL_FROM: ReelPilot <ci@example.com>
+          NEXT_PUBLIC_APP_URL: http://localhost:3100
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

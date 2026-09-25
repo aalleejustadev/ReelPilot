@@ -29,8 +29,8 @@ enum MemberRole {
 }
 
 // ─── Better Auth core tables ────────────────────────────────────────────────
-// Field names follow Better Auth's core schema; verify with
-// `npx auth@latest generate` whenever the auth config or plugins change.
+// Field names follow Better Auth's schema; verify with `npx auth@latest
+// generate` whenever the auth config or plugins change (see decisions.md).
 
 model User {
   id            String   @id
@@ -96,6 +96,16 @@ model Verification {
 
   @@index([identifier])
   @@map("verifications")
+}
+
+// Better Auth rate limiting (storage: "database").
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("rate_limits")
 }
 
 // ─── Workspaces ─────────────────────────────────────────────────────────────

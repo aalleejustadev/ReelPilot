@@ -41,3 +41,15 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-25 — Default shadcn components and variants only; styling comes from theme tokens. Restored button, input, toast, sheet, empty and badge to upstream (`shadcn add --overwrite`, owner-approved). Kept only the `use-mobile` lint fix. Supersedes the custom radius scale, type scale, `chroma` button variant and status badge variants.
 - 2026-09-25 — Status badges compose default variants: draft = secondary, failed = destructive, ready/rendering = outline + a chroma/tally dot.
 - 2026-09-25 — Contact sheet is a Card grid of 9:16 frames with a Checkbox per frame (the whole tile is a label), replacing the dark projector strip.
+- 2026-09-25 — Better Auth 1.7.6 with Prisma adapter; Google, GitHub and magic link. Hand-written core tables confirmed by `npx auth generate` (only `rateLimit` was missing). The CLI can't load files importing `server-only`; strip it temporarily, run, restore.
+- 2026-09-25 — Rate limits stored in the database (`rate_limits`), magic links limited to 3/minute — in-memory limits reset on serverless cold starts (security skill).
+- 2026-09-25 — Magic-link tokens stored hashed (`storeToken: "hashed"`), 5-minute expiry, single use.
+- 2026-09-25 — Account linking across Google, GitHub and magic link by email (owner approved) — one person, one account.
+- 2026-09-25 — `role` is a Better Auth additional field with `input: false` — sign-up can never set admin.
+- 2026-09-25 — Magic links are never logged, including in development (owner decision); tests capture them by mocking `sendEmail`.
+- 2026-09-25 — Emails rendered to HTML + plain text with `@react-email/components` and sent via `src/shared/email` — avoids Resend's optional `@react-email/render` peer and adds a text part.
+- 2026-09-25 — `proxy.ts` only checks the session cookie for app routes; `requireUser()` does the real check in every page and action (Next 16 docs).
+- 2026-09-25 — Navigation links styled as buttons use `cn(buttonVariants())` on `<Link>`, not `Button render` — Base UI gives rendered anchors role="button".
+- 2026-09-25 — `db:migrate` also runs `prisma generate` — Prisma 7's `migrate dev` no longer regenerates the client.
+- 2026-09-25 — CI sets placeholder env on build and e2e steps only, so env validation passes while database tests still skip.
+- 2026-09-25 — Home is a temporary hero + header (owner request) in `(marketing)`; `/dashboard` is a temporary signed-in page until Part F. Showcase removed (in git history).
