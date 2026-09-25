@@ -108,7 +108,7 @@ export function UserMenu({
     <DropdownMenu>
       {trigger}
       <DropdownMenuContent
-        className="w-72 p-1.5"
+        className="w-65 p-1.5"
         side={variant === "sidebar" && !isMobile ? "right" : "bottom"}
         align="end"
         sideOffset={8}
