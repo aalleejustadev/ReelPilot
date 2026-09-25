@@ -87,3 +87,4 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-25 — Accessibility is tested automatically: axe-core (`@axe-core/playwright`, dev only) scans every page and key states against WCAG 2.2 A/AA on desktop and mobile; keyboard tests cover sign-in, skip link, sidebar, user menu, tabs, focus ring and reduced motion.
 - 2026-09-25 — Mandatory accessibility edit to shadcn Tabs: inactive trigger text `text-foreground/60` → `text-muted-foreground` (4.36:1 → 5.0:1 on the tab track). No theme value can fix 60%-opacity ink on light grey.
 - 2026-09-25 — App layout has a "Skip to content" link (first tab stop, visible on focus) targeting `#main-content` below the top bar.
+- 2026-09-25 — One `ErrorFallback` for the app, root and global error boundaries; `global-error` loads its own styles and Geist (it replaces the root layout). Auth pages get a card-shaped loading skeleton. Verified with temporary throwing pages (removed).
