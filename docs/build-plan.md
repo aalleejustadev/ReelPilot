@@ -144,7 +144,7 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 | Validation | Zod | All inputs at the boundary |
 | Testing | Vitest (unit), Playwright (e2e) | |
 | Observability | Sentry + structured logs; per-render cost logging | |
-| Hosting | Vercel (web) | |
+| Hosting | **Hostinger** (Node.js) | Deployment is planned after M12; until then, development only |
 
 ---
 

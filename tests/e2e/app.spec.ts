@@ -1,6 +1,9 @@
 import { expect, hasDatabase, test } from "./fixtures"
 
-test.skip(!hasDatabase, "Signed-in tests need the real database in .env")
+test.skip(
+  !hasDatabase,
+  "Signed-in tests need a database (DATABASE_URL_UNPOOLED)"
+)
 
 const isMobile = (projectName: string) => projectName === "mobile"
 

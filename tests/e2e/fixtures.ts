@@ -6,11 +6,11 @@ import { serializeSignedCookie } from "better-call"
 import pg from "pg"
 
 /**
- * Signed-in tests need a real database. Locally that's .env; CI has only
- * placeholder env, so these tests skip there (like the DB unit tests).
+ * Signed-in tests need a real database: .env locally, a Postgres service
+ * container in CI. They skip only when no database is configured.
  */
-export const hasDatabase = existsSync(".env")
-if (hasDatabase) process.loadEnvFile(".env")
+if (existsSync(".env")) process.loadEnvFile(".env")
+export const hasDatabase = Boolean(process.env.DATABASE_URL_UNPOOLED)
 
 type TestUser = { id: string; name: string; email: string }
 
