@@ -16,6 +16,7 @@ neon checkout dev            # your dev branch; `--create` makes a new one
                              # and writes DATABASE_URL*, AWS_* into .env
 npm install                  # also generates the Prisma client
 npm run db:deploy            # apply migrations
+npx prisma db seed           # stock presenters (first run downloads the voice model, ~90 MB)
 npm run dev:all              # app + background worker
 ```
 

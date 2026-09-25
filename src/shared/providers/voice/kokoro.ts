@@ -1,8 +1,9 @@
 import "server-only"
 
 import { mkdtemp, rm } from "node:fs/promises"
+import { createRequire } from "node:module"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 
 import { voices } from "@/shared/config/voices"
 import { runFfmpeg } from "@/shared/media"
@@ -38,6 +39,26 @@ function loadModel() {
   return model
 }
 
+/**
+ * kokoro-js finds its voice files at `${__dirname}/../voices`, preferring a
+ * global `__dirname` when one exists, and Prisma's generated client sets
+ * one (pointing at src/shared/db/generated). While a voice loads, point the
+ * global at kokoro-js's own folder. Safe: syntheses run one at a time, and
+ * Prisma only reads its value when it first loads.
+ */
+const kokoroDist = dirname(createRequire(import.meta.url).resolve("kokoro-js"))
+async function withKokoroDirname<T>(task: () => Promise<T>) {
+  const scope = globalThis as { __dirname?: string }
+  const previous = scope.__dirname
+  scope.__dirname = kokoroDist
+  try {
+    return await task()
+  } finally {
+    if (previous === undefined) delete scope.__dirname
+    else scope.__dirname = previous
+  }
+}
+
 // One synthesis at a time: the model already uses every CPU core.
 let queue: Promise<unknown> = Promise.resolve()
 function oneAtATime<T>(task: () => Promise<T>): Promise<T> {
@@ -52,7 +73,9 @@ export const kokoroVoice: VoiceProvider = {
   synthesize: ({ text, voiceId, key }) =>
     oneAtATime(async () => {
       const tts = await loadModel()
-      const audio = await tts.generate(text, { voice: voiceId })
+      const audio = await withKokoroDirname(() =>
+        tts.generate(text, { voice: voiceId })
+      )
       const dir = await mkdtemp(join(tmpdir(), "reelpilot-voice-"))
       try {
         const wav = join(dir, "speech.wav")

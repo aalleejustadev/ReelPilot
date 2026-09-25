@@ -19,6 +19,9 @@ describe.runIf(hasStorage)("Kokoro voice", () => {
   let dir: string
 
   beforeAll(async () => {
+    // Load the database client first, as the worker and seed do: it sets a
+    // global __dirname that once sent kokoro-js to the wrong folder.
+    await import("@/shared/db")
     ;({ kokoroVoice: voice } = await import("../kokoro"))
     storage = await import("@/shared/storage")
     media = await import("@/shared/media")

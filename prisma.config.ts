@@ -6,6 +6,9 @@ export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
     path: "prisma/migrations",
+    // Stock presenters (portraits + voice samples). The react-server
+    // condition lets `server-only` modules load outside Next.
+    seed: "tsx --conditions=react-server prisma/seed.ts",
   },
   datasource: {
     // Migrations need Neon's direct (non-pooled) connection; PgBouncer's

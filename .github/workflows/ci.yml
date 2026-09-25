@@ -118,6 +118,8 @@ jobs:
       - run: npm run storage:cors -- --create-bucket
       - run: npx playwright install --with-deps chromium
       - run: npx prisma migrate deploy
+      # Stock presenters: portraits to the S3 server, voice samples by Kokoro.
+      - run: npx prisma db seed
       # Includes the signed-in tests (fixture creates users in this database).
       # Playwright starts the app and the job worker.
       - run: npm run test:e2e

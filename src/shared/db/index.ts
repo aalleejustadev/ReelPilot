@@ -15,6 +15,7 @@ export type {
   Footage,
   FootageMarker,
   Membership,
+  Presenter,
   Session,
   User,
   Verification,
