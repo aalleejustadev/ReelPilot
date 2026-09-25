@@ -13,8 +13,8 @@ export default async function AuthLayout({
   if (await getSession()) redirect("/dashboard")
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center p-4 sm:p-10">
-      <div className="flex w-full max-w-md flex-col gap-8">
+    <div className="flex min-h-svh w-full flex-col items-center justify-center px-4 py-6">
+      <div className="flex w-full max-w-md flex-col gap-6">
         <Link
           href="/"
           className="flex items-center gap-2.5 self-center text-lg font-semibold tracking-tight"

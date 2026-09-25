@@ -2,11 +2,8 @@ import Link from "next/link"
 
 import { getSession } from "@/features/auth"
 import { site } from "@/shared/config/site"
-import { cn } from "@/shared/lib/utils"
-import { buttonVariants } from "@/shared/ui/button"
+import { LinkButton } from "@/shared/ui/link-button"
 
-// Navigation uses real links styled as buttons (buttonVariants): Base UI
-// Button gives a rendered <a> role="button", which misleads screen readers.
 export async function SiteHeader() {
   const session = await getSession()
 
@@ -18,20 +15,13 @@ export async function SiteHeader() {
         </Link>
         <nav className="flex items-center gap-2">
           {session ? (
-            <Link href="/dashboard" className={cn(buttonVariants())}>
-              Dashboard
-            </Link>
+            <LinkButton href="/dashboard">Dashboard</LinkButton>
           ) : (
             <>
-              <Link
-                href="/sign-in"
-                className={cn(buttonVariants({ variant: "ghost" }))}
-              >
+              <LinkButton href="/sign-in" variant="ghost">
                 Sign in
-              </Link>
-              <Link href="/sign-up" className={cn(buttonVariants())}>
-                Sign up
-              </Link>
+              </LinkButton>
+              <LinkButton href="/sign-up">Sign up</LinkButton>
             </>
           )}
         </nav>

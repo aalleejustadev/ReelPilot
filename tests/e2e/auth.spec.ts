@@ -48,3 +48,38 @@ test("signed-out visitors are sent from the dashboard to sign-in", async ({
 
   await expect(page).toHaveURL(/\/sign-in$/)
 })
+
+for (const path of ["/sign-in", "/sign-up"]) {
+  test(`${path} has no horizontal scroll`, async ({ page }) => {
+    await page.goto(path)
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - window.innerWidth
+    )
+    expect(overflow).toBeLessThanOrEqual(0)
+  })
+}
+
+test("buttons show a pointer cursor", async ({ page }) => {
+  await page.goto("/sign-in")
+
+  const google = page.getByRole("button", { name: "Continue with Google" })
+  await expect(google).toHaveCSS("cursor", "pointer")
+})
+
+test("navigation buttons show a spinner while the next page loads", async ({
+  page,
+}) => {
+  await page.goto("/")
+  // Hold the navigation request so the pending state is observable.
+  await page.route("**/sign-up**", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await route.continue()
+  })
+  const signUp = page.getByRole("banner").getByRole("link", { name: "Sign up" })
+
+  await signUp.click()
+
+  await expect(signUp.locator('[data-slot="spinner"]')).toBeVisible()
+  await expect(page).toHaveURL(/\/sign-up$/)
+})

@@ -647,7 +647,7 @@ Editor
 ```
 
 ### 12.5 Components (`src/shared/ui`)
-Use **default shadcn components and variants**, styled only through the theme tokens in 12.2. Change a component's source only when it is mandatory (accessibility, a lint failure, a missing capability), and log the reason in `docs/decisions.md`.
+Use **default shadcn components and variants**, styled only through the theme tokens in 12.2. Every button shows a pointer cursor. Every button that starts async work shows a `Spinner` and is disabled until the work finishes; navigation that looks like a button uses `LinkButton` (`src/shared/ui/link-button.tsx`), which shows a spinner while the next page loads. Change a component's source only when it is mandatory (accessibility, a lint failure, a missing capability), and log the reason in `docs/decisions.md`.
 
 Button (primary/ink, secondary/outline, ghost, danger/tally), Input, Textarea, Select, Tabs, Dialog, Sheet, Toast, Tooltip, Badge (status: draft/rendering/ready/failed), CreditCost (inline cost chip shown before any spend), ProgressRing, EmptyState, PhoneFrame, VideoPlayer, ContactSheet + FrameTile, SegmentTimeline, ComplianceFlag (inline, with rewrite action), StepWizard, DataTable (admin), Avatar, WorkspaceSwitcher.
 

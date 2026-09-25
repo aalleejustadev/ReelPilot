@@ -54,3 +54,6 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-25 — CI sets placeholder env on build and e2e steps only, so env validation passes while database tests still skip.
 - 2026-09-25 — Home is a temporary hero + header (owner request) in `(marketing)`; `/dashboard` is a temporary signed-in page until Part F. Showcase removed (in git history).
 - 2026-09-25 — Auth pages follow shadcn login-03 with layout-only tweaks (owner asked for more space): 448px card, 24/32px card padding via `--card-spacing`, `lg` buttons and inputs at 40px, larger centred title, logo mark.
+- 2026-09-25 — Global `cursor: pointer` for enabled buttons, role="button" and checkboxes — Tailwind v4 resets buttons to the default cursor.
+- 2026-09-25 — Global `overflow-x: clip` on html/body as a safety net against sideways scrolling (clip keeps sticky working). Auth layout padding reduced so the card fits 1280×600 without scrolling.
+- 2026-09-25 — Loading states: async buttons use Spinner + disabled; navigation buttons use new `LinkButton` (Next `useLinkStatus`), which takes an icon *element* so server components can pass it.

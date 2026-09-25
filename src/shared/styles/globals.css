@@ -133,6 +133,19 @@
   html {
     @apply font-sans;
   }
+  /* Safety net: nothing may cause sideways scrolling. clip (not hidden)
+     keeps position: sticky working. */
+  html,
+  body {
+    overflow-x: clip;
+  }
+  /* Tailwind v4 resets buttons to cursor: default. Every enabled button,
+     checkbox and button-like element shows a pointer. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="checkbox"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
 }
 
 /* Motion (§12.6): respect reduced motion everywhere. */

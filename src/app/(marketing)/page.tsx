@@ -1,10 +1,8 @@
 import { ArrowRightIcon } from "lucide-react"
-import Link from "next/link"
 
 import { site } from "@/shared/config/site"
 import { Badge } from "@/shared/ui/badge"
-import { cn } from "@/shared/lib/utils"
-import { buttonVariants } from "@/shared/ui/button"
+import { LinkButton } from "@/shared/ui/link-button"
 
 // Temporary hero. The real landing page ships in M12.
 export default function HomePage() {
@@ -19,16 +17,17 @@ export default function HomePage() {
         product footage, with a presenter who sells it.
       </p>
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Link href="/sign-up" className={cn(buttonVariants({ size: "lg" }))}>
-          Get started free
-          <ArrowRightIcon data-icon="inline-end" />
-        </Link>
-        <Link
-          href="/sign-in"
-          className={cn(buttonVariants({ size: "lg", variant: "outline" }))}
+        <LinkButton
+          href="/sign-up"
+          size="lg"
+          icon={<ArrowRightIcon />}
+          iconPosition="end"
         >
+          Get started free
+        </LinkButton>
+        <LinkButton href="/sign-in" size="lg" variant="outline">
           Sign in
-        </Link>
+        </LinkButton>
       </div>
     </section>
   )
