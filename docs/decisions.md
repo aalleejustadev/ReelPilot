@@ -53,3 +53,4 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-25 — `db:migrate` also runs `prisma generate` — Prisma 7's `migrate dev` no longer regenerates the client.
 - 2026-09-25 — CI sets placeholder env on build and e2e steps only, so env validation passes while database tests still skip.
 - 2026-09-25 — Home is a temporary hero + header (owner request) in `(marketing)`; `/dashboard` is a temporary signed-in page until Part F. Showcase removed (in git history).
+- 2026-09-25 — Auth pages follow shadcn login-03 with layout-only tweaks (owner asked for more space): 448px card, 24/32px card padding via `--card-spacing`, `lg` buttons and inputs at 40px, larger centred title, logo mark.

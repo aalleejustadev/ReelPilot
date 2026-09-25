@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useState } from "react"
 
 import { site } from "@/shared/config/site"
+import { cn } from "@/shared/lib/utils"
 import { Alert, AlertDescription } from "@/shared/ui/alert"
 import { Button } from "@/shared/ui/button"
 import {
@@ -30,14 +31,19 @@ import { GitHubIcon, GoogleIcon } from "./provider-icons"
 const afterSignIn = "/dashboard"
 const onError = "/sign-in"
 
+// Layout only: roomier padding than the default card, and 40px controls.
+const cardLayout =
+  "[--card-spacing:--spacing(6)] sm:[--card-spacing:--spacing(8)]"
+const controlHeight = "h-10"
+
 type Pending = "google" | "github" | "email" | null
 
 const copy = {
   "sign-in": {
-    title: `Sign in to ${site.name}`,
-    description: "Use Google, GitHub or a sign-in link sent to your email.",
-    switchText: "New here?",
-    switchLink: { href: "/sign-up", label: "Create an account" },
+    title: "Welcome back",
+    description: `Sign in to ${site.name} to keep making ads.`,
+    switchText: "Don’t have an account?",
+    switchLink: { href: "/sign-up", label: "Sign up" },
   },
   "sign-up": {
     title: "Create your account",
@@ -97,11 +103,15 @@ export function SignInCard({
 
   if (sentTo) {
     return (
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <MailCheckIcon className="mb-2 text-muted-foreground" aria-hidden />
-          <CardTitle>Check your email</CardTitle>
-          <CardDescription>
+      <Card className={cardLayout}>
+        <CardHeader className="flex flex-col items-center gap-2 text-center">
+          <div className="mb-2 flex size-12 items-center justify-center rounded-full bg-muted">
+            <MailCheckIcon className="size-6" aria-hidden />
+          </div>
+          <CardTitle className="text-2xl font-semibold tracking-tight">
+            Check your email
+          </CardTitle>
+          <CardDescription className="text-base">
             We sent a sign-in link to{" "}
             <span className="font-medium text-foreground">{sentTo}</span>. It
             expires in 5 minutes.
@@ -110,7 +120,8 @@ export function SignInCard({
         <CardContent>
           <Button
             variant="outline"
-            className="w-full"
+            size="lg"
+            className={cn("w-full", controlHeight)}
             onClick={() => setSentTo(null)}
           >
             Use a different email
@@ -121,22 +132,28 @@ export function SignInCard({
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>{text.title}</CardTitle>
-        <CardDescription>{text.description}</CardDescription>
+    <Card className={cardLayout}>
+      <CardHeader className="gap-2 text-center">
+        <CardTitle className="text-2xl font-semibold tracking-tight">
+          {text.title}
+        </CardTitle>
+        <CardDescription className="text-base">
+          {text.description}
+        </CardDescription>
       </CardHeader>
       <CardContent>
-        <FieldGroup>
+        <FieldGroup className="gap-6">
           {error && (
             <Alert variant="destructive">
               <CircleAlertIcon />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <Field>
+          <Field className="gap-3">
             <Button
               variant="outline"
+              size="lg"
+              className={controlHeight}
               disabled={pending !== null}
               onClick={() => signInWith("google")}
             >
@@ -149,6 +166,8 @@ export function SignInCard({
             </Button>
             <Button
               variant="outline"
+              size="lg"
+              className={controlHeight}
               disabled={pending !== null}
               onClick={() => signInWith("github")}
             >
@@ -161,10 +180,10 @@ export function SignInCard({
             </Button>
           </Field>
           <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
-            or
+            Or continue with email
           </FieldSeparator>
           <form action={sendLink}>
-            <FieldGroup>
+            <FieldGroup className="gap-6">
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
                 <Input
@@ -173,11 +192,17 @@ export function SignInCard({
                   type="email"
                   autoComplete="email"
                   placeholder="you@yourapp.com"
+                  className={controlHeight}
                   required
                 />
               </Field>
-              <Field>
-                <Button type="submit" disabled={pending !== null}>
+              <Field className="gap-4">
+                <Button
+                  type="submit"
+                  size="lg"
+                  className={controlHeight}
+                  disabled={pending !== null}
+                >
                   {pending === "email" && <Spinner data-icon="inline-start" />}
                   Email me a sign-in link
                 </Button>

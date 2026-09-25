@@ -1,3 +1,4 @@
+import { ClapperboardIcon } from "lucide-react"
 import Link from "next/link"
 import { redirect } from "next/navigation"
 
@@ -12,11 +13,19 @@ export default async function AuthLayout({
   if (await getSession()) redirect("/dashboard")
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-4 sm:p-6">
-      <Link href="/" className="text-base font-semibold tracking-tight">
-        {site.name}
-      </Link>
-      {children}
+    <div className="flex min-h-svh flex-col items-center justify-center p-4 sm:p-10">
+      <div className="flex w-full max-w-md flex-col gap-8">
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 self-center text-lg font-semibold tracking-tight"
+        >
+          <span className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+            <ClapperboardIcon className="size-4" aria-hidden />
+          </span>
+          {site.name}
+        </Link>
+        {children}
+      </div>
     </div>
   )
 }
