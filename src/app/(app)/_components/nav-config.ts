@@ -1,4 +1,4 @@
-import { LayoutDashboardIcon, SettingsIcon } from "lucide-react"
+import { LayoutDashboardIcon, PaletteIcon, SettingsIcon } from "lucide-react"
 
 /**
  * Sidebar items: only pages that exist. Campaigns, Library, Brand kits and
@@ -7,6 +7,7 @@ import { LayoutDashboardIcon, SettingsIcon } from "lucide-react"
  */
 export const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
+  { title: "Brand kits", href: "/brand-kits", icon: PaletteIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
 ] as const
 
@@ -16,6 +17,7 @@ const pageTitles: { prefix: string; title: string }[] = [
   { prefix: "/settings/workspace", title: "Workspace" },
   { prefix: "/settings", title: "Settings" },
   { prefix: "/dashboard", title: "Dashboard" },
+  { prefix: "/brand-kits", title: "Brand kits" },
 ]
 
 export function titleFor(pathname: string) {

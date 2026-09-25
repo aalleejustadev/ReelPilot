@@ -1,6 +1,7 @@
 import "server-only"
 
 import { db } from "@/shared/db"
+import { signedFileUrl } from "@/shared/storage"
 
 import { parseStoredColors, parseStoredFonts } from "./lib/kit-record"
 
@@ -42,3 +43,8 @@ export async function getBrandKit(workspaceId: string, kitId: string) {
 export type BrandKitDetail = NonNullable<
   Awaited<ReturnType<typeof getBrandKit>>
 >
+
+/** A signed, one-hour link to a kit's logo (the bucket is private). */
+export async function logoUrlFor(logoKey: string | null) {
+  return logoKey ? signedFileUrl(logoKey, 60 * 60) : null
+}
