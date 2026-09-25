@@ -41,6 +41,10 @@ export const auth = betterAuth({
     // the same user when the email matches. Both providers return verified
     // emails, and a magic link proves ownership of the address.
     accountLinking: { enabled: true, trustedProviders: ["google", "github"] },
+    // Google/GitHub access and refresh tokens are stored AES-256-GCM
+    // encrypted (security skill). We don't call their APIs yet, but a
+    // database leak must not hand out working provider tokens.
+    encryptOAuthTokens: true,
   },
 
   session: {
