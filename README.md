@@ -26,7 +26,7 @@ npm run dev
 | `npm run db:migrate -- --name <name>` | Create and apply a migration, then regenerate the Prisma client |
 | `npm run db:deploy` | Apply existing migrations |
 | `npm run db:studio` | Browse the database |
-| `npm run test:e2e` | Playwright e2e (first run: `npx playwright install chromium`) |
+| `npm run test:e2e` | Playwright e2e (first run: `npx playwright install chromium`). Signed-in tests create a throwaway user and session in the database from `.env` and delete it afterwards; they skip when there's no `.env` (CI) |
 | `npm run format` | Prettier |
 
 ## Structure

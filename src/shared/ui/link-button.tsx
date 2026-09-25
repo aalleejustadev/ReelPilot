@@ -23,7 +23,8 @@ export function LinkButton({
   iconPosition = "start",
   className,
   children,
-}: {
+  ...linkProps
+}: Omit<React.ComponentProps<typeof Link>, "className" | "children"> & {
   href: string
   /** An icon element, e.g. <ArrowRightIcon />. Elements (not components)
    *  so server components can pass them. */
@@ -36,6 +37,7 @@ export function LinkButton({
     <Link
       href={href}
       className={cn(buttonVariants({ variant, size }), className)}
+      {...linkProps}
     >
       {iconPosition === "start" && <PendingIcon icon={icon} position="start" />}
       {children}

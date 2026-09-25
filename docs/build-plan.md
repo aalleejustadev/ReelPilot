@@ -178,6 +178,7 @@ src/features/<feature>/
 - `features/A` → may import `features/B/index.ts` and `shared/*`. No cycles.
 - `shared/*` → must not import from `features/*`.
 - Enforce with an ESLint rule (`eslint-plugin-boundaries` or `no-restricted-imports`).
+- A feature's `index.ts` may export server-only code, so **client components must not import another feature's index**. When a client component needs another feature's component, a server component renders it and passes it in as a prop or slot (e.g. the app layout passes `<SignOutMenuItem />` to the sidebar).
 
 ---
 
@@ -217,9 +218,10 @@ reelpilot/
 │   │   │   ├── library/page.tsx
 │   │   │   ├── presenters/page.tsx
 │   │   │   └── settings/
-│   │   │       ├── billing/page.tsx
-│   │   │       ├── team/page.tsx
-│   │   │       └── profile/page.tsx
+│   │   │       ├── profile/page.tsx      # name, email, sign out
+│   │   │       ├── workspace/page.tsx    # rename; plan and role
+│   │   │       ├── billing/page.tsx      # M6
+│   │   │       └── team/page.tsx         # [V1.1]
 │   │   ├── (admin)/admin/
 │   │   │   ├── page.tsx                  # overview
 │   │   │   ├── users/page.tsx
@@ -620,7 +622,7 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
-- **App shell:** left sidebar (Dashboard, Campaigns, Library, Brand kits, Presenters, Settings), top bar with workspace switcher and credit balance, content area on `--stage`.
+- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (M0: Dashboard, Settings) — add Campaigns, Library, Brand kits and Presenters as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher). Credit balance joins the top bar in M6; a workspace switcher arrives with teams (V1.1).
 - **Campaign page:** a **contact sheet** — a Card grid of 9:16 frames, each with a checkbox, hook text, status badge and angle; selected frames get a primary outline.
 - **Editor:** player on top (on `--projector`), segment timeline below, inspector on the right.
 - **Landing:** left-aligned hero with the URL input; to the right, a phone-frame player looping real example ads; below, one before/after (raw screen recording → finished ad).

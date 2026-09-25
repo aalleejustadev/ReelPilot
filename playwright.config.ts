@@ -25,6 +25,9 @@ export default defineConfig({
     command: `npm run build && npm run start -- --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
+    // Better Auth only accepts requests from BETTER_AUTH_URL's origin, so
+    // the test server must use its own port, not .env's localhost:3000.
+    env: { BETTER_AUTH_URL: baseURL, NEXT_PUBLIC_APP_URL: baseURL },
     timeout: 180_000,
   },
 })

@@ -103,3 +103,11 @@ test("magic link button shows a spinner while the link is being sent", async ({
   await expect(page.getByText("Check your email")).toBeVisible()
   await expect(page.getByText("test@example.com")).toBeVisible()
 })
+
+test("signed-out visitors are sent from settings to sign-in", async ({
+  page,
+}) => {
+  await page.goto("/settings/workspace")
+
+  await expect(page).toHaveURL(/\/sign-in$/)
+})
