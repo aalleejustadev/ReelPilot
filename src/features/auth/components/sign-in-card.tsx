@@ -80,8 +80,14 @@ export function SignInCard({
     }
   }
 
-  async function sendLink(formData: FormData) {
-    const email = String(formData.get("email") ?? "").trim()
+  // onSubmit, not <form action>: React runs form actions in a transition,
+  // which holds back setPending until the request finishes, so the spinner
+  // would never show.
+  async function sendLink(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const email = String(
+      new FormData(event.currentTarget).get("email") ?? ""
+    ).trim()
     setPending("email")
     setError(null)
     const { error } = await authClient.signIn.magicLink({
@@ -182,7 +188,7 @@ export function SignInCard({
           <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
             Or continue with email
           </FieldSeparator>
-          <form action={sendLink}>
+          <form onSubmit={sendLink}>
             <FieldGroup className="gap-6">
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>

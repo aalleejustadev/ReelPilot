@@ -83,3 +83,23 @@ test("navigation buttons show a spinner while the next page loads", async ({
   await expect(signUp.locator('[data-slot="spinner"]')).toBeVisible()
   await expect(page).toHaveURL(/\/sign-up$/)
 })
+
+test("magic link button shows a spinner while the link is being sent", async ({
+  page,
+}) => {
+  await page.goto("/sign-up")
+  // Hold the request, then fake success, so no real email is sent.
+  await page.route("**/api/auth/sign-in/magic-link", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 1000))
+    await route.fulfill({ json: { status: true } })
+  })
+  await page.getByLabel("Email").fill("test@example.com")
+  const submit = page.getByRole("button", { name: "Email me a sign-in link" })
+
+  await submit.click()
+
+  await expect(submit).toBeDisabled()
+  await expect(submit.locator('[data-slot="spinner"]')).toBeVisible()
+  await expect(page.getByText("Check your email")).toBeVisible()
+  await expect(page.getByText("test@example.com")).toBeVisible()
+})

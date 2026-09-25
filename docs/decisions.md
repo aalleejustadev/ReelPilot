@@ -57,3 +57,4 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-25 — Global `cursor: pointer` for enabled buttons, role="button" and checkboxes — Tailwind v4 resets buttons to the default cursor.
 - 2026-09-25 — Global `overflow-x: clip` on html/body as a safety net against sideways scrolling (clip keeps sticky working). Auth layout padding reduced so the card fits 1280×600 without scrolling.
 - 2026-09-25 — Loading states: async buttons use Spinner + disabled; navigation buttons use new `LinkButton` (Next `useLinkStatus`), which takes an icon *element* so server components can pass it.
+- 2026-09-25 — Magic-link form uses onSubmit, not `<form action>` — React 19 runs form actions in a transition, deferring setPending until the request finished, so the spinner never showed (owner-reported). E2e test reproduces it.
