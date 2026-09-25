@@ -5,6 +5,8 @@ import { parseEnv } from "../env-schema"
 const validEnv = {
   DATABASE_URL:
     "postgresql://user:pass@ep-x-pooler.neon.tech/db?sslmode=require",
+  DATABASE_URL_UNPOOLED:
+    "postgresql://user:pass@ep-x.neon.tech/db?sslmode=require",
   BETTER_AUTH_SECRET: "a".repeat(32),
   BETTER_AUTH_URL: "http://localhost:3000",
   GOOGLE_CLIENT_ID: "google-id",

@@ -16,7 +16,7 @@ neon checkout dev            # your dev branch; `--create` makes a new one
                              # and writes DATABASE_URL*, AWS_* into .env
 npm install                  # also generates the Prisma client
 npm run db:deploy            # apply migrations
-npm run dev
+npm run dev:all              # app + background worker
 ```
 
 Development runs on the Neon `dev` branch; `production` is left alone until deployment (after M12). Files live in the `media` bucket declared in `neon.ts`; change it there and run `neon deploy`.
@@ -26,6 +26,8 @@ Development runs on the Neon `dev` branch; `production` is left alone until depl
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start the dev server |
+| `npm run worker` | Start the job worker (pg-boss queue; ffmpeg is bundled) |
+| `npm run dev:all` | Dev server and worker together (worker restarts on change) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint, including slice-boundary rules |
 | `npm run typecheck` | TypeScript, no emit |

@@ -30,6 +30,26 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // The worker may also import a feature's `jobs` entry (its job handlers),
+    // because the feature's index.ts carries UI code the worker must not load.
+    files: ["src/worker/**"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            noAppImports,
+            {
+              group: ["@/features/*/*", "!@/features/*/jobs"],
+              message:
+                "The worker imports features only via '@/features/<name>/jobs'.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["src/shared/**"],
     rules: {
       "no-restricted-imports": [

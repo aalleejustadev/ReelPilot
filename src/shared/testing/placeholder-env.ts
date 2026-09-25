@@ -6,6 +6,7 @@
 export function fillPlaceholderEnv() {
   const placeholders = {
     DATABASE_URL: "postgresql://u:p@localhost/db",
+    DATABASE_URL_UNPOOLED: "postgresql://u:p@localhost/db",
     BETTER_AUTH_SECRET: "a".repeat(32),
     BETTER_AUTH_URL: "http://localhost:3000",
     GOOGLE_CLIENT_ID: "x",

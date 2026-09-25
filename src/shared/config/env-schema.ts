@@ -5,9 +5,11 @@ import { z } from "zod"
  * and mirror it in .env.example.
  */
 const envSchema = z.object({
-  // Neon pooled connection for app traffic. Migrations use the direct
-  // DATABASE_URL_UNPOOLED, which only the Prisma CLI reads.
+  // Neon pooled connection for app traffic.
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),
+  // Direct connection: Prisma migrations and the pg-boss job queue (it takes
+  // advisory locks, which PgBouncer's transaction mode doesn't keep).
+  DATABASE_URL_UNPOOLED: z.url({ protocol: /^postgres(ql)?$/ }),
 
   BETTER_AUTH_SECRET: z
     .string()

@@ -305,7 +305,9 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 ### 7.4 footage
 - **Purpose:** Real product footage for ads.
 - **Input:** file upload (mp4/mov/webm, size cap by plan) or in-browser screen recording (MediaRecorder + Screen Capture API) with a guided prompt.
-- **Processing job:** transcode to normalized mp4, generate thumbnails, detect key moments (click events captured during in-browser recording; scene changes for uploads), store markers.
+- **Processing job:** transcode to normalized mp4 (audio removed; ads get a voiceover), generate thumbnails, detect key moments (scene changes for uploads and recordings, plus moments the user marks while recording), store markers.
+- **Recording key moments (owner decision 2026-09-25):** a browser can't see clicks in other tabs or apps, so recordings use scene detection plus a floating "Mark moment" button (Document Picture-in-Picture, Chrome/Edge; others get scene detection only). No microphone.
+- **Where it lives:** a Footage tab on each brand kit (`/brand-kits/[kitId]/footage`), clip page `/brand-kits/[kitId]/footage/[footageId]`.
 - **Acceptance:** Upload and recording both produce a playable clip with thumbnails and at least auto-detected markers; users can add/remove markers.
 
 ### 7.5 presenters
@@ -842,7 +844,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [x] Voice: self-hosted Kokoro (2026-09-23).
 - [ ] Avatar provider bake-off — `[V1.1]`.
 - [ ] Stock presenter portrait source. `TODO(owner)`
-- [ ] Footage size/length caps per plan. `TODO(owner)`
+- [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
 - [ ] Legal review of Terms, Privacy, AI disclosure. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
 - [x] Hosting: Hostinger (Node.js), deployment after M12 (2026-09-25).
