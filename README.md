@@ -8,11 +8,18 @@ Turn your app into scroll-stopping video ads in minutes.
 ## Getting started
 
 ```bash
-cp .env.example .env         # fill in values
+cp .env.example .env         # fill in the non-Neon values
+npm i -g neon && neon login  # Neon CLI, once per machine
+neon link --project-id <id> --no-env-pull -y
+neon checkout dev            # your dev branch; `--create` makes a new one
+                             # (applies neon.ts: the private `media` bucket)
+                             # and writes DATABASE_URL*, AWS_* into .env
 npm install                  # also generates the Prisma client
 npm run db:deploy            # apply migrations
 npm run dev
 ```
+
+Development runs on the Neon `dev` branch; `production` is left alone until deployment (after M12). Files live in the `media` bucket declared in `neon.ts`; change it there and run `neon deploy`.
 
 ## Scripts
 
@@ -22,7 +29,7 @@ npm run dev
 | `npm run build` | Production build |
 | `npm run lint` | ESLint, including slice-boundary rules |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit tests; database tests run when `DATABASE_URL` is set |
+| `npm test` | Vitest unit tests; database tests run when `DATABASE_URL` is set, the live storage test when `NEON_BRANCH` is set |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run db:migrate -- --name <name>` | Create and apply a migration, then regenerate the Prisma client |
 | `npm run db:deploy` | Apply existing migrations |
@@ -39,7 +46,7 @@ Organized by feature (vertical slices), not by layer — see build plan §5–6.
 src/
 ├── app/        # thin routes only
 ├── features/   # one folder per slice; import only via its index.ts
-└── shared/     # feature-agnostic: ui, config, db, lib, styles
+└── shared/     # feature-agnostic: ui, config, db, ai, storage, lib, styles
 prisma/         # schema.prisma + migrations
 ```
 

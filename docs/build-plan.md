@@ -66,7 +66,7 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 ### 2.1 Credit rules
 - **1 ad credit** = one final HD render of one variant, up to 30 seconds, in all three aspect ratios.
 - **Previews (animatics) are free** within a fair-use cap (Starter 40/mo, Growth 120/mo, Agency 400/mo). A preview is a low-cost storyboard: presenter still frame + synthesized voice + real footage + captions. No avatar video generation.
-- **Free edits** (0 credits): captions, text overlays, trims, clip reordering, footage swaps, music, layout changes.
+- **Free edits** (0 credits): captions, text overlays, trims, clip reordering, footage swaps, layout changes. (Music arrives with the music library in `[V1.1]`.)
 - **Segment re-voice** (0.25 credit): rewriting one spoken line regenerates only that segment.
 - **Rollover:** unused credits roll over one month, capped at one month's allowance.
 - **Top-ups:** packs of 5 ad credits. `TODO(owner)`: price.
@@ -351,7 +351,7 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 ### 7.9 editor
 - **Purpose:** Fix a variant without starting over.
 - **UI:** preview player + horizontal segment timeline; inspector panel for the selected segment.
-- **Free edits:** captions, overlay text, trim, reorder, swap footage clip/marker, layout, caption style, music.
+- **Free edits:** captions, overlay text, trim, reorder, swap footage clip/marker, layout, caption style. Music is `[V1.1]` (music library).
 - **Paid edit:** rewrite a spoken line → 0.25 credit segment re-voice (cost shown before confirming).
 - **Compare:** two variants side by side, synced playback.
 - **Acceptance:** Free edits re-compose without spending credits; re-voice spends exactly 0.25 and regenerates one segment; compare works.
@@ -712,8 +712,8 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | # | Milestone | Slices | Outcome |
 |---|---|---|---|
 | M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
-| M1 | Brand kit | brand-kits (+ URL extraction) | Create and edit a kit from a URL |
-| M2 | Footage | footage | Upload/record footage with markers |
+| M1 | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo |
+| M2 | Footage | footage (reuses M1 storage) | Upload/record footage with markers |
 | M3 | Presenters | presenters (stock), Kokoro voice in the worker | Choose a stock presenter and hear its voice |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
@@ -791,7 +791,7 @@ AI_TEXT_PROVIDER=
 AI_TEXT_MODEL=
 ANTHROPIC_API_KEY=
 
-# Neon Object Storage (from M2). Don't fill by hand: `neon env pull` writes these
+# Neon Object Storage (from M1). Don't fill by hand: `neon env pull` writes these
 AWS_ACCESS_KEY_ID=
 AWS_SECRET_ACCESS_KEY=
 AWS_ENDPOINT_URL_S3=
@@ -829,6 +829,8 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
 - [x] Hosting: Hostinger (Node.js), deployment after M12 (2026-09-25).
 - [ ] Color tuning. `TODO(owner)`
+- [x] Storage setup moves into M1 for logo uploads (2026-09-25).
+- [x] Music dropped from the V1 editor; it arrives with the V1.1 music library (2026-09-25).
 
 ✏️ Owner notes (general):
 >

@@ -20,13 +20,19 @@
     "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.63",
+    "@aws-sdk/client-s3": "^3.1140.0",
+    "@aws-sdk/s3-presigned-post": "^3.1140.0",
+    "@aws-sdk/s3-request-presigner": "^3.1140.0",
     "@base-ui/react": "^1.8.0",
     "@prisma/adapter-pg": "^7.10.0",
     "@prisma/client": "^7.10.0",
     "@react-email/components": "^1.0.12",
+    "ai": "^7.0.114",
     "better-auth": "^1.7.6",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
+    "files-sdk": "^2.6.0",
     "lucide-react": "^1.47.0",
     "next": "16.3.6",
     "pg": "^8.23.0",
@@ -40,6 +46,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",
+    "@neon/config": "^1.7.3",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

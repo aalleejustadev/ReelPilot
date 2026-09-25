@@ -13,6 +13,13 @@ const validEnv = {
   GITHUB_CLIENT_SECRET: "github-secret",
   RESEND_API_KEY: "re_123",
   EMAIL_FROM: "ReelPilot <hello@example.com>",
+  AI_TEXT_PROVIDER: "anthropic",
+  AI_TEXT_MODEL: "claude-sonnet-5",
+  ANTHROPIC_API_KEY: "sk-ant-123",
+  AWS_ACCESS_KEY_ID: "key-id",
+  AWS_SECRET_ACCESS_KEY: "secret",
+  AWS_ENDPOINT_URL_S3: "https://storage.example.com",
+  AWS_REGION: "us-east-2",
   NEXT_PUBLIC_APP_URL: "http://localhost:3000",
 }
 
@@ -50,5 +57,30 @@ describe("parseEnv", () => {
     expect(() =>
       parseEnv({ ...validEnv, DATABASE_URL: "mysql://user:pass@host/db" })
     ).toThrow(/DATABASE_URL/)
+  })
+
+  it("rejects an AI provider the registry doesn't know", () => {
+    expect(() =>
+      parseEnv({ ...validEnv, AI_TEXT_PROVIDER: "sk-ant-oops" })
+    ).toThrow(/AI_TEXT_PROVIDER/)
+  })
+
+  it("rejects an Anthropic key in the wrong format without echoing it", () => {
+    const key = "not-an-anthropic-key"
+
+    expect(() => parseEnv({ ...validEnv, ANTHROPIC_API_KEY: key })).toThrow(
+      /ANTHROPIC_API_KEY/
+    )
+    try {
+      parseEnv({ ...validEnv, ANTHROPIC_API_KEY: key })
+    } catch (error) {
+      expect(String(error)).not.toContain(key)
+    }
+  })
+
+  it("requires the storage variables", () => {
+    expect(() =>
+      parseEnv({ ...validEnv, AWS_ENDPOINT_URL_S3: undefined })
+    ).toThrow(/AWS_ENDPOINT_URL_S3/)
   })
 })

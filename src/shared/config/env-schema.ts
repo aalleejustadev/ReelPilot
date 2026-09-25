@@ -24,6 +24,18 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().startsWith("re_"),
   EMAIL_FROM: z.string().min(1),
 
+  // AI text through the Vercel AI SDK registry (src/shared/ai). Add a
+  // provider here and in the registry together, with its own key below.
+  AI_TEXT_PROVIDER: z.enum(["anthropic"]),
+  AI_TEXT_MODEL: z.string().min(1),
+  ANTHROPIC_API_KEY: z.string().startsWith("sk-ant-"),
+
+  // Neon Object Storage for the linked branch. Written by `neon env pull`.
+  AWS_ACCESS_KEY_ID: z.string().min(1),
+  AWS_SECRET_ACCESS_KEY: z.string().min(1),
+  AWS_ENDPOINT_URL_S3: z.url(),
+  AWS_REGION: z.string().min(1),
+
   NEXT_PUBLIC_APP_URL: z.url(),
 })
 

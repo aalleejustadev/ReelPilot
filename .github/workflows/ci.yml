@@ -7,7 +7,8 @@ on:
 
 # Shared by both jobs. Only DATABASE_URL points somewhere real (the Postgres
 # service container below); everything else is a placeholder that passes env
-# validation. The e2e tests never contact Google, GitHub or Resend.
+# validation. Tests never contact Google, GitHub, Resend, Anthropic or Neon
+# storage.
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reelpilot
   DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/reelpilot
@@ -19,6 +20,14 @@ env:
   GITHUB_CLIENT_SECRET: ci
   RESEND_API_KEY: re_ci
   EMAIL_FROM: ReelPilot <ci@example.com>
+  AI_TEXT_PROVIDER: anthropic
+  AI_TEXT_MODEL: ci
+  ANTHROPIC_API_KEY: sk-ant-ci
+  # Storage placeholders: the live bucket test skips without NEON_BRANCH.
+  AWS_ACCESS_KEY_ID: ci
+  AWS_SECRET_ACCESS_KEY: ci
+  AWS_ENDPOINT_URL_S3: https://storage.invalid
+  AWS_REGION: us-east-2
   NEXT_PUBLIC_APP_URL: http://localhost:3100
 
 jobs:
