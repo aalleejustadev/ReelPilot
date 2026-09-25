@@ -711,7 +711,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 
 | # | Milestone | Slices | Outcome |
 |---|---|---|---|
-| M0 | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied |
+| M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
 | M1 | Brand kit | brand-kits (+ URL extraction) | Create and edit a kit from a URL |
 | M2 | Footage | footage | Upload/record footage with markers |
 | M3 | Presenters | presenters (stock), Kokoro voice in the worker | Choose a stock presenter and hear its voice |
@@ -738,6 +738,25 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 - [ ] Decisions logged in `docs/decisions.md`
 
 ---
+
+### 14.2 M0 completion record (2026-09-25)
+How M0 meets each Definition of Done item — use the same bar for every later milestone.
+
+| Item | Evidence |
+|---|---|
+| Prisma models + migration | `users`, `sessions`, `accounts`, `verifications`, `rate_limits`, `workspaces`, `memberships`; 3 migrations, applied from scratch in CI |
+| Zod schemas | env (`env-schema.ts`), profile name, workspace name |
+| Service logic with unit tests | `workspaces/service.ts` (race-safe personal workspace), permissions matrix, auth error mapping, email template — 75 unit/integration tests |
+| Server actions validated, authorized, scoped | `renameWorkspace` (reference), `updateProfile`; tested against a real database incl. redirect pass-through |
+| UI from `shared/ui` + tokens | shadcn `base-vega` defaults; only documented edits (Button padding, Tabs contrast) |
+| Loading, empty, error states | skeletons (app, auth), dashboard empty state, shared `ErrorFallback` (app, root, global), not-found |
+| Accessible | axe WCAG 2.2 A/AA scans on every page and key states; keyboard tests; skip link; visible focus; reduced motion |
+| Responsive to 375px | every e2e test runs on desktop and a 375px mobile device; no horizontal scroll checks |
+| Playwright happy path | sign-in pages, signed-in shell, settings, sign-out, user menus, tabs (78 e2e checks) |
+| Decisions logged | `docs/decisions.md` |
+| CI | lint, types, format, unit, build, e2e against a `postgres:17` service on every push |
+
+Still manual (can't be automated without real provider accounts): sign-in with Google, GitHub and a real magic-link email.
 
 ## 15. Environment variables (`.env.example`)
 
@@ -808,6 +827,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [ ] Footage size/length caps per plan. `TODO(owner)`
 - [ ] Legal review of Terms, Privacy, AI disclosure. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
+- [x] Hosting: Hostinger (Node.js), deployment after M12 (2026-09-25).
 - [ ] Color tuning. `TODO(owner)`
 
 ✏️ Owner notes (general):
