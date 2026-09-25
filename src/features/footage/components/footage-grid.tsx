@@ -1,4 +1,9 @@
-import { AlertCircleIcon, FilmIcon, MonitorIcon } from "lucide-react"
+import {
+  AlertCircleIcon,
+  FilmIcon,
+  MonitorIcon,
+  UploadIcon,
+} from "lucide-react"
 import Link from "next/link"
 
 import { Badge } from "@/shared/ui/badge"
@@ -23,23 +28,58 @@ const statusLabel = {
   FAILED: "Failed",
 } as const
 
+/** Sits on the poster, so every variant has a solid fill. */
 function StatusBadge({ status }: { status: FootageCard["status"] }) {
-  if (status === "READY") {
-    return (
-      <Badge variant="outline">
-        <span aria-hidden className="size-2 rounded-full bg-chroma" />
-        {statusLabel[status]}
-      </Badge>
-    )
-  }
   if (status === "FAILED") {
     return <Badge variant="destructive">{statusLabel[status]}</Badge>
   }
   return (
     <Badge variant="secondary">
-      <Spinner data-icon="inline-start" />
+      {status === "READY" ? (
+        <span aria-hidden className="size-2 rounded-full bg-chroma" />
+      ) : (
+        <Spinner data-icon="inline-start" />
+      )}
       {statusLabel[status]}
     </Badge>
+  )
+}
+
+/** "Screen recording · 0:32 · 3 key moments" */
+function ClipDetails({ clip }: { clip: FootageCard }) {
+  const parts: React.ReactNode[] = []
+  if (clip.durationMs !== null) {
+    parts.push(
+      <span key="duration" className="font-mono">
+        {formatDuration(clip.durationMs)}
+      </span>
+    )
+  }
+  if (clip.status === "READY") {
+    const count = clip._count.markers
+    parts.push(
+      <span key="moments">
+        {count} key {count === 1 ? "moment" : "moments"}
+      </span>
+    )
+  } else if (clip.status !== "FAILED") {
+    parts.push(<span key="working">Finding key moments…</span>)
+  }
+
+  const SourceIcon = clip.source === "RECORDING" ? MonitorIcon : UploadIcon
+  return (
+    <CardDescription className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span className="flex items-center gap-1.5">
+        <SourceIcon aria-hidden className="size-4 shrink-0" />
+        {clip.source === "RECORDING" ? "Screen recording" : "Upload"}
+      </span>
+      {parts.map((part, index) => (
+        <span key={index} className="flex items-center gap-2">
+          <span aria-hidden>·</span>
+          {part}
+        </span>
+      ))}
+    </CardDescription>
   )
 }
 
@@ -56,7 +96,7 @@ export function FootageGrid({
       {clips.map((clip) => (
         <li key={clip.id} className="flex">
           <Card className="relative w-full gap-0 overflow-hidden pt-0 transition-shadow hover:shadow-md has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/50">
-            <div className="flex aspect-video items-center justify-center bg-muted">
+            <div className="relative flex aspect-video items-center justify-center bg-muted">
               {clip.posterUrl ? (
                 // Signed, short-lived storage URL (see brand-kits LogoField).
                 // eslint-disable-next-line @next/next/no-img-element
@@ -73,42 +113,24 @@ export function FootageGrid({
               ) : (
                 <FilmIcon aria-hidden className="text-muted-foreground" />
               )}
-            </div>
-            <CardHeader className="pt-4">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="min-w-0 truncate">
-                  {/* The link covers the whole card. */}
-                  <Link
-                    href={`/brand-kits/${kitId}/footage/${clip.id}`}
-                    className="outline-none after:absolute after:inset-0"
-                  >
-                    {clip.name}
-                  </Link>
-                </CardTitle>
+              <div className="absolute top-3 left-3">
                 <StatusBadge status={clip.status} />
               </div>
-              <CardDescription className="flex items-center gap-2">
-                {clip.source === "RECORDING" && (
-                  <MonitorIcon
-                    aria-label="Screen recording"
-                    className="size-4"
-                  />
-                )}
-                {clip.durationMs !== null && (
-                  <span className="font-mono">
-                    {formatDuration(clip.durationMs)}
-                  </span>
-                )}
-                {clip.status === "READY" && (
-                  <span>
-                    {clip._count.markers} key{" "}
-                    {clip._count.markers === 1 ? "moment" : "moments"}
-                  </span>
-                )}
-              </CardDescription>
+            </div>
+            <CardHeader className="gap-2 pt-5">
+              <CardTitle className="line-clamp-2 leading-snug break-words">
+                {/* The link covers the whole card. */}
+                <Link
+                  href={`/brand-kits/${kitId}/footage/${clip.id}`}
+                  className="outline-none after:absolute after:inset-0"
+                >
+                  {clip.name}
+                </Link>
+              </CardTitle>
+              <ClipDetails clip={clip} />
             </CardHeader>
             {clip.status === "FAILED" && clip.errorMessage && (
-              <CardContent className="pt-2">
+              <CardContent className="pt-3">
                 <p className="text-sm text-destructive">{clip.errorMessage}</p>
               </CardContent>
             )}

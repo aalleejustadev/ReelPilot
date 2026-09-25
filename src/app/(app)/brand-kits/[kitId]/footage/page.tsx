@@ -67,7 +67,7 @@ export default async function FootagePage({
                 {footageUsage(workspace.plan, clips.length)}
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 sm:flex-row sm:items-start">
+            <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <ScreenRecorder
                 kitId={kitId}
                 maxBytes={limits.maxBytes}

@@ -74,7 +74,9 @@ export function FootageUploader({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    // Button and progress are separate items so the parent's layout can put
+    // the progress bar on its own full-width row.
+    <>
       <input
         ref={inputRef}
         type="file"
@@ -98,7 +100,7 @@ export function FootageUploader({
         Upload video
       </Button>
       {upload && (
-        <div className="flex items-end gap-2">
+        <div className="flex basis-full items-end gap-2">
           <Progress
             value={Math.round(upload.progress * 100)}
             className="flex-1"
@@ -119,6 +121,6 @@ export function FootageUploader({
           </Button>
         </div>
       )}
-    </div>
+    </>
   )
 }
