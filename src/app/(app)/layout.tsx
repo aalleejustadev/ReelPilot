@@ -2,6 +2,8 @@ import { cookies } from "next/headers"
 
 import { SignOutMenuItem } from "@/features/auth"
 import { getCurrentWorkspace } from "@/features/workspaces"
+import { cn } from "@/shared/lib/utils"
+import { buttonVariants } from "@/shared/ui/button"
 import { SidebarInset, SidebarProvider } from "@/shared/ui/sidebar"
 
 import { AppHeader } from "./_components/app-header"
@@ -26,21 +28,37 @@ export default async function AppLayout({
   const signOutItem = <SignOutMenuItem className={userMenuItemClass} />
 
   return (
-    <SidebarProvider defaultOpen={sidebarOpen}>
-      <AppSidebar
-        workspaceName={workspace.name}
-        user={menuUser}
-        signOutItem={signOutItem}
-      />
-      <SidebarInset>
-        <AppHeader user={menuUser} signOutItem={signOutItem} />
-        <div className="flex flex-1 flex-col p-6 md:p-8">
-          {/* Centred column; text stays left-aligned. */}
-          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
-            {children}
+    <>
+      {/* First tab stop: jumps past the sidebar and top bar (WCAG 2.4.1). */}
+      <a
+        href="#main-content"
+        className={cn(
+          buttonVariants(),
+          "sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50"
+        )}
+      >
+        Skip to content
+      </a>
+      <SidebarProvider defaultOpen={sidebarOpen}>
+        <AppSidebar
+          workspaceName={workspace.name}
+          user={menuUser}
+          signOutItem={signOutItem}
+        />
+        <SidebarInset>
+          <AppHeader user={menuUser} signOutItem={signOutItem} />
+          <div
+            id="main-content"
+            tabIndex={-1}
+            className="flex flex-1 flex-col p-6 outline-none md:p-8"
+          >
+            {/* Centred column; text stays left-aligned. */}
+            <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+              {children}
+            </div>
           </div>
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </>
   )
 }
