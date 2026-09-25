@@ -113,11 +113,7 @@ describe.runIf(hasDatabase)("brand kit actions", () => {
     await db.user.delete({ where: { id: userId } })
   })
 
-  const fromUrl = (url: string) => {
-    const formData = new FormData()
-    formData.set("url", url)
-    return actions.createBrandKitFromUrl(null, formData)
-  }
+  const fromUrl = (url: string) => actions.createBrandKitFromUrl(url)
 
   async function createKit() {
     const result = await fromUrl("acme.app")

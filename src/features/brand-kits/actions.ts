@@ -47,11 +47,10 @@ export type CreatedKit = { kitId: string; isComplete: boolean }
  * Limits are checked before the AI call so a full plan never spends one.
  */
 export async function createBrandKitFromUrl(
-  _previous: Result<CreatedKit> | null,
-  formData: FormData
+  url: unknown
 ): Promise<Result<CreatedKit>> {
   try {
-    const parsed = createFromUrlSchema.safeParse({ url: formData.get("url") })
+    const parsed = createFromUrlSchema.safeParse({ url })
     if (!parsed.success) throw invalid(parsed.error, "Check the address.")
 
     const { workspace } = await requireWorkspaceAccess("content:create")

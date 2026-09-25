@@ -765,16 +765,16 @@ Brand kits, built in parts A–F (A: storage + AI setup, B: data model, C: URL e
 |---|---|
 | Prisma models + migration | `brand_kits`, `allowed_claims` (M1), `rate_limit_buckets`; 5 migrations on the Neon `dev` branch and from scratch in CI |
 | Zod schemas | every kit field with limits (`brandKitLimits`), website URL normalization, claim links, hex colours; action inputs; AI draft schema; AI and storage env |
-| Service logic with unit tests | race-safe plan limit (workspace row lock), workspace-scoped CRUD, SSRF-safe fetch, page reader, AI draft + partial fallback, logo sniffing, rate limiter — 220 unit/integration tests |
+| Service logic with unit tests | race-safe plan limit (workspace row lock), workspace-scoped CRUD, SSRF-safe fetch, page reader, AI draft + partial fallback, logo sniffing, rate limiter, ad fonts — 224 unit/integration tests |
 | Server actions validated, authorized, scoped | `createBrandKitFromUrl`, `createBrandKitManually`, `saveBrandKit`, `uploadBrandKitLogo`, `removeBrandKitLogo`, `deleteBrandKit`; tested against a real database incl. viewer refusal, plan and daily AI limits, cross-workspace NOT_FOUND and redirect pass-through |
-| UI from `shared/ui` + tokens | shadcn `base-vega` defaults; added `textarea` and `alert-dialog` unchanged |
+| UI from `shared/ui` + tokens | shadcn `base-vega` defaults; added `textarea`, `alert-dialog` and `select` unchanged; native colour picker behind the swatch |
 | Loading, empty, error states | brand kit empty state with the create form, per-failure URL messages with a "Fill it in myself" fallback, field-level save errors, partial-draft alert, plan-limit alert, not-found for unknown kits |
-| Accessible | axe WCAG 2.2 A/AA on the list, editor, validation errors and delete dialog (scans wait for animations to settle); labelled controls, `aria-invalid` on the exact failing field |
+| Accessible | axe WCAG 2.2 A/AA on the list, editor, validation errors, delete dialog and open font menu (scans wait for animations to settle); labelled controls, `aria-invalid` on the exact failing field |
 | Responsive to 375px | every brand-kit e2e test runs on desktop and 375px mobile; no horizontal scroll checks |
-| Playwright happy path | create (by hand) → fix a field error → save → reload → list and plan limit → delete; private address refused; logo upload/remove against the real bucket (local); disguised logo refused (94 e2e checks) |
+| Playwright happy path | create (by hand) → fix a field error → pick colour and font → save (returns to the list) → reopen → plan limit → delete; private address refused; logo upload/remove against the real bucket (local); disguised logo refused (96 e2e checks) |
 | Decisions logged | `docs/decisions.md` |
 
-Checked by hand with the real model: linear.app and resend.com drafts (≈7s each, pricing page, real logo). Still manual: the AI path in the browser (e2e never calls the AI or the network).
+Checked live with the real model: linear.app and resend.com drafts (pricing page, real logo), and the full browser flow on resend.com — create from website → editor prefilled (24s, 5 claims, 600px logo, no console errors) → save → list. That run caught a bug CI couldn't (e2e never calls the AI or the network): creating the plan's last kit unmounted the form before its redirect ran; fixed. Not yet run: CI on GitHub (commits not pushed).
 
 ## 15. Environment variables (`.env.example`)
 
