@@ -9,6 +9,7 @@ import { aiLimits } from "@/shared/config/plans"
 import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
 import { consumeRateLimit } from "@/shared/rate-limit"
+import { deleteFolder, workspaceFileKey } from "@/shared/storage"
 
 import { blankFields } from "./lib/draft-fields"
 import { draftKitFromUrl } from "./lib/draft-kit"
@@ -194,8 +195,12 @@ export async function deleteBrandKit(kitId: unknown): Promise<Result<null>> {
     if (!parsed.success) throw new AppError("NOT_FOUND", "Brand kit not found.")
 
     const { workspace } = await requireWorkspaceAccess("content:edit")
-    const { logoKey } = await service.deleteBrandKit(workspace.id, parsed.data)
-    await deleteOldLogo(logoKey)
+    await service.deleteBrandKit(workspace.id, parsed.data)
+    // Everything the kit stored (logo, footage) lives under its folder.
+    const folder = `${workspaceFileKey(workspace.id, "brand-kits", parsed.data)}/`
+    await deleteFolder(folder).catch((error: unknown) =>
+      console.warn("Couldn't delete brand kit files", folder, error)
+    )
 
     refreshKits()
     return ok(null)

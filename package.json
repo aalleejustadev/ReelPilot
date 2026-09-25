@@ -20,7 +20,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "sh -c 'prisma migrate dev \"$@\" && prisma generate' --",
     "db:deploy": "prisma migrate deploy",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "storage:cors": "tsx --env-file-if-exists=.env scripts/storage-cors.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.63",

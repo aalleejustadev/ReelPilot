@@ -34,10 +34,12 @@ vi.mock("../lib/logo", async (importOriginal) => ({
 
 const putFile = vi.fn()
 const deleteFile = vi.fn()
+const deleteFolder = vi.fn()
 vi.mock("@/shared/storage", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/shared/storage")>()),
   putFile,
   deleteFile,
+  deleteFolder,
 }))
 
 const hasDatabase = Boolean(process.env.DATABASE_URL)
@@ -95,6 +97,7 @@ describe.runIf(hasDatabase)("brand kit actions", () => {
     fetchLogo.mockResolvedValue({ bytes: png, type: "image/png" })
     putFile.mockResolvedValue(undefined)
     deleteFile.mockResolvedValue(undefined)
+    deleteFolder.mockResolvedValue(undefined)
   })
 
   afterEach(async () => {
@@ -355,17 +358,16 @@ describe.runIf(hasDatabase)("brand kit actions", () => {
     })
   })
 
-  it("deletes the kit and its logo file", async () => {
+  it("deletes the kit and every file in its folder", async () => {
     const kitId = await createKit()
-    const { logoKey } = await db.brandKit.findUniqueOrThrow({
-      where: { id: kitId },
-    })
 
     expect(await actions.deleteBrandKit(kitId)).toEqual({
       ok: true,
       data: null,
     })
     expect(await db.brandKit.count({ where: { id: kitId } })).toBe(0)
-    expect(deleteFile).toHaveBeenCalledWith(logoKey)
+    expect(deleteFolder).toHaveBeenCalledWith(
+      `workspaces/${workspaceId}/brand-kits/${kitId}/`
+    )
   })
 })
