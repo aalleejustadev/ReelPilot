@@ -45,6 +45,7 @@ test.describe("signed in", () => {
   for (const path of [
     "/dashboard",
     "/brand-kits",
+    "/presenters",
     "/settings/profile",
     "/settings/workspace",
   ]) {

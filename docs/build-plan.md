@@ -716,7 +716,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
 | M1 ✅ | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo — **done 2026-09-25** (see 14.3) |
 | M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
-| M3 | Presenters | presenters (stock), Kokoro voice in the worker | Choose a stock presenter and hear its voice |
+| M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5) |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
 | M6 | Billing | billing, plans, ledger, Stripe | Subscribe, get credits, see balance |
@@ -798,6 +798,25 @@ Footage, built in parts A–G (A: worker + job queue, B: data model, C: direct u
 
 Still manual: an actual screen capture (headless browsers can't capture a screen) and the floating "Mark moment" window (Chrome/Edge). Not yet run: GitHub CI (commits not pushed). Deployment note: the worker is a second long-running process that runs ffmpeg; the worker host is still `TODO(owner)` (§17).
 
+### 14.5 M3 completion record (2026-09-25)
+Presenters, built in parts A–D (A: voice engine, B: presenter data + seed, C: presenters page, D: Definition of Done).
+
+| Item | Evidence |
+|---|---|
+| Prisma models + migration | `presenters` (global stock library); 8 migrations |
+| Zod schemas | none needed: no user input in M3 (catalog is code, seed is trusted); voice ids typed from the catalog |
+| Service logic with unit tests | `syncStockPresenters` (idempotent uploads and samples, changed-voice re-speak, replaced portraits, missing portrait error), Kokoro provider against the real model and storage (AAC output, length, queued requests, loads after Prisma), shared file keys — 299 unit/integration tests |
+| Server actions | none: the page only reads; nothing is written by users in M3 |
+| UI from `shared/ui` + tokens | Card grid, Badge tags, Button with Spinner/Play/Pause |
+| Loading, empty, error states | app loading skeleton, empty library message, "Sample coming soon", playback error toast |
+| Accessible | axe on /presenters; play buttons have spoken names and `aria-pressed`; portraits have alt text |
+| Responsive to 375px | presenter e2e on desktop and mobile; no horizontal scroll check |
+| Playwright happy path | sidebar → Presenters → 8 presenters with real portraits in order → play Maya, switching to Emma stops Maya, pause (112 e2e checks) |
+| Decisions logged | `docs/decisions.md` |
+| CI | model cached (`.cache/models`), `prisma db seed` before e2e against the SeaweedFS S3 server |
+
+Still to do by the owner: replace the 8 placeholder portraits with licensed photos (same file names) and re-run the seed.
+
 ## 15. Environment variables (`.env.example`)
 
 ```
@@ -863,7 +882,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [ ] Worker host (Railway, Fly.io or VPS) and Remotion company-license check. `TODO(owner)`
 - [x] Voice: self-hosted Kokoro (2026-09-23).
 - [ ] Avatar provider bake-off — `[V1.1]`.
-- [ ] Stock presenter portrait source. `TODO(owner)`
+- [x] Stock presenter portraits (2026-09-25): AI-generated photoreal faces with a commercial licence (no real person). Placeholders (CC0 illustrations) until the owner supplies them — drop into `prisma/seed-assets/presenters/` and re-seed.
 - [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
 - [ ] Legal review of Terms, Privacy, AI disclosure. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).

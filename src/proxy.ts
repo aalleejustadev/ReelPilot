@@ -15,5 +15,10 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   // App routes only. Add each (app) route here as it ships.
-  matcher: ["/dashboard/:path*", "/brand-kits/:path*", "/settings/:path*"],
+  matcher: [
+    "/dashboard/:path*",
+    "/brand-kits/:path*",
+    "/presenters/:path*",
+    "/settings/:path*",
+  ],
 }
