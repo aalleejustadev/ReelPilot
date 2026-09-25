@@ -38,6 +38,22 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // `_`-prefixed names are intentionally unused (e.g. a Playwright
+    // fixture requested only for its side effect).
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+    },
+  },
+  {
+    // Playwright fixtures pass values via a callback named `use`, which the
+    // React hooks rule mistakes for React's use() hook.
+    files: ["tests/e2e/**"],
+    rules: { "react-hooks/rules-of-hooks": "off" },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
