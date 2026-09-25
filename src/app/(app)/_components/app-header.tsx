@@ -11,7 +11,7 @@ export function AppHeader() {
   const pathname = usePathname()
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b px-6 md:px-8">
       <SidebarTrigger className="-ml-1" />
       <Separator
         orientation="vertical"

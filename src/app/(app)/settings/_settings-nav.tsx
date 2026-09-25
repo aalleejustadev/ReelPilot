@@ -13,7 +13,7 @@ export function SettingsNav() {
   const pathname = usePathname()
 
   return (
-    <nav aria-label="Settings" className="flex gap-1">
+    <nav aria-label="Settings" className="flex gap-2">
       {tabs.map((tab) => {
         const isCurrent = pathname === tab.href
         return (

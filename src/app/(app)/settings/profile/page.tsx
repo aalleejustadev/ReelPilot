@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/shared/ui/card"
@@ -18,7 +19,7 @@ export default async function ProfileSettingsPage() {
   const { user } = await getCurrentWorkspace()
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-8">
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -42,9 +43,10 @@ export default async function ProfileSettingsPage() {
             Sign out of ReelPilot on this device.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        {/* CardFooter keeps the button at its natural width. */}
+        <CardFooter>
           <SignOutButton />
-        </CardContent>
+        </CardFooter>
       </Card>
     </div>
   )

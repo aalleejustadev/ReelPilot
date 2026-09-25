@@ -31,7 +31,7 @@ export function ProfileForm({ currentName }: { currentName: string }) {
     <form action={formAction}>
       <Field data-invalid={nameError ? true : undefined}>
         <FieldLabel htmlFor="profile-name">Name</FieldLabel>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <Input
             id="profile-name"
             name="name"

@@ -36,7 +36,7 @@ export function RenameWorkspaceForm({ currentName }: { currentName: string }) {
     <form action={formAction} className="flex flex-col gap-3">
       <Field data-invalid={nameError ? true : undefined}>
         <FieldLabel htmlFor="workspace-name">Workspace name</FieldLabel>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="flex flex-col gap-3 sm:flex-row">
           <Input
             id="workspace-name"
             name="name"

@@ -17,9 +17,9 @@ export default async function DashboardPage() {
   const firstName = user.name.trim().split(/\s+/)[0]
 
   return (
-    <div className="flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-semibold tracking-tight">
+    <div className="flex flex-1 flex-col gap-8">
+      <div className="flex flex-col gap-2">
+        <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
           {firstName ? `Welcome, ${firstName}` : "Welcome"}
         </h1>
         <p className="text-muted-foreground">

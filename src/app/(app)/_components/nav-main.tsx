@@ -20,7 +20,7 @@ export function NavMain() {
 
   return (
     <SidebarGroup>
-      <SidebarMenu>
+      <SidebarMenu className="gap-1.5">
         {navItems.map((item) => (
           <SidebarMenuItem key={item.href}>
             <SidebarMenuButton
@@ -32,6 +32,7 @@ export function NavMain() {
                 />
               }
               isActive={isActive(pathname, item.href)}
+              className="h-9"
               tooltip={item.title}
             >
               <NavIcon icon={item.icon} />

@@ -9,11 +9,11 @@ export async function SiteHeader() {
 
   return (
     <header className="border-b bg-background">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-6 md:px-8">
         <Link href="/" className="text-base font-semibold tracking-tight">
           {site.name}
         </Link>
-        <nav className="flex items-center gap-2">
+        <nav className="flex items-center gap-3">
           {session ? (
             <LinkButton href="/dashboard">Dashboard</LinkButton>
           ) : (

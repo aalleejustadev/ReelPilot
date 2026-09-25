@@ -16,7 +16,7 @@ export default function HomePage() {
         Paste your URL and get scroll-stopping video ads built from your real
         product footage, with a presenter who sells it.
       </p>
-      <div className="flex flex-col gap-2 sm:flex-row">
+      <div className="flex flex-col gap-3 sm:flex-row">
         <LinkButton
           href="/sign-up"
           size="lg"

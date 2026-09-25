@@ -30,7 +30,7 @@ export default async function AppLayout({
       />
       <SidebarInset>
         <AppHeader />
-        <div className="flex flex-1 flex-col p-4 sm:p-6">{children}</div>
+        <div className="flex flex-1 flex-col p-6 md:p-8">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   )

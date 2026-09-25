@@ -650,11 +650,25 @@ Editor
 ```
 
 ### 12.5 Components (`src/shared/ui`)
-Use **default shadcn components and variants**, styled only through the theme tokens in 12.2. Every button shows a pointer cursor. Every button that starts async work shows a `Spinner` and is disabled until the work finishes; navigation that looks like a button uses `LinkButton` (`src/shared/ui/link-button.tsx`), which shows a spinner while the next page loads. For forms, show pending state with `useFormStatus` (server actions) or an `onSubmit` handler; never set local loading state inside a `<form action={fn}>` function, because React defers it until the action finishes. Inputs prefilled from server data (e.g. an edit form) are controlled (`value` + `onChange`), never `defaultValue`: revalidation changes the prop after mount, which Base UI rejects. Change a component's source only when it is mandatory (accessibility, a lint failure, a missing capability), and log the reason in `docs/decisions.md`.
+Use **default shadcn components and variants** from the **`base-vega`** style (`components.json`), styled only through the theme tokens in 12.2. Every button shows a pointer cursor. Every button that starts async work shows a `Spinner` and is disabled until the work finishes; navigation that looks like a button uses `LinkButton` (`src/shared/ui/link-button.tsx`), which shows a spinner while the next page loads. For forms, show pending state with `useFormStatus` (server actions) or an `onSubmit` handler; never set local loading state inside a `<form action={fn}>` function, because React defers it until the action finishes. Inputs prefilled from server data (e.g. an edit form) are controlled (`value` + `onChange`), never `defaultValue`: revalidation changes the prop after mount, which Base UI rejects. Change a component's source only when it is mandatory (accessibility, a lint failure, a missing capability), and log the reason in `docs/decisions.md`.
 
 Button (primary/ink, secondary/outline, ghost, danger/tally), Input, Textarea, Select, Tabs, Dialog, Sheet, Toast, Tooltip, Badge (status: draft/rendering/ready/failed), CreditCost (inline cost chip shown before any spend), ProgressRing, EmptyState, PhoneFrame, VideoPlayer, ContactSheet + FrameTile, SegmentTimeline, ComplianceFlag (inline, with rewrite action), StepWizard, DataTable (admin), Avatar, WorkspaceSwitcher.
 
 Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
+
+**Spacing and sizing (apply everywhere):**
+| Element | Rule |
+|---|---|
+| App page padding | `p-6 md:p-8` (24/32px); marketing header `h-16 px-6 md:px-8` |
+| Between page sections | `gap-8` (32px); title block `gap-2` |
+| Page title | `text-2xl md:text-3xl font-semibold tracking-tight`; description `text-muted-foreground` |
+| Top bar | `h-16`, `px-6 md:px-8` (aligned with page content) |
+| Cards | vega defaults (24px padding); actions in `CardFooter`, never bare in `CardContent` (it stretches children) |
+| Forms | vega `FieldGroup`/`Field` spacing; input + button on one row use `gap-3` |
+| Controls | App: default size (36px). Auth pages and marketing CTAs: `lg` (40px) |
+| Button padding | Default `px-3`, `sm` `px-3`, `lg` `px-4` (set once in `button.tsx`; owner request) |
+| Sidebar | Header/footer `p-3`, menu `gap-1.5`, nav items `h-9` |
+| Button groups / nav tabs | `gap-2`–`gap-3` |
 
 ### 12.6 Motion
 - One orchestrated moment on the landing page: the phone player cycling example ads.
