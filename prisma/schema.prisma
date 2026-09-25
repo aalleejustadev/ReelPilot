@@ -42,9 +42,10 @@ model User {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  sessions    Session[]
-  accounts    Account[]
-  memberships Membership[]
+  sessions          Session[]
+  accounts          Account[]
+  memberships       Membership[]
+  personalWorkspace Workspace?   @relation("PersonalWorkspace")
 
   @@map("users")
 }
@@ -111,13 +112,17 @@ model RateLimit {
 // ─── Workspaces ─────────────────────────────────────────────────────────────
 
 model Workspace {
-  id        String   @id @default(cuid())
-  name      String
-  plan      Plan     @default(FREE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String
+  plan            Plan     @default(FREE)
+  // Set on a user's personal workspace. Unique: at most one per user, even
+  // when two requests create it at once. Deleted with the user.
+  personalOwnerId String?  @unique
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  memberships Membership[]
+  personalOwner User?        @relation("PersonalWorkspace", fields: [personalOwnerId], references: [id], onDelete: Cascade)
+  memberships   Membership[]
 
   @@map("workspaces")
 }

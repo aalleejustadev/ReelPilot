@@ -155,7 +155,7 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 - `src/app` contains **thin routes only**: they read params, check auth, and render components from features.
 - A feature exposes a **public API** through its `index.ts`. Other features may import only from that file — never from another feature's internals.
 - Shared, feature-agnostic code lives in `src/shared` (UI kit, db client, auth helpers, provider adapters, config).
-- Business rules live in `service.ts` (pure where possible, easy to unit-test). Server actions are thin: validate → authorize → call service → revalidate.
+- Business rules live in `service.ts` (pure where possible, easy to unit-test). Server actions are thin: validate → authorize → call service → revalidate. Reference implementation: `src/features/workspaces/actions.ts` (`renameWorkspace`).
 - Every mutation that spends credits goes through the **billing** feature's `spendCredits()` / `refundCredits()` — never direct DB writes.
 - Every script that will be rendered goes through **compliance**'s `checkScript()`.
 
@@ -290,9 +290,9 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **Acceptance:** A valid URL produces a brief, 10 hooks, and a playable watermarked preview in under ~60s; invalid/blocked URLs show a clear error; rate limit enforced.
 
 ### 7.2 auth + workspaces
-- **Purpose:** Sign-in, personal workspace on first login, team invites with roles.
-- **Roles:** owner (billing + everything), editor (create/edit/render), viewer (view/comment).
-- **Acceptance:** Google, GitHub, magic link work; workspace auto-created; invite email → accept → correct role enforced on every action.
+- **Purpose:** Sign-in, and a personal workspace created on first use with the user as owner. Team invites are `[V1.1]`.
+- **Roles:** owner (billing + everything), editor (create/edit/render), viewer (view/comment). Enforced by `can(role, action)` in `features/workspaces/lib/permissions.ts`; every page and action starts with `requireWorkspaceAccess(action)`.
+- **Acceptance:** Google, GitHub, magic link work; exactly one personal workspace per user, even under concurrent first requests; the role is checked on every action. (V1.1: invite email → accept → role enforced.)
 
 ### 7.3 brand-kits
 - **Purpose:** Everything the AI needs to know about the product.
@@ -377,7 +377,7 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 
 ## 8. Data model (Prisma sketch)
 
-`TODO(agent)`: expand into full `schema.prisma` with indexes and relations; keep names.
+This is the original sketch. Implemented models live in `prisma/schema.prisma`, which is the source of truth for them (M0: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, plus `Workspace` and `Membership`). Each later slice expands its models from this sketch; keep the names.
 
 ```prisma
 model User {
@@ -394,6 +394,7 @@ model Workspace {
   id             String   @id @default(cuid())
   name           String
   plan           Plan     @default(FREE)  // FREE | STARTER | GROWTH | AGENCY
+  personalOwnerId String? @unique          // set on a user's personal workspace; cascades on user delete
   stripeCustomerId String?
   memberships    Membership[]
   brandKits      BrandKit[]
@@ -674,7 +675,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 
 - TypeScript `strict: true`; no `any` (use `unknown` + Zod). No non-null assertions without a comment.
 - **Naming:** files `kebab-case.ts`; components `PascalCase`; functions `camelCase` verbs (`createCampaign`, `spendCredits`); booleans `is/has/can`.
-- **Server actions:** always `validate (Zod) → authorize (role + workspace) → service → revalidatePath/Tag`. Return a typed `Result<T, AppError>`; never throw to the client.
+- **Server actions:** always `validate (Zod) → authorize (role + workspace) → service → revalidatePath/Tag`. Return a typed `Result<T, AppError>`; never throw to the client. Wrap the body in `try/catch`, call `unstable_rethrow(error)` first in the catch so Next's redirects still work, then return `err(toResultError(error))`. Pages and actions authorize with `requireWorkspaceAccess(action)` and scope every query by the returned `workspace.id`.
 - **Errors:** `AppError` with `code` (`NOT_FOUND`, `FORBIDDEN`, `INSUFFICIENT_CREDITS`, `COMPLIANCE_BLOCKED`, `PROVIDER_FAILED`, `RATE_LIMITED`, `VALIDATION`) and a user-safe message.
 - **Data access:** only in `queries.ts`/`service.ts`; every query is scoped by `workspaceId`.
 - **Server vs client:** default to Server Components; add `"use client"` only for interactivity (editor, recorder, wizard steps).

@@ -15,7 +15,7 @@
     "test:e2e": "playwright test",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev && prisma generate",
+    "db:migrate": "sh -c 'prisma migrate dev \"$@\" && prisma generate' --",
     "db:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio"
   },
