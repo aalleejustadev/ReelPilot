@@ -52,8 +52,7 @@
   --input: var(--frame);
   --ring: var(--chroma-strong);
 
-  /* Radius follows hierarchy (§12.5): sm = 6px controls, lg = 10px panels,
-     2xl = 18px phone frames. All derived from this one value. */
+  /* shadcn default; components derive their radii from it. */
   --radius: 0.625rem;
 
   --sidebar: var(--surface);
@@ -68,20 +67,9 @@
 
 @theme inline {
   /* Fonts: variables set by next/font in the root layout */
-  --font-sans: var(--font-schibsted-grotesk);
-  --font-heading: var(--font-big-shoulders);
-
-  /* Type scale (§12.3): 0.75 / 0.875 / 1 / 1.125 / 1.375 / 1.75 / 2.5 / 3.75 / 5 rem */
-  --text-xl: 1.375rem;
-  --text-xl--line-height: 1.4;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 1.25;
-  --text-3xl: 2.5rem;
-  --text-3xl--line-height: 1.1;
-  --text-4xl: 3.75rem;
-  --text-4xl--line-height: 1;
-  --text-5xl: 5rem;
-  --text-5xl--line-height: 0.95;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-geist-sans);
 
   /* ReelPilot palette as Tailwind colours: bg-projector, text-chroma-strong… */
   --color-stage: var(--stage);

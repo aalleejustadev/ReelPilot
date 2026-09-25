@@ -42,21 +42,15 @@ const textPairs = [
   ["slate", "stage", "secondary text on the app background"],
   ["slate", "surface", "secondary text on panels"],
   ["surface", "ink", "primary button"],
-  ["surface", "tally-strong", "danger button, failed badge"],
-  ["ink", "chroma", "chroma button"],
-  ["ink", "amber", "warning fills"],
-  ["chroma-strong", "chroma-soft", "ready badge"],
-  ["chroma-strong", "surface", "success text"],
-  ["tally-strong", "surface", "error text on panels"],
+  ["tally-strong", "surface", "destructive text, field errors"],
   ["tally-strong", "stage", "error text on the app background"],
-  ["surface", "projector", "text on the video player"],
+  ["surface", "projector", "captions on video frames"],
 ] as const
 
 // Focus rings and other non-text UI need 3:1 (WCAG 1.4.11).
 const uiPairs = [
   ["chroma-strong", "surface", "focus ring on panels"],
   ["chroma-strong", "stage", "focus ring on the app background"],
-  ["chroma", "projector", "selection outline on the contact sheet"],
 ] as const
 
 describe("colour contrast (WCAG AA)", () => {

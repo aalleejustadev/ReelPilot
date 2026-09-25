@@ -16,6 +16,15 @@ import { Avatar, AvatarFallback } from "@/shared/ui/avatar"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/shared/ui/card"
+import { Checkbox } from "@/shared/ui/checkbox"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
@@ -80,9 +89,7 @@ export function ToastDemo() {
       </Button>
       <Button
         variant="outline"
-        onClick={() =>
-          toast.add({ type: "loading", title: "Generating hooks…" })
-        }
+        onClick={() => toast.add({ type: "loading", title: "Writing hooks…" })}
       >
         Loading
       </Button>
@@ -113,15 +120,13 @@ export function LoadingButtonDemo() {
 export function UserMenuDemo() {
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={<Button variant="ghost" className="h-10 gap-2 px-2" />}
-      >
-        <Avatar>
+      <DropdownMenuTrigger render={<Button variant="ghost" />}>
+        <Avatar size="sm">
           <AvatarFallback>AM</AvatarFallback>
         </Avatar>
-        <span className="text-sm font-medium">Ali’s workspace</span>
+        Ali’s workspace
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56">
+      <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuGroup>
           <DropdownMenuLabel>you@yourapp.com</DropdownMenuLabel>
         </DropdownMenuGroup>
@@ -197,87 +202,164 @@ export function TooltipDemo() {
   )
 }
 
-const frames = [
-  { hook: "I tried every ad tool. Then this.", status: "ready" },
-  { hook: "Your app, explained in 20 seconds.", status: "ready" },
-  { hook: "Stop paying $200 per UGC video.", status: "rendering" },
-  { hook: "The old way vs the ReelPilot way.", status: "draft" },
-  { hook: "3 features your users miss.", status: "failed" },
-] as const
+type AdStatus = "ready" | "rendering" | "draft" | "failed"
 
-const statusLabel = {
-  ready: "Ready",
-  rendering: "Rendering",
-  draft: "Draft",
-  failed: "Failed",
-} as const
+/** Default badge variants; a coloured dot carries the palette meaning. */
+export function StatusBadge({ status }: { status: AdStatus }) {
+  switch (status) {
+    case "ready":
+      return (
+        <Badge variant="outline">
+          <span className="size-1.5 rounded-full bg-chroma" aria-hidden />
+          Ready
+        </Badge>
+      )
+    case "rendering":
+      return (
+        <Badge variant="outline">
+          <span
+            className="size-1.5 animate-pulse rounded-full bg-tally"
+            aria-hidden
+          />
+          Rendering
+        </Badge>
+      )
+    case "draft":
+      return <Badge variant="secondary">Draft</Badge>
+    case "failed":
+      return <Badge variant="destructive">Failed</Badge>
+  }
+}
 
-/** The signature element (§12.4): 9:16 frames on a projector strip. */
+const ads: {
+  hook: string
+  angle: string
+  duration: string
+  status: AdStatus
+}[] = [
+  {
+    hook: "I tried every ad tool. Then this.",
+    angle: "I tried everything",
+    duration: "0:24",
+    status: "ready",
+  },
+  {
+    hook: "Your app, explained in 20 seconds.",
+    angle: "Feature demo",
+    duration: "0:20",
+    status: "ready",
+  },
+  {
+    hook: "Stop paying $200 per UGC video.",
+    angle: "Problem / solution",
+    duration: "0:27",
+    status: "rendering",
+  },
+  {
+    hook: "The old way vs the new way.",
+    angle: "Old vs new",
+    duration: "0:22",
+    status: "draft",
+  },
+  {
+    hook: "3 features your users miss.",
+    angle: "Feature demo",
+    duration: "0:18",
+    status: "failed",
+  },
+]
+
+/** Stand-in for a real frame of app footage with a corner presenter. */
+function FramePreview({ duration }: { duration: string }) {
+  return (
+    <div className="relative aspect-9/16 overflow-hidden rounded-lg bg-projector">
+      <div className="absolute inset-x-3 top-8 flex flex-col gap-2 rounded-md bg-surface/10 p-2">
+        <div className="h-1.5 w-1/2 rounded-full bg-surface/30" />
+        <div className="h-12 rounded-sm bg-surface/15" />
+        <div className="h-1.5 w-2/3 rounded-full bg-surface/30" />
+        <div className="h-1.5 w-1/3 rounded-full bg-surface/30" />
+      </div>
+      <div className="absolute bottom-14 left-3 size-9 rounded-full bg-frame ring-2 ring-surface" />
+      {/* Caption bars */}
+      <div className="absolute inset-x-6 bottom-5 flex flex-col items-center gap-1.5">
+        <div className="h-2 w-full rounded-full bg-surface/80" />
+        <div className="h-2 w-2/3 rounded-full bg-surface/80" />
+      </div>
+      <span className="absolute top-2 right-2 rounded-sm bg-ink/70 px-1 font-mono text-[10px] text-surface">
+        {duration}
+      </span>
+    </div>
+  )
+}
+
+/** Contact sheet (§12.4): variants of one campaign, selectable for export. */
 export function ContactSheetDemo() {
-  const [selected, setSelected] = useState<Set<number>>(new Set([0]))
+  const [selected, setSelected] = useState<Set<string>>(new Set([ads[0].hook]))
 
-  function toggle(index: number) {
+  function setChecked(hook: string, isChecked: boolean) {
     setSelected((current) => {
       const next = new Set(current)
-      if (next.has(index)) next.delete(index)
-      else next.add(index)
+      if (isChecked) next.add(hook)
+      else next.delete(hook)
       return next
     })
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg bg-projector p-4 sm:p-6">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-sm text-surface">
-          <span className="tabular-nums">{selected.size}</span> of{" "}
-          <span className="tabular-nums">{frames.length}</span> ads selected
-        </p>
-        <Button variant="chroma" size="sm" disabled={selected.size === 0}>
-          Export {selected.size} {selected.size === 1 ? "ad" : "ads"}
-        </Button>
-      </div>
-      <div className="flex gap-3 overflow-x-auto pb-2">
-        {frames.map((frame, index) => {
-          const isSelected = selected.has(index)
-          return (
-            <button
-              key={frame.hook}
-              type="button"
-              aria-pressed={isSelected}
-              onClick={() => toggle(index)}
-              className="group flex w-36 shrink-0 flex-col gap-2 text-left outline-none"
-            >
-              <div
-                className={cn(
-                  "relative aspect-[9/16] overflow-hidden rounded-lg bg-ink ring-2 ring-transparent transition-shadow group-focus-visible:ring-surface",
-                  isSelected && "ring-chroma group-focus-visible:ring-chroma"
-                )}
-              >
-                {/* Stand-in for real app footage */}
-                <div className="absolute inset-x-3 top-6 flex flex-col gap-1.5">
-                  <div className="h-2 w-2/3 rounded-sm bg-slate" />
-                  <div className="h-16 rounded-sm bg-slate/60" />
-                  <div className="h-2 w-1/2 rounded-sm bg-slate" />
-                </div>
-                {/* Corner presenter bubble */}
-                <div className="absolute bottom-12 left-3 size-10 rounded-full border-2 border-surface bg-frame" />
-                <p className="absolute inset-x-2 bottom-3 rounded-sm bg-ink/80 px-1.5 py-1 text-center text-[0.65rem] leading-tight font-semibold text-surface">
-                  {frame.hook}
-                </p>
-                <Badge
-                  variant={frame.status}
-                  className="absolute top-2 right-2"
+    <Card>
+      <CardHeader>
+        <CardTitle>Spring launch</CardTitle>
+        <CardDescription>
+          <span className="font-mono">{ads.length}</span> ads · 9:16 · Meta and
+          TikTok
+        </CardDescription>
+        <CardAction>
+          <Button size="sm" disabled={selected.size === 0}>
+            <DownloadIcon data-icon="inline-start" />
+            Export {selected.size || ""} {selected.size === 1 ? "ad" : "ads"}
+          </Button>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 lg:grid-cols-5">
+          {ads.map((ad) => {
+            const isSelected = selected.has(ad.hook)
+            return (
+              <label key={ad.hook} className="group flex flex-col gap-3">
+                <div
+                  className={cn(
+                    "relative rounded-xl p-0.5 ring-1 ring-transparent transition-shadow",
+                    isSelected
+                      ? "ring-2 ring-primary"
+                      : "group-hover:ring-border"
+                  )}
                 >
-                  {statusLabel[frame.status]}
-                </Badge>
-              </div>
-              <span className="line-clamp-2 text-xs text-frame">
-                {frame.hook}
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
+                  <FramePreview duration={ad.duration} />
+                  <div className="absolute top-2.5 left-2.5 flex rounded-sm bg-background p-0.5">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={(checked) =>
+                        setChecked(ad.hook, checked)
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5 px-0.5">
+                  <span className="line-clamp-2 text-sm leading-snug font-medium">
+                    {ad.hook}
+                  </span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <StatusBadge status={ad.status} />
+                    <span className="truncate text-xs text-muted-foreground">
+                      {ad.angle}
+                    </span>
+                  </div>
+                </div>
+              </label>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
   )
 }

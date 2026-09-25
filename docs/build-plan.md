@@ -613,18 +613,14 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 ### 12.3 Typography
 | Role | Typeface | Notes |
 |---|---|---|
-| Display (landing hero, section titles, empty states) | **Big Shoulders Display** (700–800) | Condensed, marquee/slate feel; use large and tight |
-| UI + body | **Schibsted Grotesk** (400/500/600) | Clear at small sizes, a bit of character |
-| Timecodes & credit counts | Schibsted Grotesk with `font-variant-numeric: tabular-nums` | No separate monospace face |
+| UI, body and headings | **Geist** (400/500/600) | Headings are semibold with tight tracking; no separate display face |
+| Timecodes and credit counts | **Geist Mono** | Fixed-width digits and punctuation |
 
-Scale (rem): 0.75 / 0.875 / 1 / 1.125 / 1.375 / 1.75 / 2.5 / 3.75 / 5.
-Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
-
-`TODO(owner)`: confirm typefaces (both on Google Fonts).
+Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
 - **App shell:** left sidebar (Dashboard, Campaigns, Library, Brand kits, Presenters, Settings), top bar with workspace switcher and credit balance, content area on `--stage`.
-- **Campaign page:** a **contact sheet** — a grid of 9:16 frames on a `--projector` strip, each labeled with hook text and status; selecting frames highlights them with a chroma outline.
+- **Campaign page:** a **contact sheet** — a Card grid of 9:16 frames, each with a checkbox, hook text, status badge and angle; selected frames get a primary outline.
 - **Editor:** player on top (on `--projector`), segment timeline below, inspector on the right.
 - **Landing:** left-aligned hero with the URL input; to the right, a phone-frame player looping real example ads; below, one before/after (raw screen recording → finished ad).
 
@@ -651,9 +647,11 @@ Editor
 ```
 
 ### 12.5 Components (`src/shared/ui`)
+Use **default shadcn components and variants**, styled only through the theme tokens in 12.2. Change a component's source only when it is mandatory (accessibility, a lint failure, a missing capability), and log the reason in `docs/decisions.md`.
+
 Button (primary/ink, secondary/outline, ghost, danger/tally), Input, Textarea, Select, Tabs, Dialog, Sheet, Toast, Tooltip, Badge (status: draft/rendering/ready/failed), CreditCost (inline cost chip shown before any spend), ProgressRing, EmptyState, PhoneFrame, VideoPlayer, ContactSheet + FrameTile, SegmentTimeline, ComplianceFlag (inline, with rewrite action), StepWizard, DataTable (admin), Avatar, WorkspaceSwitcher.
 
-Radius: 6px controls, 10px panels, 18px phone frames — radius follows hierarchy, not one value everywhere. Shadows: none on panels (use `--frame` borders); a single soft shadow only on floating elements (dialogs, popovers).
+Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 
 ### 12.6 Motion
 - One orchestrated moment on the landing page: the phone player cycling example ads.
@@ -788,7 +786,8 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [ ] Stock presenter portrait source. `TODO(owner)`
 - [ ] Footage size/length caps per plan. `TODO(owner)`
 - [ ] Legal review of Terms, Privacy, AI disclosure. `TODO(owner)`
-- [ ] Typeface confirmation and color tuning. `TODO(owner)`
+- [x] Typeface: Geist + Geist Mono (2026-09-25).
+- [ ] Color tuning. `TODO(owner)`
 
 ✏️ Owner notes (general):
 >

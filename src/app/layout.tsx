@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { Big_Shoulders, Schibsted_Grotesk } from "next/font/google"
+import { Geist, Geist_Mono } from "next/font/google"
 
 import "@/shared/styles/globals.css"
 import { site } from "@/shared/config/site"
@@ -7,18 +7,12 @@ import { cn } from "@/shared/lib/utils"
 import { Toaster } from "@/shared/ui/toast"
 import { TooltipProvider } from "@/shared/ui/tooltip"
 
-// UI + body (§12.3)
-const fontSans = Schibsted_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-schibsted-grotesk",
-})
+const fontSans = Geist({ subsets: ["latin"], variable: "--font-geist-sans" })
 
-// Display. Google merged "Big Shoulders Display" into Big Shoulders; the
-// optical-size axis selects the display cut automatically at large sizes.
-const fontHeading = Big_Shoulders({
+// Timecodes and credit counts
+const fontMono = Geist_Mono({
   subsets: ["latin"],
-  axes: ["opsz"],
-  variable: "--font-big-shoulders",
+  variable: "--font-geist-mono",
 })
 
 export const metadata: Metadata = {
@@ -34,7 +28,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={cn("antialiased", fontSans.variable, fontHeading.variable)}
+      className={cn("antialiased", fontSans.variable, fontMono.variable)}
     >
       <body>
         <TooltipProvider>

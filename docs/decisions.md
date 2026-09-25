@@ -37,3 +37,7 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-25 — Status badges (draft/rendering/ready/failed/warning) use opaque fills so they read on light panels and dark video frames.
 - 2026-09-25 — `use-mobile` rewritten with `useSyncExternalStore` — the shadcn version set state in an effect and failed react-hooks lint.
 - 2026-09-25 — Home page is a temporary design-system showcase (`src/app/_showcase`, owner request) until the landing page in M12.
+- 2026-09-25 — Replaced Big Shoulders + Schibsted Grotesk with Geist + Geist Mono — owner preferred a cleaner, more professional look. Mono also fixes the wide punctuation in tabular timecodes. Supersedes the earlier font decisions.
+- 2026-09-25 — Default shadcn components and variants only; styling comes from theme tokens. Restored button, input, toast, sheet, empty and badge to upstream (`shadcn add --overwrite`, owner-approved). Kept only the `use-mobile` lint fix. Supersedes the custom radius scale, type scale, `chroma` button variant and status badge variants.
+- 2026-09-25 — Status badges compose default variants: draft = secondary, failed = destructive, ready/rendering = outline + a chroma/tally dot.
+- 2026-09-25 — Contact sheet is a Card grid of 9:16 frames with a Checkbox per frame (the whole tile is a label), replacing the dark projector strip.

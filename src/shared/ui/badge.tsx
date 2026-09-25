@@ -18,14 +18,6 @@ const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
-        // Render status (§12.5). Opaque fills so they read on dark frames too.
-        draft: "border-border bg-card text-muted-foreground",
-        rendering:
-          "bg-[color-mix(in_oklch,var(--tally)_12%,var(--surface))] text-tally-strong",
-        ready: "bg-chroma-soft text-chroma-strong",
-        failed: "bg-tally-strong text-white",
-        warning:
-          "bg-[color-mix(in_oklch,var(--amber)_35%,var(--surface))] text-ink",
       },
     },
     defaultVariants: {
