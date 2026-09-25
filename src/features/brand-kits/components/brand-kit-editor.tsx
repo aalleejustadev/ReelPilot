@@ -1,6 +1,7 @@
 "use client"
 
 import { PlusIcon, XIcon } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useState, useTransition } from "react"
 
 import { Button } from "@/shared/ui/button"
@@ -28,7 +29,9 @@ import { toast } from "@/shared/ui/toast"
 import { saveBrandKit } from "../actions"
 import type { BrandKitDetail } from "../queries"
 import { brandKitLimits as L, type BrandKitFieldsInput } from "../schema"
+import { ColorField } from "./color-field"
 import { DeleteKitButton } from "./delete-kit-button"
+import { FontField } from "./font-field"
 import { LogoField } from "./logo-field"
 
 type ClaimRow = { key: number; text: string; sourceUrl: string }
@@ -59,7 +62,6 @@ function formStateFrom(kit: BrandKitDetail) {
 }
 
 const lines = (text: string) => text.split("\n")
-const isHex = (value: string) => /^#[0-9a-f]{6}$/i.test(value.trim())
 
 /**
  * The whole kit in one form. Inputs are controlled (build plan §12.5); the
@@ -85,6 +87,7 @@ export function BrandKitEditor({
   const [nextKey, setNextKey] = useState(kit.claims.length)
   const [errors, setErrors] = useState<Record<string, string[]>>({})
   const [isSaving, startSave] = useTransition()
+  const router = useRouter()
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
     setForm((current) => ({ ...current, [key]: value }))
@@ -112,8 +115,9 @@ export function BrandKitEditor({
     startSave(async () => {
       const result = await saveBrandKit({ kitId: kit.id, fields })
       if (result.ok) {
-        setErrors({})
         toast.add({ type: "success", title: "Brand kit saved" })
+        // Saved: back to the list. On errors the user stays to fix them.
+        router.push("/brand-kits")
       } else {
         setErrors(result.error.fieldErrors ?? {})
         toast.add({ type: "error", title: result.error.message })
@@ -399,62 +403,45 @@ export function BrandKitEditor({
                   readOnly={readOnly}
                 />
                 <div className="grid gap-6 sm:grid-cols-3">
-                  {colorSlots.map((slot) => {
-                    const value = form.colors[slot]
-                    const path = `colors.${slot}`
-                    return (
-                      <Field key={slot} data-invalid={invalid(path)}>
-                        <FieldLabel htmlFor={`kit-color-${slot}`}>
-                          {colorLabels[slot]} colour
-                        </FieldLabel>
-                        <div className="flex items-center gap-2">
-                          <span
-                            aria-hidden
-                            className="size-9 shrink-0 rounded-md border"
-                            style={{
-                              backgroundColor: isHex(value) ? value : undefined,
-                            }}
-                          />
-                          <Input
-                            id={`kit-color-${slot}`}
-                            placeholder="#rrggbb"
-                            value={value}
-                            onChange={(e) =>
-                              set("colors", {
-                                ...form.colors,
-                                [slot]: e.target.value,
-                              })
-                            }
-                            aria-invalid={invalid(path)}
-                          />
-                        </div>
-                        <FieldError>{errorFor(path)}</FieldError>
-                      </Field>
-                    )
-                  })}
+                  {colorSlots.map((slot) => (
+                    <ColorField
+                      key={slot}
+                      id={`kit-color-${slot}`}
+                      label={`${colorLabels[slot]} colour`}
+                      value={form.colors[slot]}
+                      error={errorFor(`colors.${slot}`)}
+                      onChange={(value) =>
+                        set("colors", { ...form.colors, [slot]: value })
+                      }
+                    />
+                  ))}
                 </div>
                 <div className="grid gap-6 sm:grid-cols-2">
-                  {(["heading", "body"] as const).map((slot) => (
-                    <Field key={slot} data-invalid={invalid(`fonts.${slot}`)}>
-                      <FieldLabel htmlFor={`kit-font-${slot}`}>
-                        {slot === "heading" ? "Heading font" : "Body font"}
-                      </FieldLabel>
-                      <Input
-                        id={`kit-font-${slot}`}
-                        placeholder="Inter"
-                        value={form.fonts[slot]}
-                        onChange={(e) =>
-                          set("fonts", {
-                            ...form.fonts,
-                            [slot]: e.target.value,
-                          })
-                        }
-                        maxLength={L.font}
-                        aria-invalid={invalid(`fonts.${slot}`)}
-                      />
-                      <FieldError>{errorFor(`fonts.${slot}`)}</FieldError>
-                    </Field>
-                  ))}
+                  <FontField
+                    id="kit-font-heading"
+                    label="Heading font"
+                    role="heading"
+                    value={form.fonts.heading}
+                    sample={form.name.trim() || "Your app, in ads that sell it"}
+                    error={errorFor("fonts.heading")}
+                    onChange={(value) =>
+                      set("fonts", { ...form.fonts, heading: value })
+                    }
+                  />
+                  <FontField
+                    id="kit-font-body"
+                    label="Body font"
+                    role="body"
+                    value={form.fonts.body}
+                    sample={
+                      form.description.trim() ||
+                      "Paste your website and get a batch of ads in minutes."
+                    }
+                    error={errorFor("fonts.body")}
+                    onChange={(value) =>
+                      set("fonts", { ...form.fonts, body: value })
+                    }
+                  />
                 </div>
               </FieldGroup>
             </CardContent>

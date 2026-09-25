@@ -16,7 +16,7 @@ const facts: PageFacts = {
   siteName: null,
   text: "…",
   colors: ["#ff5a1f", "#2f6bff"],
-  fonts: ["Space Grotesk"],
+  fonts: ["Helvetica", "montserrat"],
   logoUrls: [],
   pricingUrl: null,
 }
@@ -80,7 +80,8 @@ describe("toDraftFields", () => {
       ],
       bannedWords: [],
       colors: { primary: "#ff5a1f", secondary: "#2f6bff" },
-      fonts: { heading: "Space Grotesk", body: "Space Grotesk" },
+      // Helvetica isn't an ad font; the site's Montserrat is.
+      fonts: { heading: "Montserrat", body: "Montserrat" },
       tone: "Friendly, plain",
     })
   })

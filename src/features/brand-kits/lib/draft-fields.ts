@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { toAdFont, type AdFontName } from "@/shared/config/ad-fonts"
+
 import {
   brandKitFieldsSchema,
   brandKitLimits as L,
@@ -70,7 +72,10 @@ export function toDraftFields(
   pricingUrl: string | null
 ): BrandKitFields {
   const [primary, secondary, accent] = facts.colors
+  // Only fonts ads can render; the site's others are dropped.
   const [headingFont, bodyFont] = facts.fonts
+    .map(toAdFont)
+    .filter((font): font is AdFontName => font !== null)
 
   return brandKitFieldsSchema.parse({
     name: clip(ai?.name ?? "", L.name) || fallbackName(facts),

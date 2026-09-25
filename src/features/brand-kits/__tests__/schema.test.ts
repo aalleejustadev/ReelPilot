@@ -17,7 +17,7 @@ const validFields: BrandKitFieldsInput = {
   claims: [{ text: "Ads in minutes", sourceUrl: "https://reelpilot.app" }],
   bannedWords: ["guaranteed"],
   colors: { primary: "#18B26B" },
-  fonts: { heading: "Geist" },
+  fonts: { heading: "Inter" },
   tone: "Plain and confident",
 }
 
@@ -106,5 +106,17 @@ describe("brandKitFieldsSchema", () => {
     expect(messagesFor({ ...validFields, claims: tooMany })).toContain(
       `Add up to ${brandKitLimits.claims} claims.`
     )
+  })
+
+  it("stores fonts in the list's spelling and rejects fonts ads can't use", () => {
+    expect(
+      brandKitFieldsSchema.parse({
+        ...validFields,
+        fonts: { heading: " bebas neue ", body: "" },
+      }).fonts
+    ).toEqual({ heading: "Bebas Neue", body: undefined })
+    expect(
+      messagesFor({ ...validFields, fonts: { heading: "Comic Sans MS" } })
+    ).toContain("Choose a font from the list.")
   })
 })

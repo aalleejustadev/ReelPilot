@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { toAdFont } from "@/shared/config/ad-fonts"
+
 /** Field limits, shared by validation and the editor's hints. */
 export const brandKitLimits = {
   name: 60,
@@ -12,7 +14,6 @@ export const brandKitLimits = {
   claims: 20,
   bannedWord: 40,
   bannedWords: 50,
-  font: 60,
   tone: 200,
   url: 2048,
 } as const
@@ -69,11 +70,19 @@ export const brandColorsSchema = z.object({
 })
 export type BrandColors = z.infer<typeof brandColorsSchema>
 
+/** One of the ad fonts (any casing), stored in the list's spelling. */
 const fontName = z
   .string()
   .trim()
-  .max(L.font, `Keep font names under ${L.font} characters.`)
-  .transform((value) => value || undefined)
+  .transform((value, ctx) => {
+    if (!value) return undefined
+    const font = toAdFont(value)
+    if (!font) {
+      ctx.addIssue({ code: "custom", message: "Choose a font from the list." })
+      return z.NEVER
+    }
+    return font
+  })
 
 export const brandFontsSchema = z.object({
   heading: fontName.optional(),

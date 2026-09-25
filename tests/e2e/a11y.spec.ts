@@ -98,6 +98,16 @@ test.describe("signed in", () => {
     await expectNoViolations(page)
   })
 
+  test("no accessibility violations with the font menu open", async ({
+    page,
+    signedInUser: _user,
+  }) => {
+    await createKitByHand(page)
+    await page.getByRole("combobox", { name: "Heading font" }).click()
+    await expect(page.getByRole("option", { name: "Inter" })).toBeVisible()
+    await expectNoViolations(page)
+  })
+
   test("no accessibility violations on the brand kit list and create error", async ({
     page,
     signedInUser: _user,

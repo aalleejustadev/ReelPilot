@@ -298,7 +298,7 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 
 ### 7.3 brand-kits
 - **Purpose:** Everything the AI needs to know about the product.
-- **Fields:** name, URL, one-line description, audience, key features (list), pricing summary, **allowed claims** (list, each optionally with a source link), banned words, logo, colors, fonts, tone.
+- **Fields:** name, URL, one-line description, audience, key features (list), pricing summary, **allowed claims** (list, each optionally with a source link), banned words, logo, colors (colour picker), fonts (heading + body, from the 15 ad fonts in `src/shared/config/ad-fonts.ts`, with previews), tone.
 - **Actions:** `createKitFromUrl`, `updateKit`, `refreshFromSite` `[V1.1]`.
 - **Acceptance:** Extraction pre-fills all fields; user can edit and save; plan limit on number of kits enforced.
 

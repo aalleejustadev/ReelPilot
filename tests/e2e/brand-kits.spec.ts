@@ -49,15 +49,31 @@ test("create, edit, save and delete a brand kit", async ({
   ).toBeVisible()
   await expect(source).toHaveAttribute("aria-invalid", "true")
 
-  // Fixed, saved, and still there after a reload.
+  // Fixed, saved, and still there when reopened.
   await source.fill("https://acme.app/setup")
   await page
     .getByRole("textbox", { name: "Key features" })
     .fill("Reminders\nStripe payouts")
-  await page.getByRole("textbox", { name: "Primary colour" }).fill("#FF5A1F")
+  // The swatch opens the system colour picker; the hex box follows it.
+  await page.getByLabel("Pick primary colour").fill("#ff5a1f")
+  await expect(
+    page.getByRole("textbox", { name: "Primary colour", exact: true })
+  ).toHaveValue("#ff5a1f")
+  // Fonts come from the list, each shown in its own face, with a preview.
+  await page.getByRole("combobox", { name: "Heading font" }).click()
+  await page.getByRole("option", { name: "Bebas Neue" }).click()
+  await expect(
+    page.getByRole("combobox", { name: "Heading font" })
+  ).toContainText("Bebas Neue")
+  await expect(page.getByText("Acme", { exact: true }).last()).toHaveCSS(
+    "font-family",
+    /Bebas Neue/
+  )
   await page.getByRole("button", { name: "Save changes" }).first().click()
   await expect(page.getByText("Brand kit saved")).toBeVisible()
-  await page.reload()
+  // Saving returns to the list; the changes are there when reopened.
+  await expect(page).toHaveURL(/\/brand-kits$/)
+  await page.getByRole("link", { name: "Acme" }).click()
   await expect(
     page.getByRole("heading", { level: 1, name: "Acme" })
   ).toBeVisible()
@@ -68,8 +84,11 @@ test("create, edit, save and delete a brand kit", async ({
     "Reminders\nStripe payouts"
   )
   await expect(
-    page.getByRole("textbox", { name: "Primary colour" })
+    page.getByRole("textbox", { name: "Primary colour", exact: true })
   ).toHaveValue("#ff5a1f")
+  await expect(
+    page.getByRole("combobox", { name: "Heading font" })
+  ).toContainText("Bebas Neue")
   await noSidewaysScroll(page)
 
   // The list shows it, and the Free plan's one kit is used up.
