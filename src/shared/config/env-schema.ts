@@ -4,7 +4,7 @@ import { z } from "zod"
  * Server environment. Add a variable here in the slice that first uses it,
  * and mirror it in .env.example.
  */
-export const envSchema = z.object({
+const envSchema = z.object({
   // Neon pooled connection for app traffic. Migrations use the direct
   // DATABASE_URL_UNPOOLED, which only the Prisma CLI reads.
   DATABASE_URL: z.url({ protocol: /^postgres(ql)?$/ }),

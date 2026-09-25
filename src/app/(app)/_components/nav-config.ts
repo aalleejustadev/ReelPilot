@@ -11,7 +11,7 @@ export const navItems = [
 ] as const
 
 /** Top bar titles, most specific path first. */
-export const pageTitles: { prefix: string; title: string }[] = [
+const pageTitles: { prefix: string; title: string }[] = [
   { prefix: "/settings/profile", title: "Profile" },
   { prefix: "/settings/workspace", title: "Workspace" },
   { prefix: "/settings", title: "Settings" },

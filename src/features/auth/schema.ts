@@ -12,5 +12,3 @@ export const updateProfileSchema = z.object({
       `Keep your name under ${profileNameMaxLength} characters.`
     ),
 })
-
-export type UpdateProfileInput = z.infer<typeof updateProfileSchema>

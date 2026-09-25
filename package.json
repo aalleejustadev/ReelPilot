@@ -46,6 +46,7 @@
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "better-call": "^1.4.0",
     "dotenv": "^18.0.3",
     "eslint": "^9.39.5",
     "eslint-config-next": "16.3.6",

@@ -22,11 +22,13 @@ npm run dev
 | `npm run build` | Production build |
 | `npm run lint` | ESLint, including slice-boundary rules |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest tests (database tests run only when `.env` exists) |
+| `npm test` | Vitest unit tests; database tests run when `DATABASE_URL` is set |
+| `npm run test:watch` | Vitest in watch mode |
 | `npm run db:migrate -- --name <name>` | Create and apply a migration, then regenerate the Prisma client |
 | `npm run db:deploy` | Apply existing migrations |
+| `npm run db:generate` | Regenerate the Prisma client |
 | `npm run db:studio` | Browse the database |
-| `npm run test:e2e` | Playwright e2e (first run: `npx playwright install chromium`). Signed-in tests create a throwaway user and session in the database from `.env` and delete it afterwards; they skip when there's no `.env` (CI) |
+| `npm run test:e2e` | Playwright e2e on desktop and 375px mobile (first run: `npx playwright install chromium`) |
 | `npm run format` | Prettier |
 
 ## Structure
@@ -41,7 +43,13 @@ src/
 prisma/         # schema.prisma + migrations
 ```
 
-Add shadcn components with `npx shadcn@latest add <name>` — they land in `src/shared/ui`.
+Add shadcn components with `npx shadcn@latest add <name>` — they land in `src/shared/ui` (style `base-vega`). Follow the design rules in build plan §12, including the spacing table in §12.5.
+
+## Testing
+
+- **Unit and integration** (`npm test`): services, schemas, actions and the real magic-link flow. Tests that need a database run against `DATABASE_URL`.
+- **End to end** (`npm run test:e2e`): pages, signed-in flows, accessibility (axe, WCAG 2.2 A/AA) and keyboard use. Signed-in tests create a throwaway user and session and delete them afterwards; they skip when `DATABASE_URL_UNPOOLED` isn't set.
+- **CI** (GitHub Actions): lint, types, formatting, unit, build and e2e on every push, against a fresh `postgres:17` service container with all migrations applied.
 
 ## Database migrations
 

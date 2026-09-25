@@ -1,15 +1,12 @@
-export const appErrorCodes = [
-  "NOT_FOUND",
-  "FORBIDDEN",
-  "INSUFFICIENT_CREDITS",
-  "COMPLIANCE_BLOCKED",
-  "PROVIDER_FAILED",
-  "RATE_LIMITED",
-  "VALIDATION",
-  "INTERNAL",
-] as const
-
-export type AppErrorCode = (typeof appErrorCodes)[number]
+export type AppErrorCode =
+  | "NOT_FOUND"
+  | "FORBIDDEN"
+  | "INSUFFICIENT_CREDITS"
+  | "COMPLIANCE_BLOCKED"
+  | "PROVIDER_FAILED"
+  | "RATE_LIMITED"
+  | "VALIDATION"
+  | "INTERNAL"
 
 /**
  * An expected failure with a message that is safe to show the user.

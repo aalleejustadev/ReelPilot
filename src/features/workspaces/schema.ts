@@ -12,5 +12,3 @@ export const renameWorkspaceSchema = z.object({
       `Keep the name under ${workspaceNameMaxLength} characters.`
     ),
 })
-
-export type RenameWorkspaceInput = z.infer<typeof renameWorkspaceSchema>
