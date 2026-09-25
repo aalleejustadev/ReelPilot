@@ -28,3 +28,12 @@ One line per decision: `YYYY-MM-DD — decision — reason`.
 - 2026-09-23 — Tables use lowercase plural names via `@@map`; columns keep Better Auth's camelCase names.
 - 2026-09-23 — Migrated on the Neon main branch (no real data yet); switch development to a `dev` branch at M2, when the Neon CLI is installed.
 - 2026-09-23 — Database tests run against the real database when `.env` exists and skip otherwise (CI).
+- 2026-09-25 — Added `chroma-strong` (#007B38) and `tally-strong` (#CA2C37) — plain chroma (2.8:1) and tally (3.9:1) fail WCAG AA as text on white; the strong shades carry text, icons, focus rings and white-on-colour fills. A contrast test reads globals.css and fails if any pair drops below AA, and flags any `text-chroma` usage.
+- 2026-09-25 — Chroma buttons use ink text, not white — white on chroma is 2.8:1.
+- 2026-09-25 — Display font is Google's "Big Shoulders" with the `opsz` axis — "Big Shoulders Display" no longer exists as a separate family; optical sizing picks the display cut at large sizes.
+- 2026-09-25 — `--radius: 10px` so shadcn's derived sizes land on the plan: rounded-sm 6px (controls), rounded-lg 10px (panels), rounded-2xl 18px (phone frames).
+- 2026-09-25 — Tailwind's text-xl…5xl overridden to the §12.3 scale (1.375 / 1.75 / 2.5 / 3.75 / 5rem).
+- 2026-09-25 — Removed shadcn's dark theme and chart tokens — dark mode is V1.1, charts arrive with admin (M11).
+- 2026-09-25 — Status badges (draft/rendering/ready/failed/warning) use opaque fills so they read on light panels and dark video frames.
+- 2026-09-25 — `use-mobile` rewritten with `useSyncExternalStore` — the shadcn version set state in an effect and failed react-hooks lint.
+- 2026-09-25 — Home page is a temporary design-system showcase (`src/app/_showcase`, owner request) until the landing page in M12.
