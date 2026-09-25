@@ -1,5 +1,5 @@
 // Each slice adds its own models in its own migration (M0: auth, workspaces;
-// M1: brand kits).
+// M1: brand kits, rate limit buckets).
 // Models are PascalCase; tables are lowercase plurals via @@map.
 
 generator client {
@@ -190,4 +190,17 @@ model AllowedClaim {
 
   @@unique([brandKitId, position])
   @@map("allowed_claims")
+}
+
+// ─── App rate limits ────────────────────────────────────────────────────────
+// Fixed-window counters for costly actions (src/shared/rate-limit), e.g.
+// AI drafts per workspace per day. Better Auth keeps its own `rate_limits`.
+
+model RateLimitBucket {
+  // e.g. "brand-kit-draft:<workspaceId>"
+  key         String   @id
+  count       Int
+  windowStart DateTime
+
+  @@map("rate_limit_buckets")
 }

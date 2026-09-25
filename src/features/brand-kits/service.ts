@@ -15,6 +15,20 @@ const kitNotFound = () =>
   )
 
 /**
+ * Cheap early check before costly work (the AI draft). Not race-safe on its
+ * own: createBrandKit re-checks under a lock.
+ */
+export async function assertRoomForBrandKit(workspace: {
+  id: string
+  plan: Plan
+}) {
+  const kitCount = await db.brandKit.count({
+    where: { workspaceId: workspace.id },
+  })
+  assertCanAddBrandKit(workspace.plan, kitCount)
+}
+
+/**
  * Creates a kit if the workspace's plan allows another. The workspace row is
  * locked for the check, so concurrent creates can't both pass the limit.
  */

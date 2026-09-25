@@ -24,6 +24,13 @@ const nextConfig: NextConfig = {
   devIndicators: false,
   // Don't advertise the framework in an X-Powered-By header.
   poweredByHeader: false,
+  experimental: {
+    serverActions: {
+      // Logo uploads are up to 2 MB; the limit counts the raw multipart
+      // body, so leave room for its boundaries and headers.
+      bodySizeLimit: 2 * 1024 * 1024 + 64 * 1024,
+    },
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }]
   },

@@ -83,3 +83,9 @@ export const credits = {
   topUpPackSize: 5,
   topUpPriceCents: null, // TODO(owner): set top-up price
 } as const
+
+/** Caps on costly AI work, independent of plan. */
+export const aiLimits = {
+  /** "Create from URL" drafts per workspace per day (each is an AI call). */
+  brandKitDraftsPerDay: 20,
+} as const

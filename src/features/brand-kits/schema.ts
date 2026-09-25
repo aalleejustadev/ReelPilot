@@ -171,3 +171,12 @@ export const brandKitFieldsSchema = z.object({
 })
 export type BrandKitFields = z.infer<typeof brandKitFieldsSchema>
 export type BrandKitFieldsInput = z.input<typeof brandKitFieldsSchema>
+
+export const kitIdSchema = z.string().min(1).max(64)
+
+export const createFromUrlSchema = z.object({ url: websiteUrlSchema })
+
+export const saveBrandKitSchema = z.object({
+  kitId: kitIdSchema,
+  fields: brandKitFieldsSchema,
+})

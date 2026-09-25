@@ -100,3 +100,21 @@ export function toDraftFields(
     tone: ai?.tone ? clip(ai.tone, L.tone) : null,
   })
 }
+
+/** An empty kit for `url`, for when the user fills it in themselves. */
+export function blankFields(url: string): BrandKitFields {
+  const host = new URL(url).hostname.replace(/^www\./, "")
+  return brandKitFieldsSchema.parse({
+    name: clip(host, L.name),
+    url,
+    description: "",
+    audience: "",
+    features: [],
+    pricingSummary: null,
+    claims: [],
+    bannedWords: [],
+    colors: {},
+    fonts: {},
+    tone: null,
+  })
+}
