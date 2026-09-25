@@ -36,6 +36,7 @@ describe.runIf(hasDatabase)("background jobs (pg-boss)", () => {
 
   const received: string[] = []
   const attempts = new Map<string, number>()
+  const lastAttemptFlags: boolean[] = []
 
   beforeAll(async () => {
     jobs = await import("../index")
@@ -45,7 +46,8 @@ describe.runIf(hasDatabase)("background jobs (pg-boss)", () => {
         worker.handle(echoJob, async ({ message }) => {
           received.push(message)
         }),
-        worker.handle(flakyJob, async ({ id }) => {
+        worker.handle(flakyJob, async ({ id }, { isLastAttempt }) => {
+          lastAttemptFlags.push(isLastAttempt)
           const count = (attempts.get(id) ?? 0) + 1
           attempts.set(id, count)
           if (count < 2) throw new Error("provider hiccup")
@@ -73,6 +75,8 @@ describe.runIf(hasDatabase)("background jobs (pg-boss)", () => {
     await jobs.enqueue(flakyJob, { id: "a" })
 
     await waitFor(() => attempts.get("a") === 2, 30_000)
+    // 3 retries allowed, so neither attempt was the last.
+    expect(lastAttemptFlags).toEqual([false, false])
   })
 
   it("refuses a bad payload at the caller", async () => {

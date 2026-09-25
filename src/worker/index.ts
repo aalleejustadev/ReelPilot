@@ -6,12 +6,13 @@
  * with the "react-server" condition so shared modules marked `server-only`
  * load outside Next.
  */
-import { startWorkers } from "@/shared/jobs/worker"
+import { startMaintenance, startWorkers } from "@/shared/jobs/worker"
 
-import { registrations } from "./registrations"
+import { maintenance, registrations } from "./registrations"
 
 async function main() {
   const boss = await startWorkers(registrations)
+  const stopMaintenance = startMaintenance(maintenance)
   console.info(
     `[worker] running ${registrations.length} job type(s): ${
       registrations.map((r) => r.job.name).join(", ") || "none"
@@ -23,6 +24,7 @@ async function main() {
     if (stopping) return
     stopping = true
     console.info(`[worker] ${signal}: finishing running jobs, then stopping`)
+    stopMaintenance()
     // Graceful: running jobs get up to 30s to finish; the rest stay queued.
     await boss.stop({ graceful: true, timeout: 30_000 })
     process.exit(0)
