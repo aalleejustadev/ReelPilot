@@ -1,6 +1,6 @@
 "use client"
 
-import { useActionState, useEffect } from "react"
+import { useActionState, useEffect, useState } from "react"
 
 import { Button } from "@/shared/ui/button"
 import { Field, FieldError, FieldLabel } from "@/shared/ui/field"
@@ -12,6 +12,11 @@ import { renameWorkspace } from "../actions"
 import { workspaceNameMaxLength } from "../schema"
 
 export function RenameWorkspaceForm({ currentName }: { currentName: string }) {
+  // Controlled: after a rename the page re-renders with the new currentName.
+  // An uncontrolled input would see its defaultValue change after mount
+  // (Base UI warns) and React would reset it after the action, losing what
+  // the user typed when validation fails.
+  const [name, setName] = useState(currentName)
   // useActionState's isPending is true for the whole action, so the button
   // shows its loading state immediately (build plan §12.5).
   const [result, formAction, isPending] = useActionState(renameWorkspace, null)
@@ -35,7 +40,8 @@ export function RenameWorkspaceForm({ currentName }: { currentName: string }) {
           <Input
             id="workspace-name"
             name="name"
-            defaultValue={currentName}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             maxLength={workspaceNameMaxLength}
             aria-invalid={nameError ? true : undefined}
             required
