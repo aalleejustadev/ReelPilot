@@ -154,3 +154,54 @@ test("unknown pages show a helpful not-found page", async ({ page }) => {
     page.getByRole("link", { name: "Go to dashboard" })
   ).toBeVisible()
 })
+
+test("collapsed sidebar centres its icons", async ({
+  page,
+  context,
+  baseURL,
+  signedInUser: _user,
+}, testInfo) => {
+  test.skip(isMobile(testInfo.project.name), "Desktop sidebar only")
+  await context.addCookies([
+    { name: "sidebar_state", value: "false", url: baseURL! },
+  ])
+  await page.goto("/dashboard")
+
+  const offsets = await page.evaluate(() => {
+    const rail = document
+      .querySelector('[data-slot="sidebar-container"]')!
+      .getBoundingClientRect()
+    const centre = rail.left + rail.width / 2
+    return [
+      ...document.querySelectorAll(
+        '[data-slot="sidebar-container"] [data-sidebar="menu-button"]'
+      ),
+    ].map((button) => {
+      const box = button.getBoundingClientRect()
+      return Math.abs(box.left + box.width / 2 - centre)
+    })
+  })
+
+  expect(offsets.length).toBeGreaterThan(0)
+  for (const offset of offsets) expect(offset).toBeLessThanOrEqual(0.5)
+})
+
+test("page content is a centred column", async ({
+  page,
+  signedInUser: _user,
+}) => {
+  await page.setViewportSize({ width: 1600, height: 900 })
+  await page.goto("/settings/profile")
+
+  const heading = page.getByRole("heading", { level: 1, name: "Settings" })
+  const gaps = await heading.evaluate((element) => {
+    const column = element.closest(".mx-auto")!.getBoundingClientRect()
+    const inset = document
+      .querySelector('[data-slot="sidebar-inset"]')!
+      .getBoundingClientRect()
+    return { left: column.left - inset.left, right: inset.right - column.right }
+  })
+
+  expect(Math.abs(gaps.left - gaps.right)).toBeLessThanOrEqual(1)
+  await expect(heading).toHaveCSS("text-align", "start")
+})

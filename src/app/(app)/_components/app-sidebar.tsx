@@ -19,7 +19,8 @@ import { NavMain } from "./nav-main"
 import { NavUser, type NavUserProps } from "./nav-user"
 
 // Follows shadcn's sidebar-07 block: collapses to icons on desktop and
-// becomes a sheet on mobile.
+// becomes a sheet on mobile. The roomier padding applies only when expanded:
+// the collapsed rail is 48px and needs shadcn's 8px to centre 32px icons.
 export function AppSidebar({
   workspaceName,
   user,
@@ -31,7 +32,7 @@ export function AppSidebar({
 }) {
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-3">
+      <SidebarHeader className="p-3 group-data-[collapsible=icon]:p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href="/dashboard" />}>
@@ -48,10 +49,10 @@ export function AppSidebar({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent className="px-1">
+      <SidebarContent className="px-1 group-data-[collapsible=icon]:px-0">
         <NavMain />
       </SidebarContent>
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
         <NavUser {...user} signOutItem={signOutItem} />
       </SidebarFooter>
       <SidebarRail />

@@ -667,7 +667,8 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | Forms | vega `FieldGroup`/`Field` spacing; input + button on one row use `gap-3` |
 | Controls | App: default size (36px). Auth pages and marketing CTAs: `lg` (40px) |
 | Button padding | Default `px-3`, `sm` `px-3`, `lg` `px-4` (set once in `button.tsx`; owner request) |
-| Sidebar | Header/footer `p-3`, menu `gap-1.5`, nav items `h-9` |
+| Sidebar | Expanded: header/footer `p-3`, menu `gap-1.5`, nav items `h-9`. Collapsed: shadcn's `p-2` (`group-data-[collapsible=icon]:p-2`), so icons centre in the 48px rail |
+| Content column | Centred: `mx-auto w-full max-w-5xl` in the app layout; settings `max-w-3xl`. Text stays left-aligned |
 | Button groups / nav tabs | `gap-2`–`gap-3` |
 
 ### 12.6 Motion

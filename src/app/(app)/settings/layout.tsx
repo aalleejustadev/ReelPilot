@@ -6,7 +6,7 @@ export default function SettingsLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-8">
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
           Settings

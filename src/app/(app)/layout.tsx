@@ -30,7 +30,12 @@ export default async function AppLayout({
       />
       <SidebarInset>
         <AppHeader />
-        <div className="flex flex-1 flex-col p-6 md:p-8">{children}</div>
+        <div className="flex flex-1 flex-col p-6 md:p-8">
+          {/* Centred column; text stays left-aligned. */}
+          <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col">
+            {children}
+          </div>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )
