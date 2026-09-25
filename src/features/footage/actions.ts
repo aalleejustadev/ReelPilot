@@ -4,19 +4,29 @@ import { revalidatePath } from "next/cache"
 import { unstable_rethrow } from "next/navigation"
 import { z } from "zod"
 
+import { getBrandKit } from "@/features/brand-kits"
 import { requireWorkspaceAccess } from "@/features/workspaces"
+import { aiLimits } from "@/shared/config/plans"
 import { enqueue } from "@/shared/jobs"
 import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
+import type { Presentation, Shot } from "@/shared/motion"
+import { consumeRateLimit } from "@/shared/rate-limit"
 import { deleteFolder, fileSize, signedFileUpload } from "@/shared/storage"
 
 import { processFootageJob } from "./jobs/definitions"
+import { directMotion } from "./lib/direct-motion"
+import { presentationFor } from "./lib/motion"
+import { getFootage } from "./queries"
 import {
   addMarkerSchema,
   completeUploadSchema,
+  directMotionSchema,
   footageIdSchema,
   requestUploadSchema,
   updateMarkerSchema,
+  updatePresentationSchema,
+  updateShotSchema,
 } from "./schema"
 import * as service from "./service"
 
@@ -194,6 +204,96 @@ export async function deleteFootageMarker(
 
     refreshFootage()
     return ok(null)
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+export async function updateMarkerShot(input: unknown): Promise<Result<null>> {
+  try {
+    const parsed = updateShotSchema.safeParse(input)
+    if (!parsed.success)
+      throw invalid(parsed.error, "Check the camera settings.")
+
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    await service.setMarkerShot(
+      workspace.id,
+      parsed.data.markerId,
+      parsed.data.shot
+    )
+
+    refreshFootage()
+    return ok(null)
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+export async function updateFootagePresentation(
+  input: unknown
+): Promise<Result<null>> {
+  try {
+    const parsed = updatePresentationSchema.safeParse(input)
+    if (!parsed.success) throw invalid(parsed.error, "Check the clip’s style.")
+
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    await service.setFootagePresentation(
+      workspace.id,
+      parsed.data.footageId,
+      parsed.data.presentation
+    )
+
+    refreshFootage()
+    return ok(null)
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+/** "Direct with AI": turns the owner's words into shots for every marker. */
+export async function directFootageMotion(input: unknown): Promise<
+  Result<{
+    presentation: Presentation
+    shots: { markerId: string; shot: Shot }[]
+  }>
+> {
+  try {
+    const parsed = directMotionSchema.safeParse(input)
+    if (!parsed.success)
+      throw invalid(parsed.error, "Describe the motion you want.")
+
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    const clip = await getFootage(workspace.id, parsed.data.footageId)
+    if (!clip || clip.status !== "READY" || !clip.durationMs) {
+      throw new AppError("NOT_FOUND", "That clip isn’t ready yet.")
+    }
+    if (clip.markers.length === 0) {
+      throw new AppError(
+        "VALIDATION",
+        "Add a key moment first: the AI directs the camera at each one."
+      )
+    }
+    await consumeRateLimit({
+      key: `motion-direction:${workspace.id}`,
+      limit: aiLimits.motionDirectionsPerDay,
+      windowSeconds: 24 * 60 * 60,
+      message: `You’ve used AI direction ${aiLimits.motionDirectionsPerDay} times today. Adjust the shots by hand, or try again tomorrow.`,
+    })
+
+    const kit = await getBrandKit(workspace.id, clip.brandKitId)
+    const direction = await directMotion({
+      instruction: parsed.data.instruction,
+      durationMs: clip.durationMs,
+      markers: clip.markers,
+      current: presentationFor(clip.presentation, kit?.colors ?? {}),
+    })
+    await service.applyMotionDirection(workspace.id, clip.id, direction)
+
+    refreshFootage()
+    return ok(direction)
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

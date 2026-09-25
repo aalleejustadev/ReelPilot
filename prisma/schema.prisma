@@ -255,6 +255,9 @@ model Footage {
   height              Int?
   // User-safe reason when status is FAILED.
   errorMessage        String?
+  // Presentation (background, frame, intro) for the 3D motion (§7.4a),
+  // validated by shared/motion. Null = defaults from the brand kit.
+  presentation        Json?
   processedAt         DateTime?
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
@@ -275,6 +278,9 @@ model FootageMarker {
   atMs      Int
   label     String?
   source    MarkerSource
+  // Camera shot the view moves into at this moment (§7.4a), validated by
+  // shared/motion. Null = the camera keeps its previous shot.
+  shot      Json?
   createdAt DateTime     @default(now())
 
   footage Footage @relation(fields: [footageId], references: [id], onDelete: Cascade)

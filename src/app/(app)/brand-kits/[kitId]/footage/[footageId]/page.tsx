@@ -8,8 +8,10 @@ import {
   DeleteClipButton,
   formatDuration,
   getFootage,
+  presentationFor,
   RefreshWhileProcessing,
 } from "@/features/footage"
+import { getBrandKit } from "@/features/brand-kits"
 import { can, requireWorkspaceAccess } from "@/features/workspaces"
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert"
 import { LinkButton } from "@/shared/ui/link-button"
@@ -26,6 +28,12 @@ export default async function ClipPage({
   if (!clip || clip.brandKitId !== kitId) notFound()
 
   const media = await clipMediaUrls(clip)
+  // Cached: the kit layout already loaded it for this request.
+  const kit = await getBrandKit(workspace.id, kitId)
+  const colors = kit?.colors ?? {}
+  const brandColors = [colors.primary, colors.secondary, colors.accent].filter(
+    (color): color is string => Boolean(color)
+  )
   const canEdit = can(role, "content:edit")
   const isWorking = clip.status === "UPLOADING" || clip.status === "PROCESSING"
 
@@ -70,6 +78,8 @@ export default async function ClipPage({
           videoUrl={media.videoUrl}
           posterUrl={media.posterUrl}
           thumbnailsUrl={media.thumbnailsUrl}
+          initialPresentation={presentationFor(clip.presentation, colors)}
+          brandColors={brandColors}
           readOnly={!canEdit}
         />
       ) : clip.status === "FAILED" ? (

@@ -8,6 +8,7 @@ export { RefreshWhileProcessing } from "./components/refresh-while-processing"
 export { ScreenRecorder } from "./components/screen-recorder"
 export { formatDuration } from "./lib/format"
 export { footageLimitsFor, footageUsage } from "./lib/limits"
+export { presentationFor } from "./lib/motion"
 export {
   clipMediaUrls,
   getFootage,

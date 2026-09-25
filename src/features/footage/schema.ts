@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { presentationSchema, shotSchema } from "@/shared/motion"
+
 /** Accepted video types → file extension for the stored original. */
 export const footageTypes = {
   "video/mp4": "mp4",
@@ -72,3 +74,22 @@ export const updateMarkerSchema = z.object({
 })
 
 export const footageIdSchema = idSchema
+
+export const updateShotSchema = z.object({
+  markerId: idSchema,
+  shot: shotSchema.nullable(),
+})
+
+export const updatePresentationSchema = z.object({
+  footageId: idSchema,
+  presentation: presentationSchema,
+})
+
+export const directMotionSchema = z.object({
+  footageId: idSchema,
+  instruction: z
+    .string()
+    .trim()
+    .min(1, "Describe the motion you want.")
+    .max(500, "Keep the instruction under 500 characters."),
+})

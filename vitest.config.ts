@@ -21,6 +21,8 @@ export default defineConfig({
       "@": fromRoot("./src"),
       // Tests run outside React Server Components, where `server-only` throws.
       "server-only": fromRoot("./node_modules/server-only/empty.js"),
+      // Next's font loader only runs inside Next's build.
+      "next/font/google": fromRoot("./src/shared/testing/next-font-stub.ts"),
     },
   },
   test: {

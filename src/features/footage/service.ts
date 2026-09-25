@@ -1,6 +1,7 @@
 import "server-only"
 
-import { db, type Plan } from "@/shared/db"
+import { db, Prisma, type Plan } from "@/shared/db"
+import type { Presentation, Shot } from "@/shared/motion"
 import { AppError } from "@/shared/lib/errors"
 
 import { footageFileKey, footageFolder, originalFileName } from "./lib/keys"
@@ -254,5 +255,59 @@ export async function deleteFootage(workspaceId: string, footageId: string) {
     if (!clip) throw footageNotFound()
     await tx.footage.delete({ where: { id: footageId } })
     return { folder: footageFolder(workspaceId, clip.brandKitId, footageId) }
+  })
+}
+
+// ── Motion (§7.4a) ──────────────────────────────────────────────────────────
+
+/** Sets (or clears, with null) the camera shot a marker moves into. */
+export async function setMarkerShot(
+  workspaceId: string,
+  markerId: string,
+  shot: Shot | null
+) {
+  const { count } = await db.footageMarker.updateMany({
+    where: markerInWorkspace(markerId, workspaceId),
+    data: { shot: shot ?? Prisma.DbNull },
+  })
+  if (count === 0) throw new AppError("NOT_FOUND", "That marker is gone.")
+}
+
+export async function setFootagePresentation(
+  workspaceId: string,
+  footageId: string,
+  presentation: Presentation
+) {
+  const { count } = await db.footage.updateMany({
+    where: { id: footageId, workspaceId },
+    data: { presentation },
+  })
+  if (count === 0) throw footageNotFound()
+}
+
+/**
+ * Saves an AI direction in one go: the intro, and a shot per marker.
+ * Markers not in this clip (or workspace) are ignored.
+ */
+export async function applyMotionDirection(
+  workspaceId: string,
+  footageId: string,
+  direction: {
+    presentation: Presentation
+    shots: { markerId: string; shot: Shot }[]
+  }
+) {
+  await db.$transaction(async (tx) => {
+    const { count } = await tx.footage.updateMany({
+      where: { id: footageId, workspaceId },
+      data: { presentation: direction.presentation },
+    })
+    if (count === 0) throw footageNotFound()
+    for (const { markerId, shot } of direction.shots) {
+      await tx.footageMarker.updateMany({
+        where: { id: markerId, footageId },
+        data: { shot },
+      })
+    }
   })
 }

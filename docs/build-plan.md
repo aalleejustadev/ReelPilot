@@ -310,6 +310,15 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **Where it lives:** a Footage tab on each brand kit (`/brand-kits/[kitId]/footage`), clip page `/brand-kits/[kitId]/footage/[footageId]`.
 - **Acceptance:** Upload and recording both produce a playable clip with thumbnails and at least auto-detected markers; users can add/remove markers.
 
+### 7.4a footage motion `[V1, owner-added 2026-09-25]`
+- **Purpose:** Present screen footage like a product intro: the recording sits on a styled background and the camera tilts, turns, zooms and glides between the moments the owner marked.
+- **Shots on markers:** any marker can carry a camera shot (tilt, turn, roll, zoom, focus point) and a transition (duration, easing). From that moment the camera moves into the shot; markers without one keep the previous shot. Presets: Flat, Tilt left, Tilt right, Low angle, Top down, Push in, Dramatic.
+- **Clip presentation:** background (brand colours, gradient), frame (corner radius, shadow), intro (none, fly in from left/right, rise up, zoom out).
+- **Controls:** a right-hand inspector on the clip page (selected marker's shot, or the clip's presentation), a live 3D preview in 16:9, 9:16 or 1:1, click the video to set the focus point.
+- **AI direction:** the owner describes the motion in words; the AI proposes shots for every marker and the intro, which the owner can then adjust. Rate-limited.
+- **One source of truth:** camera math in `src/shared/motion` (pure), used by the browser preview now and the Remotion compositions in M5, so renders match the preview.
+- **Acceptance:** shots can be set per marker by preset, sliders or AI; the preview animates between them over the clip's background; settings persist; reduced-motion users get a non-animated preview.
+
 ### 7.5 presenters
 - **Purpose:** Stock presenters: a licensed still portrait paired with a Kokoro stock voice. `TODO(owner)`: source of the portraits (licensed stock photos or generated faces).
 - **`[V1.1]` — everything below in this section.**
@@ -717,6 +726,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M1 ✅ | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo — **done 2026-09-25** (see 14.3) |
 | M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
 | M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5) |
+| M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
 | M6 | Billing | billing, plans, ledger, Stripe | Subscribe, get credits, see balance |
@@ -816,6 +826,22 @@ Presenters, built in parts A–D (A: voice engine, B: presenter data + seed, C: 
 | CI | model cached (`.cache/models`), `prisma db seed` before e2e against the SeaweedFS S3 server |
 
 Still to do by the owner: replace the 8 placeholder portraits with licensed photos (same file names) and re-run the seed.
+
+### 14.6 M3b completion record (2026-09-25)
+Footage motion (§7.4a), owner-requested after M3.
+
+| Item | Evidence |
+|---|---|
+| Prisma + migration | `footage_markers.shot`, `footage.presentation` (JSON, validated by `shared/motion`); 9 migrations |
+| Zod schemas | camera (limits per axis), shot (transition, easing), presentation (background, frame, intro); action inputs; AI direction schema |
+| Logic with tests | `shared/motion` camera timeline (intro, holds, mid-move starts without jumps, ordering, cuts, easing), CSS transform/background builders, presets; AI direction clean-up (unknown/duplicate markers dropped, values clamped) and prompt fencing; motion actions (save/clear shot, limits, presentation, workspace scoping, AI apply, no-marker refusal, rate limit) — 323 unit/integration tests |
+| UI | 3D stage (CSS perspective; pose written per animation frame, React told the time 10×/s), playback bar, 16:9/9:16/1:1 preview, timeline marks moments with a camera, right-hand inspector (Shot / Style / AI tabs), auto-save with status, click-to-set focus on a flat frame |
+| States | reduced-motion preview (cuts, note), "select a moment" empty inspector, AI needs a key moment first, save failure toast, AI limit message |
+| Accessible | axe on the clip page with the inspector; labelled sliders (shadcn Slider accessibility edit), toggle groups, moments as pressed buttons with spoken times and "camera set" |
+| Responsive | inspector stacks under the editor on narrow screens; checked at 375px |
+| Playwright | upload → Ready → select the cut → Dramatic → stage transform really turned → Solid background → reload keeps both → axe (112 e2e checks) |
+
+Not yet: the AI direction was tested with a mocked model only (no live run), and rendering the motion into the final video arrives with the Remotion compositions in M5 (they use the same `cameraTimeline`).
 
 ## 15. Environment variables (`.env.example`)
 

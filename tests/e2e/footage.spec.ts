@@ -1,4 +1,5 @@
 import { expect, hasDatabase, test } from "./fixtures"
+import { expectNoViolations } from "./helpers/axe"
 import { createKitByHand } from "./helpers/brand-kits"
 import { makeTestVideo } from "./helpers/video"
 
@@ -101,11 +102,46 @@ test("upload a clip, let the worker process it, then edit its markers", async ({
   // The cut at 2s was found: on the timeline and in the list.
   await expect(
     page.getByRole("group", { name: "Timeline" }).getByRole("button", {
-      name: /^Jump to 0:02\.\d$/,
+      name: /^Select the moment at 0:02\.\d/,
     })
   ).toBeVisible()
 
+  // Give the cut a camera shot and a style; both survive a reload.
+  await page
+    .getByRole("group", { name: "Timeline" })
+    .getByRole("button", { name: /^Select the moment at 0:02/ })
+    .click()
+  const inspector = page.getByRole("complementary", { name: "Motion controls" })
+  await inspector.getByRole("button", { name: "Dramatic" }).click()
+  await expect(inspector.getByText("Saved")).toBeVisible()
+  await inspector.getByRole("tab", { name: "Style" }).click()
+  await inspector.getByRole("button", { name: "Solid" }).click()
+  await expect(inspector.getByText("Saved")).toBeVisible()
+  // The 3D stage shows the shot: the frame is turned, not flat.
+  await expect
+    .poll(() =>
+      page
+        .getByTestId("motion-stage")
+        .locator(".will-change-transform")
+        .evaluate((el) => (el as HTMLElement).style.transform)
+    )
+    .toContain("rotateY(-34deg)")
+  await page.reload()
+  await page
+    .getByRole("group", { name: "Timeline" })
+    .getByRole("button", { name: /camera set/ })
+    .click()
+  await expect(
+    page
+      .getByRole("complementary", { name: "Motion controls" })
+      .getByRole("button", { name: "Dramatic" })
+  ).toHaveAttribute("aria-pressed", "true")
+  await expectNoViolations(page)
+
   // Add a marker at the start, label it, then remove it.
+  await page
+    .getByRole("group", { name: "Timeline" })
+    .click({ position: { x: 1, y: 30 } })
   await page.getByRole("button", { name: /Add marker at 0:00\.0/ }).click()
   await expect(page.getByText("Marker added at 0:00.0")).toBeVisible()
   const label = page.getByRole("textbox", { name: "Label for 0:00.0" })

@@ -117,4 +117,6 @@ export const credits = {
 export const aiLimits = {
   /** "Create from URL" drafts per workspace per day (each is an AI call). */
   brandKitDraftsPerDay: 20,
+  /** "Direct with AI" requests for footage motion per workspace per day. */
+  motionDirectionsPerDay: 40,
 } as const
