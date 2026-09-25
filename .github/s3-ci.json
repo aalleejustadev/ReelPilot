@@ -1,0 +1,9 @@
+{
+  "identities": [
+    {
+      "name": "ci",
+      "credentials": [{ "accessKey": "ci-access", "secretKey": "ci-secret-key" }],
+      "actions": ["Admin", "Read", "Write", "List", "Tagging"]
+    }
+  ]
+}

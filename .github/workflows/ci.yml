@@ -7,8 +7,8 @@ on:
 
 # Shared by both jobs. Only DATABASE_URL points somewhere real (the Postgres
 # service container below); everything else is a placeholder that passes env
-# validation. Tests never contact Google, GitHub, Resend, Anthropic or Neon
-# storage.
+# validation. Tests never contact Google, GitHub, Resend, Anthropic or Neon;
+# storage tests run against the local S3 server below.
 env:
   DATABASE_URL: postgresql://postgres:postgres@localhost:5432/reelpilot
   DATABASE_URL_UNPOOLED: postgresql://postgres:postgres@localhost:5432/reelpilot
@@ -23,11 +23,13 @@ env:
   AI_TEXT_PROVIDER: anthropic
   AI_TEXT_MODEL: ci
   ANTHROPIC_API_KEY: sk-ant-ci
-  # Storage placeholders: the live bucket test skips without NEON_BRANCH.
-  AWS_ACCESS_KEY_ID: ci
-  AWS_SECRET_ACCESS_KEY: ci
-  AWS_ENDPOINT_URL_S3: https://storage.invalid
-  AWS_REGION: us-east-2
+  # Storage: a local SeaweedFS S3 server started in each job (open source,
+  # no account). Dummy credentials from .github/s3-ci.json.
+  AWS_ACCESS_KEY_ID: ci-access
+  AWS_SECRET_ACCESS_KEY: ci-secret-key
+  AWS_ENDPOINT_URL_S3: http://localhost:8333
+  AWS_REGION: us-east-1
+  STORAGE_TESTS: "1"
   NEXT_PUBLIC_APP_URL: http://localhost:3100
 
 jobs:
@@ -53,6 +55,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Start S3 server (SeaweedFS)
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/.github/s3-ci.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:4.47 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          for i in $(seq 1 60); do
+            curl -s -o /dev/null http://localhost:8333 && break
+            sleep 1
+          done
+      - run: npm run storage:cors -- --create-bucket
       - run: npm run lint
       - run: npm run typecheck
       - run: npx prettier --check "src/**/*.{ts,tsx}"
@@ -84,9 +96,20 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Start S3 server (SeaweedFS)
+        run: |
+          docker run -d --name s3 -p 8333:8333 \
+            -v "$PWD/.github/s3-ci.json:/etc/seaweedfs/s3.json:ro" \
+            chrislusf/seaweedfs:4.47 server -dir=/data -s3 -s3.port=8333 -s3.config=/etc/seaweedfs/s3.json
+          for i in $(seq 1 60); do
+            curl -s -o /dev/null http://localhost:8333 && break
+            sleep 1
+          done
+      - run: npm run storage:cors -- --create-bucket
       - run: npx playwright install --with-deps chromium
       - run: npx prisma migrate deploy
       # Includes the signed-in tests (fixture creates users in this database).
+      # Playwright starts the app and the job worker.
       - run: npm run test:e2e
       - uses: actions/upload-artifact@v4
         if: failure()

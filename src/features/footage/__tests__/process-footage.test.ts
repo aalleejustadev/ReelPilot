@@ -129,6 +129,41 @@ describe.runIf(hasStorage)("processFootage job", () => {
     expect(await storage.fileSize(clip.thumbnailsKey ?? "")).toBeGreaterThan(0)
   })
 
+  it("handles a browser recording that has no duration in its header", async () => {
+    // `-live 1` writes WebM the way MediaRecorder does: no duration, no cues.
+    const file = join(dir, "recording.webm")
+    await media.runFfmpeg(
+      [
+        "-f",
+        "lavfi",
+        "-i",
+        "testsrc=duration=3:size=640x400:rate=30",
+        "-c:v",
+        "libvpx",
+        "-deadline",
+        "realtime",
+        "-b:v",
+        "500k",
+        "-live",
+        "1",
+        "-f",
+        "webm",
+        file,
+      ],
+      { timeoutMs: 60_000 }
+    )
+    expect((await media.probeVideo(file))?.durationMs).toBe(0)
+    const footageId = await clipFrom(file, "video/webm")
+
+    await processFootage({ footageId }, attempt)
+
+    const clip = await db.footage.findUniqueOrThrow({
+      where: { id: footageId },
+    })
+    expect(clip.status).toBe("READY")
+    expect(clip.durationMs).toBeGreaterThan(2900)
+  })
+
   it("fails a file that isn't a video, without retrying", async () => {
     const file = join(dir, "fake.mp4")
     await writeFile(file, "<svg onload=alert(1)>")

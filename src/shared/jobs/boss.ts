@@ -3,6 +3,7 @@ import "server-only"
 import { PgBoss } from "pg-boss"
 
 import { env } from "@/shared/config/env"
+import { withStrictSsl } from "@/shared/db/connection-string"
 
 import type { JobDefinition } from "./define"
 
@@ -13,7 +14,7 @@ import type { JobDefinition } from "./define"
  */
 export function createBoss(options: { max: number; supervise: boolean }) {
   const boss = new PgBoss({
-    connectionString: env.DATABASE_URL_UNPOOLED,
+    connectionString: withStrictSsl(env.DATABASE_URL_UNPOOLED),
     max: options.max,
     supervise: options.supervise,
     schedule: false,

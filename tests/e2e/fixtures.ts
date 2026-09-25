@@ -12,6 +12,19 @@ import pg from "pg"
 if (existsSync(".env")) process.loadEnvFile(".env")
 export const hasDatabase = Boolean(process.env.DATABASE_URL_UNPOOLED)
 
+/** Same as src/shared/db/connection-string.ts (no @/ alias in e2e). */
+function strictSsl(connectionString: string) {
+  const url = new URL(connectionString)
+  if (
+    ["prefer", "require", "verify-ca"].includes(
+      url.searchParams.get("sslmode") ?? ""
+    )
+  ) {
+    url.searchParams.set("sslmode", "verify-full")
+  }
+  return url.toString()
+}
+
 type TestUser = { id: string; name: string; email: string }
 
 export const test = base.extend<{
@@ -22,7 +35,7 @@ export const test = base.extend<{
 }>({
   signedInUser: async ({ context, baseURL }, use) => {
     const db = new pg.Client({
-      connectionString: process.env.DATABASE_URL_UNPOOLED,
+      connectionString: strictSsl(process.env.DATABASE_URL_UNPOOLED ?? ""),
     })
     await db.connect()
     const id = `e2e-${randomUUID()}`

@@ -2,9 +2,9 @@ import { randomUUID } from "node:crypto"
 
 import { beforeAll, describe, expect, it } from "vitest"
 
-// Talks to the real bucket on the linked Neon branch. NEON_BRANCH is written
-// by `neon env pull` locally; CI has placeholder storage env and skips this.
-const hasStorage = Boolean(process.env.NEON_BRANCH)
+// Talks to a real bucket: the linked Neon branch locally (NEON_BRANCH is
+// written by `neon env pull`), or CI's local S3 server (STORAGE_TESTS).
+const hasStorage = Boolean(process.env.NEON_BRANCH || process.env.STORAGE_TESTS)
 
 describe.runIf(hasStorage)("file storage (Neon)", () => {
   let storage: typeof import("../index")

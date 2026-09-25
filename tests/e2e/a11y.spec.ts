@@ -116,4 +116,21 @@ test.describe("signed in", () => {
     await page.goto("/brand-kits")
     await expectNoViolations(page)
   })
+
+  test("no accessibility violations on the footage tab and recorder dialog", async ({
+    page,
+    signedInUser: _user,
+  }) => {
+    await createKitByHand(page)
+    await page.getByRole("tab", { name: "Footage" }).click()
+    await expect(page.getByText("No footage yet")).toBeVisible()
+    await expectNoViolations(page)
+
+    await page.getByRole("button", { name: "Record your screen" }).click()
+    // Named: toasts are dialogs too.
+    await expect(
+      page.getByRole("dialog", { name: "Record your screen" })
+    ).toBeVisible()
+    await expectNoViolations(page)
+  })
 })

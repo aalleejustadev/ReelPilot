@@ -75,3 +75,20 @@ describe("pickAutoMarkers", () => {
     expect(pickAutoMarkers([], 3000)).toEqual([])
   })
 })
+
+describe("formatting and file types", async () => {
+  const { formatDuration, formatTimecode, videoTypeOf } =
+    await import("../lib/format")
+
+  it("formats clip lengths and marker times", () => {
+    expect(formatDuration(65_400)).toBe("1:05")
+    expect(formatTimecode(12_450)).toBe("0:12.4")
+    expect(formatTimecode(61_000)).toBe("1:01.0")
+  })
+
+  it("falls back to the extension when the browser gives no type", () => {
+    expect(videoTypeOf({ type: "", name: "Demo.MOV" })).toBe("video/quicktime")
+    expect(videoTypeOf({ type: "video/webm;codecs=vp9" })).toBe("video/webm")
+    expect(videoTypeOf({ type: "", name: "notes.txt" })).toBe("")
+  })
+})

@@ -19,6 +19,8 @@ npm run db:deploy            # apply migrations
 npm run dev:all              # app + background worker
 ```
 
+Once per Neon branch, let browsers upload to the bucket: `npm run storage:cors`.
+
 Development runs on the Neon `dev` branch; `production` is left alone until deployment (after M12). Files live in the `media` bucket declared in `neon.ts`; change it there and run `neon deploy`.
 
 ## Scripts
@@ -39,6 +41,7 @@ Development runs on the Neon `dev` branch; `production` is left alone until depl
 | `npm run db:studio` | Browse the database |
 | `npm run test:e2e` | Playwright e2e on desktop and 375px mobile (first run: `npx playwright install chromium`) |
 | `npm run format` | Prettier |
+| `npm run storage:cors` | Set the bucket's CORS so browsers can upload (once per branch; `-- --create-bucket` for a local S3 server) |
 
 ## Structure
 
@@ -58,7 +61,8 @@ Add shadcn components with `npx shadcn@latest add <name>` — they land in `src/
 
 - **Unit and integration** (`npm test`): services, schemas, actions and the real magic-link flow. Tests that need a database run against `DATABASE_URL`.
 - **End to end** (`npm run test:e2e`): pages, signed-in flows, accessibility (axe, WCAG 2.2 A/AA) and keyboard use. Signed-in tests create a throwaway user and session and delete them afterwards; they skip when `DATABASE_URL_UNPOOLED` isn't set.
-- **CI** (GitHub Actions): lint, types, formatting, unit, build and e2e on every push, against a fresh `postgres:17` service container with all migrations applied.
+- **Background jobs**: `npm run worker` runs pg-boss jobs (footage processing with bundled ffmpeg). Playwright starts it alongside the app for e2e.
+- **CI** (GitHub Actions): lint, types, formatting, unit, build and e2e on every push, against a fresh `postgres:17` service container with all migrations applied and a SeaweedFS S3 server (`.github/s3-ci.json`, dummy credentials) for storage, processing and upload tests.
 
 ## Database migrations
 

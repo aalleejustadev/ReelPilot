@@ -5,19 +5,28 @@
  *
  *   npm run storage:cors                      # NEXT_PUBLIC_APP_URL + e2e server
  *   npm run storage:cors -- https://app.example.com
+ *   npm run storage:cors -- --create-bucket   # local S3 servers (CI)
+ *
+ * Neon creates the bucket from neon.ts; `--create-bucket` is for S3
+ * emulators, which start empty.
  */
 import {
+  CreateBucketCommand,
   GetBucketCorsCommand,
+  HeadBucketCommand,
   PutBucketCorsCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
 
 const bucket = "media" // src/shared/storage/keys.ts MEDIA_BUCKET
 
+const args = process.argv.slice(2)
+const createBucket = args.includes("--create-bucket")
+
 const origins = [
   ...new Set(
     [
-      ...process.argv.slice(2),
+      ...args.filter((arg) => !arg.startsWith("--")),
       process.env.NEXT_PUBLIC_APP_URL,
       "http://localhost:3100", // Playwright's test server
     ]
@@ -31,6 +40,14 @@ const s3 = new S3Client({
   endpoint: process.env.AWS_ENDPOINT_URL_S3,
   region: process.env.AWS_REGION,
 })
+
+if (createBucket) {
+  const exists = await s3
+    .send(new HeadBucketCommand({ Bucket: bucket }))
+    .then(() => true)
+    .catch(() => false)
+  if (!exists) await s3.send(new CreateBucketCommand({ Bucket: bucket }))
+}
 
 await s3.send(
   new PutBucketCorsCommand({

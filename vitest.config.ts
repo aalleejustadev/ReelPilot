@@ -7,8 +7,13 @@ import { defineConfig } from "vitest/config"
 const fromRoot = (path: string) => fileURLToPath(new URL(path, import.meta.url))
 
 // Load .env so database tests can run locally; they skip when it's absent (CI).
+// Variables already set in the shell win, as with dotenv (e.g. CI pointing
+// storage at a local S3 server).
 const envFile = fromRoot("./.env")
-const env = existsSync(envFile) ? parseEnv(readFileSync(envFile, "utf8")) : {}
+const fileEnv = existsSync(envFile) ? parseEnv(readFileSync(envFile, "utf8")) : {}
+const env = Object.fromEntries(
+  Object.entries(fileEnv).filter(([name]) => process.env[name] === undefined)
+)
 
 export default defineConfig({
   resolve: {

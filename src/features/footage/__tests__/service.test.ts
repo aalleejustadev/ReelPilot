@@ -174,7 +174,13 @@ describe.runIf(hasDatabase)("footage service", () => {
       upload(kitId)
     )
 
-    await service.failStaleUploads(new Date(Date.now() + 1000))
+    // Backdate only this clip: other test files share the database, and a
+    // future cutoff would fail their in-progress uploads too.
+    await db.footage.update({
+      where: { id: footageId },
+      data: { createdAt: new Date(Date.now() - 4 * 60 * 60 * 1000) },
+    })
+    await service.failStaleUploads(new Date(Date.now() - 3 * 60 * 60 * 1000))
 
     expect((await queries.getFootage(workspaceId, footageId))?.status).toBe(
       "FAILED"

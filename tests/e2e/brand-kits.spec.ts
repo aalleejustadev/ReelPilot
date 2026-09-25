@@ -6,8 +6,8 @@ test.skip(
   "Signed-in tests need a database (DATABASE_URL_UNPOOLED)"
 )
 
-// Logo upload writes to the real bucket, which only local dev has.
-const hasStorage = Boolean(process.env.NEON_BRANCH)
+// Logo upload writes to a real bucket: Neon locally, the S3 server in CI.
+const hasStorage = Boolean(process.env.NEON_BRANCH || process.env.STORAGE_TESTS)
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
@@ -26,6 +26,8 @@ test("create, edit, save and delete a brand kit", async ({
   signedInUser: _user,
   consoleProblems,
 }) => {
+  // The longest flow here: many saves and page loads.
+  test.setTimeout(60_000)
   // Dashboard points new users at brand kits.
   await page.goto("/dashboard")
   await page.getByRole("link", { name: "Create a brand kit" }).click()

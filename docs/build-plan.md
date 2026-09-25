@@ -715,7 +715,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 |---|---|---|---|
 | M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
 | M1 ✅ | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo — **done 2026-09-25** (see 14.3) |
-| M2 | Footage | footage (reuses M1 storage) | Upload/record footage with markers |
+| M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
 | M3 | Presenters | presenters (stock), Kokoro voice in the worker | Choose a stock presenter and hear its voice |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
@@ -777,6 +777,26 @@ Brand kits, built in parts A–F (A: storage + AI setup, B: data model, C: URL e
 | Decisions logged | `docs/decisions.md` |
 
 Checked live with the real model: linear.app and resend.com drafts (pricing page, real logo), and the full browser flow on resend.com — create from website → editor prefilled (24s, 5 claims, 600px logo, no console errors) → save → list. That run caught a bug CI couldn't (e2e never calls the AI or the network): creating the plan's last kit unmounted the form before its redirect ran; fixed. Not yet run: CI on GitHub (commits not pushed).
+
+### 14.4 M2 completion record (2026-09-25)
+Footage, built in parts A–G (A: worker + job queue, B: data model, C: direct uploads, D: processing job, E: screen recording, F: screens, G: Definition of Done).
+
+| Item | Evidence |
+|---|---|
+| Prisma models + migration | `footage`, `footage_markers` (+ pg-boss's own `pgboss` schema, created by the worker); 7 migrations |
+| Zod schemas | upload request (type incl. recorder codecs, size, source), completion (recorded marks), markers, job payloads; `DATABASE_URL_UNPOOLED` in env |
+| Service logic with unit tests | race-safe clips-per-kit limit (kit row lock), forward-only status, retry-safe processed save, stale-upload expiry, markers; pure processing rules (thumbnail plan, scene log parsing, marker picking), recorder helpers — 289 unit/integration tests |
+| Server actions validated, authorized, scoped | `requestFootageUpload`, `completeFootageUpload`, `deleteFootage`, `add/update/deleteFootageMarker`; viewers refused, arrival and size verified before queuing, idempotent completion |
+| Background job | `footage.process` in `src/worker` against real ffmpeg + storage: converts MOV/MP4/duration-less WebM to silent H.264, poster, thumbnail strip, finds a hard cut within 100ms; bad files and over-long clips fail with plan-specific messages; queue retries with backoff tested |
+| UI from `shared/ui` + tokens | shadcn `progress` and `dialog` added unchanged; Footage tab, clip grid, clip page with timeline, recorder dialog |
+| Loading, empty, error states | empty footage tab, upload progress with cancel, Processing badges that refresh themselves, failed clips with the reason, plan-limit alert, "not a video" before upload, recorder not supported on mobile |
+| Accessible | axe on the footage tab and recorder dialog; markers are keyboard buttons with spoken times; labelled inputs; reduced-motion respected on the recording light |
+| Responsive to 375px | footage e2e on desktop and mobile; marker rows restack on narrow screens (checked in screenshots) |
+| Playwright happy path | upload a real MP4 in the browser → worker processes it → Ready with the cut found → add, label, reload, remove a marker → delete clip; non-video refused; recorder dialog (106 e2e checks) |
+| Decisions logged | `docs/decisions.md` |
+| CI | a SeaweedFS S3 server in each job (Docker, no account) so storage, processing and upload tests run on every push; simulated locally against SeaweedFS 4.47: 289 unit + 106 e2e passed |
+
+Still manual: an actual screen capture (headless browsers can't capture a screen) and the floating "Mark moment" window (Chrome/Edge). Not yet run: GitHub CI (commits not pushed). Deployment note: the worker is a second long-running process that runs ffmpeg; the worker host is still `TODO(owner)` (§17).
 
 ## 15. Environment variables (`.env.example`)
 
