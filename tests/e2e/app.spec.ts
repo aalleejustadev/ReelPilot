@@ -45,9 +45,9 @@ test("sidebar shows the workspace and navigates with real links", async ({
   await expect(
     page.getByRole("heading", { level: 1, name: "Settings" })
   ).toBeVisible()
-  await expect(page.getByRole("link", { name: "Profile" })).toHaveAttribute(
-    "aria-current",
-    "page"
+  await expect(page.getByRole("tab", { name: "Profile" })).toHaveAttribute(
+    "aria-selected",
+    "true"
   )
   expect(consoleProblems).toEqual([])
 })
@@ -204,4 +204,45 @@ test("page content is a centred column", async ({
 
   expect(Math.abs(gaps.left - gaps.right)).toBeLessThanOrEqual(1)
   await expect(heading).toHaveCSS("text-align", "start")
+})
+
+test("settings tabs switch pages and show the active tab", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  await page.goto("/settings/profile")
+  const workspaceTab = page.getByRole("tab", { name: "Workspace" })
+  await expect(workspaceTab).toHaveAttribute("aria-selected", "false")
+
+  await workspaceTab.click()
+
+  await expect(page).toHaveURL(/\/settings\/workspace$/)
+  await expect(workspaceTab).toHaveAttribute("aria-selected", "true")
+  await expect(page.getByRole("tab", { name: "Profile" })).toHaveAttribute(
+    "aria-selected",
+    "false"
+  )
+  await expect(page.getByLabel("Workspace name")).toBeVisible()
+  expect(consoleProblems).toEqual([])
+})
+
+test("the header user menu matches the sidebar menu", async ({
+  page,
+  signedInUser,
+  consoleProblems,
+}) => {
+  await page.goto("/dashboard")
+
+  await page.getByRole("button", { name: "Open user menu" }).click()
+  const menu = page.getByRole("menu")
+
+  await expect(menu.getByText("Ada Lovelace")).toBeVisible()
+  await expect(menu.getByText(signedInUser.email)).toBeVisible()
+  await expect(menu.getByRole("menuitem", { name: "Profile" })).toBeVisible()
+  await expect(menu.getByRole("menuitem", { name: "Sign out" })).toBeVisible()
+  await menu.getByRole("menuitem", { name: "Workspace settings" }).click()
+
+  await expect(page).toHaveURL(/\/settings\/workspace$/)
+  expect(consoleProblems).toEqual([])
 })

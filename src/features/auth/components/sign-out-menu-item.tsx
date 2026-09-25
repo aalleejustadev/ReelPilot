@@ -10,7 +10,7 @@ import { toast } from "@/shared/ui/toast"
 
 import { authClient } from "../lib/auth-client"
 
-export function SignOutMenuItem() {
+export function SignOutMenuItem({ className }: { className?: string }) {
   const router = useRouter()
   const [isPending, setIsPending] = useState(false)
 
@@ -32,6 +32,7 @@ export function SignOutMenuItem() {
   return (
     // Stays open so the spinner is visible until sign-out finishes.
     <DropdownMenuItem
+      className={className}
       closeOnClick={false}
       disabled={isPending}
       onClick={signOut}

@@ -603,6 +603,7 @@ ReelPilot is an editing bay for ads, not a generic SaaS dashboard. The visual la
 | `--ink` | `#15171C` | Primary text, primary buttons |
 | `--slate` | `#5B6170` | Secondary text, icons |
 | `--frame` | `#D5D9E0` | Borders, dividers, timeline track |
+| `--well` | `#E4E7EC` | Recessed fills one step below stage: tab tracks, hovers, skeletons (`muted`/`accent`) |
 | `--chroma` | `#18B26B` | Accent: primary actions on dark, selection, "ready" states (green-screen green) |
 | `--chroma-soft` | `#DDF5E9` | Selected rows, success backgrounds |
 | `--tally` | `#E5484D` | Recording, live render, destructive, blocking compliance flags |
@@ -669,7 +670,9 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | Button padding | Default `px-3`, `sm` `px-3`, `lg` `px-4` (set once in `button.tsx`; owner request) |
 | Sidebar | Expanded: header/footer `p-3`, menu `gap-1.5`, nav items `h-9`. Collapsed: shadcn's `p-2` (`group-data-[collapsible=icon]:p-2`), so icons centre in the 48px rail |
 | Content column | Centred: `mx-auto w-full max-w-5xl` in the app layout; settings `max-w-3xl`. Text stays left-aligned |
-| Button groups / nav tabs | `gap-2`–`gap-3` |
+| Button groups | `gap-2`–`gap-3` |
+| Page tabs | shadcn `Tabs` with `TabsTrigger render={<Link>}` (each tab has its URL; icon becomes a spinner while loading) |
+| User menu | One `UserMenu` (`src/app/(app)/_components/user-menu.tsx`) used by the sidebar footer and the top-bar avatar; items share `userMenuItemClass` |
 
 ### 12.6 Motion
 - One orchestrated moment on the landing page: the phone player cycling example ads.

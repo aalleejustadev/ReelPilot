@@ -6,8 +6,15 @@ import { Separator } from "@/shared/ui/separator"
 import { SidebarTrigger } from "@/shared/ui/sidebar"
 
 import { titleFor } from "./nav-config"
+import { UserMenu, type MenuUser } from "./user-menu"
 
-export function AppHeader() {
+export function AppHeader({
+  user,
+  signOutItem,
+}: {
+  user: MenuUser
+  signOutItem: React.ReactNode
+}) {
   const pathname = usePathname()
 
   return (
@@ -18,6 +25,9 @@ export function AppHeader() {
         className="mr-2 data-vertical:h-4 data-vertical:self-auto"
       />
       <span className="text-sm font-medium">{titleFor(pathname)}</span>
+      <div className="ml-auto">
+        <UserMenu user={user} signOutItem={signOutItem} variant="header" />
+      </div>
     </header>
   )
 }

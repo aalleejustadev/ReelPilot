@@ -16,7 +16,7 @@ import {
 } from "@/shared/ui/sidebar"
 
 import { NavMain } from "./nav-main"
-import { NavUser, type NavUserProps } from "./nav-user"
+import { UserMenu, type MenuUser } from "./user-menu"
 
 // Follows shadcn's sidebar-07 block: collapses to icons on desktop and
 // becomes a sheet on mobile. The roomier padding applies only when expanded:
@@ -27,7 +27,7 @@ export function AppSidebar({
   signOutItem,
 }: {
   workspaceName: string
-  user: NavUserProps
+  user: MenuUser
   signOutItem: React.ReactNode
 }) {
   return (
@@ -53,7 +53,11 @@ export function AppSidebar({
         <NavMain />
       </SidebarContent>
       <SidebarFooter className="p-3 group-data-[collapsible=icon]:p-2">
-        <NavUser {...user} signOutItem={signOutItem} />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <UserMenu user={user} signOutItem={signOutItem} variant="sidebar" />
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

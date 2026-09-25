@@ -17,6 +17,9 @@
   --ink: oklch(0.205 0.01 268.2); /* #15171C text, primary buttons */
   --slate: oklch(0.493 0.025 268.2); /* #5B6170 secondary text, icons */
   --frame: oklch(0.884 0.011 261.8); /* #D5D9E0 borders, timeline track */
+  /* One step darker than stage: recessed fills (tab tracks, hovers,
+     skeletons) must stay visible on the stage background. */
+  --well: oklch(0.927 0.007 260.7); /* #E4E7EC */
   --chroma: oklch(0.673 0.159 155.9); /* #18B26B accent fills, selection */
   --chroma-soft: oklch(0.949 0.03 164.3); /* #DDF5E9 selected rows */
   --tally: oklch(0.626 0.193 23); /* #E5484D recording, live, blocking */
@@ -43,9 +46,9 @@
   --primary-foreground: var(--surface);
   --secondary: var(--frame);
   --secondary-foreground: var(--ink);
-  --muted: var(--stage);
+  --muted: var(--well);
   --muted-foreground: var(--slate);
-  --accent: var(--stage);
+  --accent: var(--well);
   --accent-foreground: var(--ink);
   --destructive: var(--tally-strong);
   --border: var(--frame);
@@ -78,6 +81,7 @@
   --color-ink: var(--ink);
   --color-slate: var(--slate);
   --color-frame: var(--frame);
+  --color-well: var(--well);
   --color-chroma: var(--chroma);
   --color-chroma-soft: var(--chroma-soft);
   --color-chroma-strong: var(--chroma-strong);

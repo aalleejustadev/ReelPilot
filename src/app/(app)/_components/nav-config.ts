@@ -25,3 +25,6 @@ export function titleFor(pathname: string) {
 export function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`)
 }
+
+/** Spacing for every user menu item, including the auth slice's sign-out. */
+export const userMenuItemClass = "gap-2.5 px-2 py-2"

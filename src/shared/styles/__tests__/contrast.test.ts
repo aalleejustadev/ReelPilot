@@ -41,6 +41,8 @@ const textPairs = [
   ["ink", "surface", "body text on panels"],
   ["slate", "stage", "secondary text on the app background"],
   ["slate", "surface", "secondary text on panels"],
+  ["slate", "well", "muted text on tab tracks and hovers"],
+  ["ink", "well", "text on tab tracks and hovers"],
   ["surface", "ink", "primary button"],
   ["tally-strong", "surface", "destructive text, field errors"],
   ["tally-strong", "stage", "error text on the app background"],
