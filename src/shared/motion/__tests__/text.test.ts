@@ -73,7 +73,12 @@ describe("text items", () => {
   })
 
   it("old styles read with no text and word rise", () => {
-    const { texts, textStyle, edit, ...old } = defaultPresentation
+    const {
+      texts: _texts,
+      textStyle: _textStyle,
+      edit: _edit,
+      ...old
+    } = defaultPresentation
     expect(presentationSchema.parse(old)).toMatchObject({
       texts: [],
       textStyle: { animation: "word-rise" },
