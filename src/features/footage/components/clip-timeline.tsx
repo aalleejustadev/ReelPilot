@@ -42,6 +42,10 @@ export function ClipTimeline({
   graphics = [],
   selectedGraphic = null,
   onSelectGraphic,
+  onMoveText,
+  onResizeText,
+  onMoveGraphic,
+  onResizeGraphic,
   onSeek,
   onScrubbingChange,
   onSelect,
@@ -67,6 +71,11 @@ export function ClipTimeline({
   graphics?: OverlayBlock[]
   selectedGraphic?: string | null
   onSelectGraphic?: (id: string) => void
+  /** Drag on the Text/Graphics rows (footage times); omit = read-only. */
+  onMoveText?: (id: string, startMs: number) => void
+  onResizeText?: (id: string, endMs: number) => void
+  onMoveGraphic?: (id: string, startMs: number) => void
+  onResizeGraphic?: (id: string, endMs: number) => void
   onSeek: (ms: number) => void
   /** True while the user drags, so playback can pause and resume. */
   onScrubbingChange: (scrubbing: boolean) => void
@@ -183,6 +192,7 @@ export function ClipTimeline({
     endMs: withShots[index + 1]?.atMs ?? durationMs,
   }))
   const playhead = clampPercent(currentMs, durationMs)
+  const snapTo = [...moments.map((moment) => moment.atMs), currentMs, 0]
 
   // Ruler marks: whole seconds, labelled at a spacing that stays readable.
   const seconds = Math.floor(durationMs / 1000)
@@ -421,14 +431,20 @@ export function ClipTimeline({
         selectedId={selectedText}
         durationMs={durationMs}
         className="bg-card font-medium"
+        snapTo={snapTo}
         onSelect={onSelectText}
+        onMove={onMoveText}
+        onResize={onResizeText}
       />
       <OverlayRow
         items={graphics}
         selectedId={selectedGraphic}
         durationMs={durationMs}
         className="bg-chroma-soft"
+        snapTo={snapTo}
         onSelect={onSelectGraphic}
+        onMove={onMoveGraphic}
+        onResize={onResizeGraphic}
       />
 
       {/* Which shot each part of the clip uses. */}
@@ -474,43 +490,159 @@ type OverlayBlock = {
   label: string
 }
 
-/** A row of blocks for items on the ad (text, graphics). */
+/**
+ * A row of blocks for items on the ad (text, graphics). Drag a block to
+ * move it, or its right edge to change how long it stays; both snap to
+ * key moments and the playhead within 8px.
+ */
 function OverlayRow({
   items,
   selectedId,
   durationMs,
   className,
+  snapTo,
   onSelect,
+  onMove,
+  onResize,
 }: {
   items: OverlayBlock[]
   selectedId: string | null
   durationMs: number
   className: string
+  /** Footage times blocks snap to. */
+  snapTo: number[]
   onSelect?: (id: string) => void
+  onMove?: (id: string, startMs: number) => void
+  onResize?: (id: string, endMs: number) => void
 }) {
+  const rowRef = useRef<HTMLDivElement>(null)
+  const drag = useRef<{
+    id: string
+    mode: "move" | "resize"
+    startX: number
+    startMs: number
+    endMs: number
+    moved: boolean
+  } | null>(null)
+  const [preview, setPreview] = useState<{
+    id: string
+    startMs: number
+    endMs: number
+  } | null>(null)
+
+  const msPerPx = () => {
+    const width = rowRef.current?.getBoundingClientRect().width ?? 0
+    return width > 0 ? durationMs / width : 0
+  }
+  const snap = (ms: number) => {
+    const tolerance = 8 * msPerPx()
+    let best = ms
+    let bestGap = tolerance
+    for (const point of snapTo) {
+      const gap = Math.abs(point - ms)
+      if (gap < bestGap) {
+        best = point
+        bestGap = gap
+      }
+    }
+    return Math.round(best)
+  }
+
   if (items.length === 0) return null
   return (
     <div className="relative h-6" aria-hidden>
-      <div className="absolute inset-x-3 inset-y-0">
-        {items.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            tabIndex={-1}
-            className={cn(
-              "absolute inset-y-0 truncate rounded-sm border border-border px-1.5 text-left text-xs",
-              className,
-              item.id === selectedId && "ring-2 ring-ring"
-            )}
-            style={{
-              left: `${clampPercent(item.startMs, durationMs)}%`,
-              width: `${Math.max(1, clampPercent(item.endMs - item.startMs, durationMs))}%`,
-            }}
-            onClick={() => onSelect?.(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
+      <div ref={rowRef} className="absolute inset-x-3 inset-y-0">
+        {items.map((item) => {
+          const shown = preview?.id === item.id ? preview : item
+          const start = (
+            event: React.PointerEvent,
+            mode: "move" | "resize"
+          ) => {
+            if (!onMove) return
+            event.stopPropagation()
+            event.currentTarget.setPointerCapture(event.pointerId)
+            drag.current = {
+              id: item.id,
+              mode,
+              startX: event.clientX,
+              startMs: item.startMs,
+              endMs: item.endMs,
+              moved: false,
+            }
+          }
+          const move = (event: React.PointerEvent) => {
+            const current = drag.current
+            if (!current || current.id !== item.id) return
+            const dx = event.clientX - current.startX
+            if (!current.moved && Math.abs(dx) < 4) return
+            current.moved = true
+            const delta = dx * msPerPx()
+            if (current.mode === "move") {
+              const length = current.endMs - current.startMs
+              const startMs = Math.min(
+                durationMs - 100,
+                Math.max(0, snap(current.startMs + delta))
+              )
+              setPreview({ id: item.id, startMs, endMs: startMs + length })
+            } else {
+              const endMs = Math.min(
+                durationMs,
+                Math.max(current.startMs + 400, snap(current.endMs + delta))
+              )
+              setPreview({ id: item.id, startMs: current.startMs, endMs })
+            }
+          }
+          const end = (event: React.PointerEvent) => {
+            const current = drag.current
+            drag.current = null
+            if (!current || current.id !== item.id) return
+            event.currentTarget.releasePointerCapture(event.pointerId)
+            const result = preview
+            setPreview(null)
+            if (!current.moved) {
+              onSelect?.(item.id)
+              return
+            }
+            if (!result) return
+            if (current.mode === "move") onMove?.(item.id, result.startMs)
+            else onResize?.(item.id, result.endMs)
+          }
+          return (
+            <div
+              key={item.id}
+              className={cn(
+                "absolute inset-y-0 flex touch-none items-center overflow-hidden rounded-sm border border-border text-xs select-none",
+                className,
+                onMove
+                  ? "cursor-grab active:cursor-grabbing"
+                  : "cursor-pointer",
+                item.id === selectedId && "ring-2 ring-ring"
+              )}
+              style={{
+                left: `${clampPercent(shown.startMs, durationMs)}%`,
+                width: `${Math.max(1, clampPercent(shown.endMs - shown.startMs, durationMs))}%`,
+              }}
+              onPointerDown={(event) => start(event, "move")}
+              onPointerMove={move}
+              onPointerUp={end}
+              onPointerCancel={end}
+              onClick={() => !onMove && onSelect?.(item.id)}
+            >
+              <span className="min-w-0 flex-1 truncate px-1.5">
+                {item.label}
+              </span>
+              {onResize && (
+                <span
+                  className="h-full w-2 shrink-0 cursor-ew-resize bg-foreground/15 hover:bg-foreground/30"
+                  onPointerDown={(event) => start(event, "resize")}
+                  onPointerMove={move}
+                  onPointerUp={end}
+                  onPointerCancel={end}
+                />
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

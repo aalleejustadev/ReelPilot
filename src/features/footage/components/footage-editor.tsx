@@ -90,6 +90,7 @@ import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
 import { CutsPanel } from "./cuts-panel"
+import { ShortcutsDialog } from "./shortcuts-dialog"
 import { GraphicsPanel } from "./graphics-panel"
 import { LensPanel } from "./lens-panel"
 import { TextPanel, type TextPreset } from "./text-panel"
@@ -225,6 +226,8 @@ export function FootageEditor({
     thumbnailsUrl,
   })
   const [currentMs, setCurrentMs] = useState(0)
+  // Playback speed for the J/K/L shuttle (negative plays backwards).
+  const [rate, setRate] = useState(1)
   const [isPlaying, setPlaying] = useState(false)
   const [isAdding, startAdd] = useTransition()
   const [isDirecting, startDirect] = useTransition()
@@ -434,6 +437,14 @@ export function FootageEditor({
     [history, saveDifferences]
   )
 
+  /** Ad time between two footage times (a resized block's length). */
+  function adLengthBetween(startMs: number, endMs: number, min: number) {
+    const length =
+      toOutputNearest(edit, durationMs, endMs) -
+      toOutputNearest(edit, durationMs, startMs)
+    return Math.round(Math.min(15_000, Math.max(min, length)))
+  }
+
   /** Moves the playhead to a time in the ad. */
   function seekAd(adMs: number) {
     const player = playerRef.current
@@ -563,6 +574,23 @@ export function FootageEditor({
     // Show it: pause where it lands, a moment into its entrance.
     playerRef.current?.pause()
     seek(sourceMs + 600)
+  }
+
+  /** Delete: the selected text or graphic, in their tools. */
+  function removeSelectedItem() {
+    if (tool === "text" && selectedTextId) {
+      setTexts(
+        presentation.texts.filter((item) => item.id !== selectedTextId),
+        `remove:${selectedTextId}`
+      )
+      setSelectedTextId(null)
+    } else if (tool === "graphics" && selectedGraphicId) {
+      setGraphics(
+        presentation.graphics.filter((item) => item.id !== selectedGraphicId),
+        `remove:${selectedGraphicId}`
+      )
+      setSelectedGraphicId(null)
+    }
   }
 
   // ── Graphics ──
@@ -701,13 +729,60 @@ export function FootageEditor({
     const player = playerRef.current
     if (!player) return
     if (player.isPlaying()) player.pause()
-    else play()
+    else {
+      // Space always plays forward at normal speed.
+      setRate(1)
+      play()
+    }
   }, [play])
 
   function stop() {
     playerRef.current?.pause()
+    setRate(1)
     seekAd(0)
   }
+
+  // J/K/L shuttle: J plays backwards and L forwards, faster each press
+  // (1×, 2×, 4×); K pauses. The Player takes −10…10, never 0.
+  function shuttle(direction: -1 | 1) {
+    const player = playerRef.current
+    if (!player) return
+    const playing = player.isPlaying()
+    const next =
+      playing && Math.sign(rate) === direction
+        ? Math.min(4, Math.abs(rate) * 2) * direction
+        : direction
+    setRate(next)
+    if (direction === 1 && playerTime(player) >= adDurationMs - 40)
+      player.seekTo(0)
+    player.play()
+  }
+  function stepFrame(frames: number) {
+    const player = playerRef.current
+    if (!player) return
+    player.pause()
+    const frame = Math.max(0, player.getCurrentFrame() + frames)
+    player.seekTo(frame)
+    setCurrentMs((frame / stageFps) * 1000)
+  }
+  const [showShortcuts, setShowShortcuts] = useState(false)
+  // Keys read the latest state through this ref (the listener is stable).
+  const keyActions = useRef<Record<string, (event: KeyboardEvent) => void>>({})
+  useEffect(() => {
+    keyActions.current = {
+      j: () => shuttle(-1),
+      k: () => {
+        playerRef.current?.pause()
+        setRate(1)
+      },
+      l: () => shuttle(1),
+      ",": () => stepFrame(-1),
+      ".": () => stepFrame(1),
+      "?": () => setShowShortcuts(true),
+      delete: () => removeSelectedItem(),
+      backspace: () => removeSelectedItem(),
+    }
+  })
 
   // Dragging the playhead pauses playback, then resumes it if it was on.
   const resumeAfterScrub = useRef(false)
@@ -752,6 +827,9 @@ export function FootageEditor({
       } else if (key === "s" && !mod && !event.altKey) {
         event.preventDefault()
         splitRef.current()
+      } else if (!mod && !event.altKey && keyActions.current[key]) {
+        event.preventDefault()
+        keyActions.current[key]!(event)
       }
     }
     window.addEventListener("keydown", onKey)
@@ -864,6 +942,11 @@ export function FootageEditor({
           </p>
         </div>
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
+          <ShortcutsDialog
+            open={showShortcuts}
+            onOpenChange={setShowShortcuts}
+            mac={mac}
+          />
           {!readOnly && (
             <>
               <Tooltip>
@@ -1206,6 +1289,18 @@ export function FootageEditor({
               reduceMotion={reduceMotion}
               pickingFocus={pickingFocus || pickingGraphic !== null}
               onPickFocus={onPickFocus}
+              playbackRate={rate}
+              selectedTextId={
+                tool === "text" && !readOnly ? selectedTextId : null
+              }
+              onMoveText={(id, point) =>
+                setTexts(
+                  presentation.texts.map((t) =>
+                    t.id === id ? { ...t, ...point } : t
+                  ),
+                  `${id}:place`
+                )
+              }
               logoUrl={kitLogoUrl}
               brandName={kitName}
               siteLabel={kitSite}
@@ -1237,6 +1332,14 @@ export function FootageEditor({
             <span className="font-mono text-sm" aria-label="Playback position">
               {formatTimecode(currentMs)} / {formatTimecode(adDurationMs)}
             </span>
+            {rate !== 1 && isPlaying && (
+              <span
+                className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-xs"
+                aria-live="polite"
+              >
+                {rate < 0 ? `◀ ${Math.abs(rate)}×` : `${rate}× ▶`}
+              </span>
+            )}
             {reduceMotion && (
               <span className="text-xs text-muted-foreground">
                 Reduced motion: the preview cuts between shots.
@@ -1344,6 +1447,42 @@ export function FootageEditor({
             setSelectedGraphicId(id)
             if (!readOnly) setTool("graphics")
           }}
+          {...(!readOnly && {
+            onMoveText: (id, atMs) => {
+              setTexts(
+                presentation.texts.map((t) =>
+                  t.id === id ? { ...t, atMs } : t
+                ),
+                `${id}:time`
+              )
+            },
+            onResizeText: (id, endMs) => {
+              const item = presentation.texts.find((t) => t.id === id)
+              if (!item) return
+              setTexts(
+                presentation.texts.map((t) =>
+                  t.id === id
+                    ? {
+                        ...t,
+                        durationMs: adLengthBetween(item.atMs, endMs, 600),
+                      }
+                    : t
+                ),
+                `${id}:duration`
+              )
+            },
+            onMoveGraphic: (id, atMs) => updateGraphic(id, { atMs }, "time"),
+            onResizeGraphic: (id, endMs) => {
+              const item = presentation.graphics.find((g) => g.id === id)
+              if (item) {
+                updateGraphic(
+                  id,
+                  { durationMs: adLengthBetween(item.atMs, endMs, 400) },
+                  "duration"
+                )
+              }
+            },
+          })}
           onSelectText={(id) => {
             setSelectedTextId(id)
             if (!readOnly) setTool("text")

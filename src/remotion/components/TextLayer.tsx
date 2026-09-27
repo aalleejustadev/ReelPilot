@@ -253,7 +253,8 @@ export function TextItemView({
   }
 
   return (
-    <div style={container}>
+    // data-text-id lets the editor find it to draw a drag handle.
+    <div style={container} data-text-id={item.id}>
       <AnimatedText
         item={item}
         animation={animation}

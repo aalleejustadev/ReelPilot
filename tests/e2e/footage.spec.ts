@@ -628,3 +628,92 @@ test("turn a moment into graphics, place them, and close on an end card", async 
   await expect(list.getByText("Callout · Colour bars")).toBeVisible()
   expect(consoleProblems).toEqual([])
 })
+
+test("pro controls: shuttle keys, frame steps, and dragging on stage and timeline", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}, info) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  // Keyboard and fine pointer work: desktop only.
+  test.skip(info.project.name === "mobile", "Keyboard and pointer controls")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const position = page.getByLabel("Playback position")
+  const playhead = page.getByRole("slider", { name: "Playhead" })
+
+  // L plays, L again doubles; K pauses.
+  await playhead.focus()
+  await page.keyboard.press("l")
+  await page.keyboard.press("l")
+  await expect(page.getByText("2× ▶")).toBeVisible()
+  await page.keyboard.press("k")
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true })
+  ).toBeVisible()
+  // Frame steps: three frames forward from the start is 0.1s.
+  await page.keyboard.press("Home")
+  for (let i = 0; i < 3; i++) await page.keyboard.press(".")
+  await expect(position).toHaveText(/^0:00\.1 /)
+  // ? shows the shortcuts.
+  await page.keyboard.press("Shift+?")
+  await expect(
+    page.getByRole("dialog", { name: "Keyboard shortcuts" })
+  ).toBeVisible()
+  await page.keyboard.press("Escape")
+
+  // Drag a headline on the stage: it snaps to the centre line.
+  await tools.getByRole("tab", { name: "Text" }).click()
+  await page.getByRole("button", { name: /^Headline/ }).click()
+  const handle = page.getByTitle("Drag to move the text")
+  const box = await handle.boundingBox()
+  const stage = await page.getByTestId("motion-stage").boundingBox()
+  if (!box || !stage) throw new Error("No handle")
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+  await page.mouse.down()
+  // From the top (y 0.14) to just off the middle: snaps to 0.5.
+  await page.mouse.move(box.x + box.width / 2, stage.y + stage.height * 0.51, {
+    steps: 8,
+  })
+  await page.mouse.up()
+  await expect(
+    page.getByRole("button", { name: "Centre", exact: true })
+  ).toHaveAttribute("aria-pressed", "true")
+
+  // Drag its block on the timeline to 2s (it snaps to the moment there).
+  const items = page.getByRole("list", { name: "Text items" })
+  await expect(items.getByText("0:00.1")).toBeVisible()
+  const track = await page
+    .getByRole("group", { name: "Timeline" })
+    .boundingBox()
+  const block = page.getByText("Your headline here", { exact: true }).last()
+  const blockBox = await block.boundingBox()
+  if (!track || !blockBox) throw new Error("No block")
+  const inset = 12
+  const xAt = (ms: number) =>
+    track.x + inset + ((track.width - 2 * inset) * ms) / 5000
+  await page.mouse.move(blockBox.x + 6, blockBox.y + blockBox.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(
+    xAt(2030) + (blockBox.x + 6 - xAt(100)),
+    blockBox.y + blockBox.height / 2,
+    {
+      steps: 10,
+    }
+  )
+  await page.mouse.up()
+  await expect(items.getByText(/^0:02\.0$/)).toBeVisible()
+
+  // Delete removes the selected text.
+  await playhead.focus()
+  await page.keyboard.press("Delete")
+  await expect(items).toBeHidden()
+  expect(consoleProblems).toEqual([])
+})
