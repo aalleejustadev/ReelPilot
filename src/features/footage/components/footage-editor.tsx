@@ -9,6 +9,7 @@ import {
   PauseIcon,
   PlayIcon,
   Redo2Icon,
+  ScissorsIcon,
   SparklesIcon,
   SquareIcon,
   Undo2Icon,
@@ -27,7 +28,20 @@ import {
   useTransition,
 } from "react"
 
-import { shotLabel, type Presentation, type Shot } from "@/shared/motion"
+import {
+  joinWithPrevious,
+  outputDuration,
+  partsOf,
+  shotLabel,
+  splitAt,
+  toOutputNearest,
+  toSource,
+  updatePart,
+  updateRange,
+  type ClipEdit,
+  type Presentation,
+  type Shot,
+} from "@/shared/motion"
 import { Button } from "@/shared/ui/button"
 import { LinkButton } from "@/shared/ui/link-button"
 import { Spinner } from "@/shared/ui/spinner"
@@ -53,6 +67,7 @@ import { parseStoredShot } from "../lib/motion"
 import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
+import { CutsPanel } from "./cuts-panel"
 import { DeleteClipButton } from "./delete-clip-button"
 import {
   DirectPanel,
@@ -78,10 +93,11 @@ function historyReducer(history: History<Motion>, action: HistoryAction) {
   return commit(history, action.next, { coalesceKey: action.coalesceKey })
 }
 
-type Tool = "effects" | "shot" | "style" | "ai" | "moments"
+type Tool = "effects" | "shot" | "cuts" | "style" | "ai" | "moments"
 const tools: { id: Tool; label: string; icon: React.ComponentType }[] = [
   { id: "effects", label: "Effects", icon: WandSparklesIcon },
   { id: "shot", label: "Shot", icon: VideoIcon },
+  { id: "cuts", label: "Cuts", icon: ScissorsIcon },
   { id: "style", label: "Style", icon: PaletteIcon },
   { id: "ai", label: "AI", icon: SparklesIcon },
   { id: "moments", label: "Moments", icon: ListIcon },
@@ -242,6 +258,11 @@ export function FootageEditor({
   }
 
   const durationMs = clip.durationMs ?? 1
+  // The Player runs on the ad's time (after cuts, speed changes and
+  // transitions); the timeline, moments and markers on the footage's.
+  const edit = presentation.edit
+  const adDurationMs = outputDuration(edit, durationMs)
+  const sourceMs = toSource(edit, durationMs, currentMs)
   // The strip covers count × interval ms, which can run past the clip's end.
   const stripWidth =
     clip.thumbnailCount && clip.thumbnailIntervalMs
@@ -368,17 +389,29 @@ export function FootageEditor({
     [history, saveDifferences]
   )
 
-  function seek(ms: number) {
+  /** Moves the playhead to a time in the ad. */
+  function seekAd(adMs: number) {
     const player = playerRef.current
     if (!player) return
-    player.seekTo(Math.round((ms / 1000) * stageFps))
-    setCurrentMs(ms)
+    player.seekTo(Math.round((adMs / 1000) * stageFps))
+    setCurrentMs(adMs)
+  }
+
+  /** Moves the playhead to a time in the footage (cut parts: the next kept one). */
+  function seek(footageMs: number) {
+    seekAd(toOutputNearest(edit, durationMs, footageMs))
   }
 
   /** Paused: show where the camera lands, not the start of the move. */
   function showLanded(marker: Marker, shot: Shot | null) {
     if (playerRef.current?.isPlaying()) return
-    seek(Math.min(durationMs, marker.atMs + (shot?.transitionMs ?? 0)))
+    seekAd(
+      Math.min(
+        adDurationMs,
+        toOutputNearest(edit, durationMs, marker.atMs) +
+          (shot?.transitionMs ?? 0)
+      )
+    )
   }
 
   function changeShotFor(marker: Marker, shot: Shot | null, control = "shot") {
@@ -391,6 +424,61 @@ export function FootageEditor({
 
   function changePresentation(next: Presentation, control = "style") {
     change({ shots, presentation: next }, `style:${control}`)
+  }
+
+  // ── Cuts, speed and transitions ──
+  const clipParts = partsOf(edit, durationMs)
+  const [selectedPart, setSelectedPart] = useState<number | null>(null)
+
+  function changeEdit(next: ClipEdit, control: string) {
+    if (next === edit) return false
+    changePresentation({ ...presentation, edit: next }, `edit:${control}`)
+    return true
+  }
+
+  function splitAtPlayhead() {
+    const next = splitAt(edit, durationMs, sourceMs)
+    if (!changeEdit(next, `split:${Math.round(sourceMs)}`)) {
+      toast.add({
+        type: "error",
+        title: "Too close to the edge of a part to split here.",
+      })
+      return
+    }
+    setSelectedPart(
+      partsOf(next, durationMs).findLastIndex((p) => p.startMs <= sourceMs)
+    )
+    setTool("cuts")
+  }
+  // The S shortcut reads the latest version.
+  const splitRef = useRef(splitAtPlayhead)
+  useEffect(() => {
+    splitRef.current = splitAtPlayhead
+  })
+
+  function treatStillStretches(action: "speed" | "cut") {
+    // A little of each still stretch stays at normal speed, so the cut
+    // into and out of it doesn't feel abrupt.
+    let next = edit
+    for (const range of analysis?.idle ?? []) {
+      next = updateRange(
+        next,
+        durationMs,
+        range.startMs + 150,
+        range.endMs - 150,
+        action === "speed" ? { speed: 4 } : { removed: true }
+      )
+    }
+    if (changeEdit(next, `still:${action}`)) {
+      toast.add({
+        type: "success",
+        title:
+          action === "speed"
+            ? "Still stretches play at 4×"
+            : "Still stretches cut",
+        description: `The ad now runs ${formatTimecode(outputDuration(next, durationMs))}. ${undoKey} undoes it.`,
+      })
+    }
   }
 
   // Stable for the Player's props; reads the latest selection.
@@ -425,11 +513,11 @@ export function FootageEditor({
     const player = playerRef.current
     if (!player) return
     // At the end, Play starts again from the beginning.
-    if (playerTime(player) >= durationMs - 1000 / stageFps - 1) {
+    if (playerTime(player) >= adDurationMs - 1000 / stageFps - 1) {
       player.seekTo(0)
     }
     player.play()
-  }, [durationMs])
+  }, [adDurationMs])
 
   const togglePlay = useCallback(() => {
     const player = playerRef.current
@@ -440,7 +528,7 @@ export function FootageEditor({
 
   function stop() {
     playerRef.current?.pause()
-    seek(0)
+    seekAd(0)
   }
 
   // Dragging the playhead pauses playback, then resumes it if it was on.
@@ -483,6 +571,9 @@ export function FootageEditor({
       ) {
         event.preventDefault()
         togglePlay()
+      } else if (key === "s" && !mod && !event.altKey) {
+        event.preventDefault()
+        splitRef.current()
       }
     }
     window.addEventListener("keydown", onKey)
@@ -490,7 +581,9 @@ export function FootageEditor({
   }, [readOnly, stepHistory, togglePlay])
 
   function addAtCurrentTime() {
-    const atMs = Math.round(playerTime(playerRef.current))
+    const atMs = Math.round(
+      toSource(edit, durationMs, playerTime(playerRef.current))
+    )
     startAdd(async () => {
       const result = await addFootageMarker({ footageId: clip.id, atMs })
       if (result.ok) setSelectedId(result.data.markerId)
@@ -697,6 +790,33 @@ export function FootageEditor({
                   }
                 />
               </TabsContent>
+              <TabsContent value="cuts">
+                <CutsPanel
+                  parts={clipParts}
+                  selectedIndex={selectedPart}
+                  playheadMs={sourceMs}
+                  adDurationMs={adDurationMs}
+                  durationMs={durationMs}
+                  idle={analysis?.idle ?? []}
+                  onSelect={(index) => {
+                    setSelectedPart(index)
+                    const part = clipParts[index]
+                    if (part) seek(part.startMs)
+                  }}
+                  onSplit={splitAtPlayhead}
+                  onUpdate={(index, patch) =>
+                    changeEdit(
+                      updatePart(edit, index, patch),
+                      `part:${index}:${Object.keys(patch).join()}`
+                    )
+                  }
+                  onJoin={(index) => {
+                    changeEdit(joinWithPrevious(edit, index), `join:${index}`)
+                    setSelectedPart(index - 1)
+                  }}
+                  onIdle={treatStillStretches}
+                />
+              </TabsContent>
               <TabsContent value="shot">
                 <ShotPanel
                   moment={selected}
@@ -757,7 +877,7 @@ export function FootageEditor({
                     count: clip.thumbnailCount,
                     intervalMs: clip.thumbnailIntervalMs,
                   }}
-                  playheadMs={currentMs}
+                  playheadMs={sourceMs}
                   onMove={(marker, atMs) => moveMoment(marker.id, atMs)}
                   onSelect={(marker) => {
                     selectMarker(marker)
@@ -785,6 +905,8 @@ export function FootageEditor({
               presentation={presentation}
               shots={timedShots}
               durationMs={durationMs}
+              videoWidth={clip.width ?? 1920}
+              videoHeight={clip.height ?? 1080}
               aspect={aspect}
               reduceMotion={reduceMotion}
               pickingFocus={pickingFocus}
@@ -815,7 +937,7 @@ export function FootageEditor({
               <SquareIcon />
             </Button>
             <span className="font-mono text-sm" aria-label="Playback position">
-              {formatTimecode(currentMs)} / {formatTimecode(durationMs)}
+              {formatTimecode(currentMs)} / {formatTimecode(adDurationMs)}
             </span>
             {reduceMotion && (
               <span className="text-xs text-muted-foreground">
@@ -878,13 +1000,13 @@ export function FootageEditor({
                 <FlagIcon data-icon="inline-start" />
               )}
               Add marker at{" "}
-              <span className="font-mono">{formatTimecode(currentMs)}</span>
+              <span className="font-mono">{formatTimecode(sourceMs)}</span>
             </Button>
           )}
         </div>
         <ClipTimeline
           durationMs={durationMs}
-          currentMs={currentMs}
+          currentMs={sourceMs}
           thumbnailsUrl={links.thumbnailsUrl}
           stripWidth={stripWidth}
           moments={markers.map((marker) => {
@@ -899,6 +1021,12 @@ export function FootageEditor({
           })}
           selectedId={selectedId}
           idle={analysis?.idle}
+          clipParts={clipParts}
+          selectedPart={tool === "cuts" ? selectedPart : null}
+          onSelectPart={(index) => {
+            setSelectedPart(index)
+            if (!readOnly) setTool("cuts")
+          }}
           onSeek={seek}
           onScrubbingChange={onScrubbingChange}
           onMoveMoment={

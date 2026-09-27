@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { clipEditSchema } from "./edit"
+
 /**
  * How the screen recording is shown at a moment: rotations in degrees,
  * zoom as a scale, focus as the point (0–1 of the frame) the zoom and
@@ -76,5 +78,7 @@ export const presentationSchema = z.object({
    * would show. Styles saved before it existed read as on.
    */
   motionBlur: z.boolean().default(true),
+  /** Cuts, speed and transitions; none = the whole clip as recorded. */
+  edit: clipEditSchema.default({ parts: [] }),
 })
 export type Presentation = z.output<typeof presentationSchema>

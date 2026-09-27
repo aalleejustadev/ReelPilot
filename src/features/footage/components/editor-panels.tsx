@@ -73,7 +73,7 @@ export function PanelHeading({
   )
 }
 
-function SliderField({
+export function SliderField({
   label,
   value,
   min,

@@ -192,6 +192,7 @@ export const defaultPresentation: Presentation = {
   frame: { radius: 2, shadow: true, padding: 0.02 },
   intro: { kind: "none", durationMs: 1200 },
   motionBlur: true,
+  edit: { parts: [] },
 }
 
 /** The preset a camera matches exactly, if any. */

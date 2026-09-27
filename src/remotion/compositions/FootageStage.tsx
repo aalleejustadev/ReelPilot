@@ -1,7 +1,8 @@
-import { useMemo } from "react"
+import { useId, useMemo } from "react"
 import {
   AbsoluteFill,
   Html5Video,
+  Sequence,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion"
@@ -12,8 +13,12 @@ import {
   cameraStyle,
   cameraTimeline,
   flatCamera,
+  outputDuration,
+  outputLayout,
+  toOutput,
   type Presentation,
   type TimedShot,
+  type Transition,
 } from "@/shared/motion"
 
 /** Frames per second of the stage (footage is converted to 30fps). */
@@ -33,8 +38,13 @@ export const framesFor = (durationMs: number) =>
 export type FootageStageProps = {
   videoUrl: string
   posterUrl?: string | null
+  /** The footage's own size (the frame takes its shape). */
+  videoWidth: number
+  videoHeight: number
   presentation: Presentation
+  /** Shots at footage times (moments); mapped onto the ad's timeline. */
   shots: TimedShot[]
+  /** The footage's length. */
   durationMs: number
   /** Show the frame flat (the editor picks a focus point on it). */
   flat?: boolean
@@ -46,19 +56,34 @@ export type FootageStageProps = {
   onVideoError?: () => void
 }
 
+/** The ad's length for these props (cuts, speed and transitions). */
+export const stageDurationMs = (props: {
+  presentation: Presentation
+  durationMs: number
+}) => outputDuration(props.presentation.edit, props.durationMs)
+
 const flatPose = { ...flatCamera, x: 0, y: 0 }
 
 /** Strongest blur, in % of the stage width (about 4px at 1080p). */
 const maxBlur = 0.22
 
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
+const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+const easeInOutQuart = (t: number) =>
+  t < 0.5 ? 8 * t ** 4 : 1 - (-2 * t + 2) ** 4 / 2
+
 /**
- * The screen recording on its stage: background, frame, and the camera
- * moving between shots. The same component plays in the editor (Remotion
- * Player) and renders the final video (M5), so they always match.
+ * The screen recording on its stage: background, frame, the kept parts of
+ * the footage with transitions between them, and the camera moving
+ * between shots. The same component plays in the editor (Remotion Player)
+ * and renders the final video (M5), so they always match.
  */
 export function FootageStage({
   videoUrl,
   posterUrl,
+  videoWidth,
+  videoHeight,
   presentation,
   shots,
   durationMs,
@@ -69,20 +94,31 @@ export function FootageStage({
 }: FootageStageProps) {
   const frameNumber = useCurrentFrame()
   const { fps, width } = useVideoConfig()
-  const poseAt = useMemo(
-    () =>
-      reduceMotion
-        ? cameraTimeline(
-            shots.map((entry) => ({
-              ...entry,
-              shot: { ...entry.shot, transitionMs: 0 },
-            })),
-            { ...presentation.intro, kind: "none" },
-            durationMs
-          )
-        : cameraTimeline(shots, presentation.intro, durationMs),
-    [shots, presentation.intro, reduceMotion, durationMs]
+  const { edit } = presentation
+  const layout = useMemo(
+    () => outputLayout(edit, durationMs),
+    [edit, durationMs]
   )
+  const poseAt = useMemo(() => {
+    // Moments in cut footage drop out; the rest move to ad time.
+    const timed = shots.flatMap((entry) => {
+      const atMs = toOutput(edit, durationMs, entry.atMs)
+      return atMs === null
+        ? []
+        : [
+            {
+              atMs,
+              shot: reduceMotion
+                ? { ...entry.shot, transitionMs: 0 }
+                : entry.shot,
+            },
+          ]
+    })
+    const intro = reduceMotion
+      ? { ...presentation.intro, kind: "none" as const }
+      : presentation.intro
+    return cameraTimeline(timed, intro, outputDuration(edit, durationMs))
+  }, [shots, edit, durationMs, presentation.intro, reduceMotion])
 
   const timeMs = (frameNumber / fps) * 1000
   const pose = flat ? flatPose : poseAt(timeMs)
@@ -115,6 +151,7 @@ export function FootageStage({
           style={{
             position: "relative",
             width: "100%",
+            aspectRatio: `${videoWidth} / ${videoHeight}`,
             overflow: "hidden",
             transform: style.transform,
             transformOrigin: style.transformOrigin,
@@ -125,6 +162,7 @@ export function FootageStage({
               : "none",
             filter: blur > 0.05 ? `blur(${blur.toFixed(2)}px)` : undefined,
             cursor: flat && onPickFocus ? "crosshair" : undefined,
+            background: "#000",
           }}
           onClick={(event) => {
             if (!flat || !onPickFocus) return
@@ -135,16 +173,218 @@ export function FootageStage({
             })
           }}
         >
-          <Html5Video
-            src={videoUrl}
-            poster={posterUrl ?? undefined}
-            muted
-            pauseWhenBuffering
-            onError={onVideoError}
-            style={{ display: "block", width: "100%" }}
-          />
+          {layout.map((part, i) => {
+            const next = layout[i + 1]
+            const from = Math.round((part.outStartMs / 1000) * fps)
+            const to = Math.round((part.outEndMs / 1000) * fps)
+            return (
+              <Sequence
+                key={part.startMs}
+                from={from}
+                durationInFrames={Math.max(1, to - from)}
+                // Loads and seeks the next part a second early: no blank
+                // frame at a cut.
+                premountFor={fps}
+              >
+                <PartLayer
+                  videoUrl={videoUrl}
+                  posterUrl={posterUrl}
+                  trimBefore={Math.round((part.startMs / 1000) * fps)}
+                  speed={part.speed}
+                  lengthMs={part.outEndMs - part.outStartMs}
+                  enter={
+                    i > 0 ? { ...part.transition, durationMs: part.inMs } : null
+                  }
+                  exit={
+                    next ? { ...next.transition, durationMs: next.inMs } : null
+                  }
+                  irisAt={{ x: pose.focusX, y: pose.focusY }}
+                  unit={unit}
+                  onVideoError={onVideoError}
+                />
+              </Sequence>
+            )
+          })}
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
   )
+}
+
+/**
+ * One part of the footage inside the frame, styled by the transitions
+ * into it (`enter`) and out of it into the next part (`exit`).
+ */
+function PartLayer({
+  videoUrl,
+  posterUrl,
+  trimBefore,
+  speed,
+  lengthMs,
+  enter,
+  exit,
+  irisAt,
+  unit,
+  onVideoError,
+}: {
+  videoUrl: string
+  posterUrl?: string | null
+  trimBefore: number
+  speed: number
+  lengthMs: number
+  enter: Transition | null
+  exit: Transition | null
+  irisAt: { x: number; y: number }
+  unit: number
+  onVideoError?: () => void
+}) {
+  const filterId = useId().replace(/:/g, "")
+  const localMs = (useCurrentFrame() / stageFps) * 1000
+  const inT =
+    enter && enter.durationMs > 0 ? clamp01(localMs / enter.durationMs) : 1
+  const outT =
+    exit && exit.durationMs > 0
+      ? clamp01((localMs - (lengthMs - exit.durationMs)) / exit.durationMs)
+      : 0
+  const look = {
+    ...(enter && inT < 1 ? enterStyle(enter, inT, irisAt, unit) : {}),
+    ...(exit && outT > 0 ? exitStyle(exit, outT, unit) : {}),
+  }
+  const whip = look.whipBlur ?? 0
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        transform: look.transform,
+        opacity: look.opacity,
+        clipPath: look.clipPath,
+        filter:
+          whip > 0.1
+            ? `url(#${filterId})`
+            : look.blur
+              ? `blur(${look.blur.toFixed(2)}px)`
+              : undefined,
+      }}
+    >
+      {whip > 0.1 && (
+        // A horizontal-only blur: CSS blur() can't blur in one direction.
+        <svg width="0" height="0" style={{ position: "absolute" }}>
+          <filter id={filterId}>
+            <feGaussianBlur stdDeviation={`${whip.toFixed(2)} 0`} />
+          </filter>
+        </svg>
+      )}
+      <Html5Video
+        src={videoUrl}
+        poster={posterUrl ?? undefined}
+        muted
+        pauseWhenBuffering
+        trimBefore={trimBefore}
+        playbackRate={speed}
+        onError={onVideoError}
+        style={{
+          display: "block",
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+        }}
+      />
+    </div>
+  )
+}
+
+export type LayerLook = {
+  transform?: string
+  opacity?: number
+  clipPath?: string
+  blur?: number
+  whipBlur?: number
+}
+
+const pushOffset = (direction: Transition["direction"], amount: number) =>
+  direction === "left"
+    ? `translateX(${amount}%)`
+    : direction === "right"
+      ? `translateX(${-amount}%)`
+      : direction === "up"
+        ? `translateY(${amount}%)`
+        : `translateY(${-amount}%)`
+
+/** The incoming part at progress `t` (0 → 1). */
+export function enterStyle(
+  transition: Transition,
+  t: number,
+  irisAt: { x: number; y: number },
+  unit: number
+): LayerLook {
+  switch (transition.kind) {
+    case "push": {
+      const e = easeInOutCubic(t)
+      return { transform: pushOffset(transition.direction, (1 - e) * 100) }
+    }
+    case "whip": {
+      const e = easeInOutQuart(t)
+      return {
+        transform: pushOffset(transition.direction, (1 - e) * 100),
+        whipBlur: Math.sin(Math.PI * e) * 2.4 * unit,
+      }
+    }
+    case "zoom": {
+      const e = easeInOutCubic(t)
+      return {
+        transform: `scale(${0.88 + 0.12 * e})`,
+        opacity: e,
+        blur: (1 - e) * 0.4 * unit,
+      }
+    }
+    case "blur": {
+      const e = easeInOutCubic(t)
+      return { opacity: e, blur: Math.sin(Math.PI * e) * 0.5 * unit }
+    }
+    case "iris": {
+      // A circle opening from where the camera is looking.
+      const e = easeInOutCubic(t)
+      return {
+        clipPath: `circle(${(e * 150).toFixed(2)}% at ${(irisAt.x * 100).toFixed(1)}% ${(irisAt.y * 100).toFixed(1)}%)`,
+      }
+    }
+    default:
+      return {}
+  }
+}
+
+/** The outgoing part at progress `t` (0 → 1) of the next part's entry. */
+export function exitStyle(
+  transition: Transition,
+  t: number,
+  unit: number
+): LayerLook {
+  switch (transition.kind) {
+    case "push": {
+      const e = easeInOutCubic(t)
+      return { transform: pushOffset(transition.direction, -e * 100) }
+    }
+    case "whip": {
+      const e = easeInOutQuart(t)
+      return {
+        transform: pushOffset(transition.direction, -e * 100),
+        whipBlur: Math.sin(Math.PI * e) * 2.4 * unit,
+      }
+    }
+    case "zoom": {
+      const e = easeInOutCubic(t)
+      return {
+        transform: `scale(${1 + 0.35 * e})`,
+        blur: e * 0.4 * unit,
+      }
+    }
+    case "blur": {
+      const e = easeInOutCubic(t)
+      return { blur: Math.sin(Math.PI * e) * 0.5 * unit }
+    }
+    default:
+      return {}
+  }
 }

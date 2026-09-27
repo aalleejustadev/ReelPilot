@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef } from "react"
 import {
   FootageStage,
   framesFor,
+  stageDurationMs,
   stageFps,
   stageSizes,
   type FootageStageProps,
@@ -29,6 +30,8 @@ export function MotionStage({
   playerRef,
   videoUrl,
   posterUrl,
+  videoWidth,
+  videoHeight,
   presentation,
   shots,
   durationMs,
@@ -43,9 +46,12 @@ export function MotionStage({
   playerRef: React.RefObject<PlayerRef | null>
   videoUrl: string
   posterUrl: string | null
+  videoWidth: number
+  videoHeight: number
   presentation: Presentation
+  /** Shots at footage times. */
   shots: TimedShot[]
-  /** The clip's length (the composition's length). */
+  /** The footage's length (the ad's comes from the edit). */
   durationMs: number
   aspect: StageAspect
   reduceMotion: boolean
@@ -64,6 +70,8 @@ export function MotionStage({
     () => ({
       videoUrl,
       posterUrl,
+      videoWidth,
+      videoHeight,
       presentation,
       shots,
       durationMs,
@@ -75,6 +83,8 @@ export function MotionStage({
     [
       videoUrl,
       posterUrl,
+      videoWidth,
+      videoHeight,
       presentation,
       shots,
       durationMs,
@@ -119,6 +129,7 @@ export function MotionStage({
   }, [playerRef, onTimeChange, onPlayingChange, aspect])
 
   const { width: w, height: h } = size
+  // Reported times are the ad's (after cuts and speed changes).
   return (
     // The box fills the space it's given; the stage is the largest
     // rectangle of the chosen shape that fits inside (container units).
@@ -137,7 +148,9 @@ export function MotionStage({
           ref={playerRef}
           component={FootageStage}
           inputProps={inputProps}
-          durationInFrames={framesFor(durationMs)}
+          durationInFrames={framesFor(
+            stageDurationMs({ presentation, durationMs })
+          )}
           compositionWidth={w}
           compositionHeight={h}
           fps={stageFps}

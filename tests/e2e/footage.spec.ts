@@ -372,3 +372,83 @@ test("key moments can be dragged, nudged and moved to the playhead", async ({
   await expectNoViolations(page)
   expect(consoleProblems).toEqual([])
 })
+
+test("cut, speed up and add transitions between parts", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const position = page.getByLabel("Playback position")
+  const saved = page.getByText("Saved", { exact: true })
+  await expect(position).toHaveText("0:00.0 / 0:05.0")
+
+  // S splits at the playhead (here 1s) and opens the new part.
+  const playhead = page.getByRole("slider", { name: "Playhead" })
+  await playhead.focus()
+  await page.keyboard.press("Shift+ArrowRight")
+  await page.keyboard.press("s")
+  await expect(tools.getByRole("tab", { name: "Cuts" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  )
+  const parts = page.getByRole("list", { name: "Parts" })
+  await expect(parts.getByRole("listitem")).toHaveCount(2)
+
+  // Part 2 comes in with a push; the ad overlaps the parts by 0.5s.
+  await page.getByRole("button", { name: "Push", exact: true }).click()
+  await expect(
+    page.getByRole("button", { name: "Push", exact: true })
+  ).toHaveAttribute("aria-pressed", "true")
+  await expect(position).toHaveText(/\/ 0:04\.5$/)
+  await expectNoViolations(page)
+
+  // Cut part 1 and play part 2 at 2×: a 2 second ad.
+  await parts.getByRole("button", { name: /^Part 1/ }).click()
+  await page.getByRole("button", { name: "Cut out" }).click()
+  await expect(position).toHaveText(/\/ 0:04\.0$/)
+  await parts.getByRole("button", { name: /^Part 2/ }).click()
+  await page.getByRole("button", { name: "2×", exact: true }).click()
+  await expect(position).toHaveText(/\/ 0:02\.0$/)
+  await expect(saved).toBeVisible()
+
+  // Undo and redo step through the edits.
+  await page.getByRole("button", { name: /^Undo/ }).click()
+  await expect(position).toHaveText(/\/ 0:04\.0$/)
+  await page.getByRole("button", { name: /^Redo/ }).click()
+  await expect(position).toHaveText(/\/ 0:02\.0$/)
+  await expect(saved).toBeVisible()
+
+  // It plays through to the end of the (shorter) ad.
+  await page.getByRole("button", { name: "Play", exact: true }).click()
+  await expect(position).toHaveText(/^0:0(1\.9|2\.0) \/ 0:02\.0$/, {
+    timeout: 10_000,
+  })
+
+  // Kept after a reload; the still colour bars can be sped up in one go.
+  await page.reload()
+  await expect(position).toHaveText("0:00.0 / 0:02.0")
+  await page
+    .getByRole("tablist", { name: "Editor tools" })
+    .getByRole("tab", { name: "Cuts" })
+    .click()
+  await expect(page.getByTestId("cut-range")).toHaveCount(1)
+  await parts.getByRole("button", { name: /^Part 2/ }).click()
+  await page.getByRole("button", { name: "1×", exact: true }).click()
+  await expect(position).toHaveText(/\/ 0:04\.0$/)
+  await expect(page.getByText("Still stretches")).toBeVisible({
+    timeout: 30_000,
+  })
+  await page.getByRole("button", { name: "Speed them up" }).click()
+  await expect(page.getByText("Still stretches play at 4×")).toBeVisible()
+  expect(consoleProblems).toEqual([])
+})

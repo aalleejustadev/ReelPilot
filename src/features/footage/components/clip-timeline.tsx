@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 
 import { cn } from "@/shared/lib/utils"
+import { transitionDefaults, type TimedPart } from "@/shared/motion"
 
 import { formatTimecode } from "../lib/format"
 
@@ -32,6 +33,9 @@ export function ClipTimeline({
   moments,
   selectedId,
   idle = [],
+  clipParts = [],
+  selectedPart = null,
+  onSelectPart,
   onSeek,
   onScrubbingChange,
   onSelect,
@@ -45,6 +49,10 @@ export function ClipTimeline({
   selectedId: string | null
   /** Stretches where nothing changes on screen (from the analysis). */
   idle?: { startMs: number; endMs: number }[]
+  /** The footage's parts (cuts, speed, transitions). */
+  clipParts?: TimedPart[]
+  selectedPart?: number | null
+  onSelectPart?: (index: number) => void
   onSeek: (ms: number) => void
   /** True while the user drags, so playback can pause and resume. */
   onScrubbingChange: (scrubbing: boolean) => void
@@ -249,6 +257,28 @@ export function ClipTimeline({
               style={{ width: `${stripWidth}%` }}
             />
           )}
+          {clipParts
+            .filter((part) => part.removed)
+            .map((part) => (
+              <span
+                key={`cut-${part.startMs}`}
+                aria-hidden
+                data-testid="cut-range"
+                className="pointer-events-none absolute inset-y-0 bg-background/75"
+                style={{
+                  left: `${clampPercent(part.startMs, durationMs)}%`,
+                  width: `${clampPercent(part.endMs - part.startMs, durationMs)}%`,
+                }}
+              />
+            ))}
+          {clipParts.slice(1).map((part) => (
+            <span
+              key={`split-${part.startMs}`}
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0 -ml-px w-0.5 bg-background"
+              style={{ left: `${clampPercent(part.startMs, durationMs)}%` }}
+            />
+          ))}
           {idle.map((range) => (
             <span
               key={range.startMs}
@@ -332,6 +362,44 @@ export function ClipTimeline({
           />
         </div>
       </div>
+
+      {/* The footage's parts: kept, cut, sped up, and how each comes in. */}
+      {clipParts.length > 1 && (
+        <div className="relative h-6" aria-hidden>
+          <div className="absolute inset-x-3 inset-y-0">
+            {clipParts.map((part) => (
+              <button
+                key={part.startMs}
+                type="button"
+                tabIndex={-1}
+                className={cn(
+                  "absolute inset-y-0 truncate rounded-sm border border-background px-1.5 text-left text-xs",
+                  part.removed
+                    ? "bg-muted text-muted-foreground line-through"
+                    : "bg-secondary",
+                  part.index === selectedPart && "ring-2 ring-ring"
+                )}
+                style={{
+                  left: `${clampPercent(part.startMs, durationMs)}%`,
+                  width: `${clampPercent(part.endMs - part.startMs, durationMs)}%`,
+                }}
+                onClick={() => onSelectPart?.(part.index)}
+              >
+                {part.removed
+                  ? "Cut"
+                  : [
+                      part.index > 0 && part.transition.kind !== "cut"
+                        ? `↦ ${transitionDefaults[part.transition.kind].label}`
+                        : null,
+                      part.speed !== 1 ? `${part.speed}×` : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ") || `Part ${part.index + 1}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Which shot each part of the clip uses. */}
       <div
