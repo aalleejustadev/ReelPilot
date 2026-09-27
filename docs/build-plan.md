@@ -739,7 +739,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
 | M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5) |
 | M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
-| M3c | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **in progress** |
+| M3c ✅ | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **done 2026-09-27** (see 14.7) |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
 | M6 | Billing | billing, plans, ledger, Stripe | Subscribe, get credits, see balance |
@@ -855,6 +855,22 @@ Footage motion (§7.4a), owner-requested after M3.
 | Playwright | upload → Ready → select the cut → Dramatic → stage transform really turned → Solid background → reload keeps both → axe (112 e2e checks) |
 
 Checked live with the real model: "Direct with AI" returned in 7.5s, chose a zoom-out intro and aimed a 2.2× zoom at a marker labelled "Export button (top right)" (focus 0.85, 0.15). Not yet: rendering the motion into the final video arrives with the Remotion compositions in M5 (they use the same `cameraTimeline`).
+
+### 14.7 M3c completion record (2026-09-27)
+Motion studio (§7.4b), owner-requested after M3b, built in parts A–I plus the owner's lens request (depth of field, progressive blur).
+
+| Item | Evidence |
+|---|---|
+| Prisma + migration | `footage.analysis`, `analysisStatus`, `recording`; `footage_markers.insight` (10 migrations). Edit, text, graphics, lens and background light live in the validated `footage.presentation` JSON |
+| Zod schemas | analysis, insight, recording; clip edit (parts, speed, transitions); text items and style; graphics; lens; AI plan (director v2) and graphic suggestion |
+| Logic with tests | frame-diff activity, idle, scroll and palette; "aim at the action"; closed-form spring camera (smooth/snappy/linear, speed carried, log-space zoom); look rules (no repeats, alternating turns, rests, hero, pans, depth-scaled timing, takes); cut/speed/transition time mapping; text helpers (keyword swap, number ticker, readable colours); thin-lens depth of field and progressive blur (quadrature-corrected layers); graphic templates; AI plan cleaning and application — 420+ unit/integration tests |
+| UI | Remotion Player stage (same composition M5 renders); tools: Effects, Shot, Cuts, Text, Graphics, Lens, Style, AI, Moments; live previews that run the real transition and text code; multi-row timeline (parts, text, graphics, shots) with drag, resize and snapping; on-stage text dragging with guides; J/K/L, frame steps, S split, Delete, shortcuts sheet |
+| States | analysis pending/running/failed with "Analyse again"; flat-shot hint for depth of field; AI limits; reduced motion (static previews, cut shots) |
+| Accessible | axe on each new tool (cuts, text, graphics, lens) and the analysis panel; spoken names for toggles and keycaps; label-in-name for the split key |
+| Responsive | editor at 375px: tools in a scrolling row that keeps the open tool in view |
+| Playwright | analysis after upload; cuts/speed/transitions played to the end; text; lens; graphics and end card; pro controls (shuttle, frame steps, stage and timeline drags, Delete); playback through refreshes (125 e2e checks) |
+
+Checked live with the real model: moment descriptions with pixel-accurate focus boxes; graphic choices ("Export CSV" click + label; "+18%" stat card); a whole-edit plan for a four-moment clip in 12.8s. Not yet: the final render (M5) — it uses the same `FootageStage` composition; fonts for the renderer are M5 work (the editor loads them through next/font). Owner to-do: confirm the Remotion licence (§17).
 
 ## 15. Environment variables (`.env.example`)
 

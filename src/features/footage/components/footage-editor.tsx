@@ -856,6 +856,14 @@ export function FootageEditor({
     })
   }
 
+  // Keep the open tool's tab in view in the phone's scrolling row.
+  const railRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    railRef.current
+      ?.querySelector<HTMLElement>("[data-active]")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" })
+  }, [tool])
+
   // The look applied last and which take, for "New take".
   const [activeLook, setActiveLook] = useState<{
     id: string
@@ -1036,13 +1044,16 @@ export function FootageEditor({
           >
             <TabsList
               aria-label="Editor tools"
-              className="w-full shrink-0 flex-row! justify-start gap-1 overflow-x-auto rounded-none bg-card p-2 lg:h-full! lg:w-20 lg:flex-col! lg:justify-start! lg:self-stretch lg:border-r"
+              ref={railRef}
+              className="w-full shrink-0 flex-row! justify-start gap-1 overflow-x-auto rounded-none bg-card p-2 lg:h-full! lg:w-20 lg:flex-col! lg:justify-start! lg:self-stretch lg:overflow-x-hidden lg:overflow-y-auto lg:border-r"
             >
               {tools.map(({ id, label, icon: Icon }) => (
                 <TabsTrigger
                   key={id}
                   value={id}
-                  className="h-auto! flex-none! flex-col! gap-1 px-2 py-2 text-xs lg:w-full lg:justify-center!"
+                  // Vertical tabs are full width; in the phone's row they
+                  // size to their label so they all fit side by side.
+                  className="h-auto! w-auto! flex-none! flex-col! gap-1 px-2 py-1.5 text-xs lg:w-full! lg:justify-center!"
                 >
                   <Icon />
                   {label}
