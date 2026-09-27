@@ -91,7 +91,7 @@ export const presentationSchema = z.object({
   graphics: z.array(graphicItemSchema).max(graphicLimits.items).default([]),
   /** Depth of field and progressive blur. */
   lens: lensSchema.default({
-    depthOfField: { enabled: false, fStop: 2.8, maxBlur: 1.2 },
+    depthOfField: { enabled: false, fStop: 2.8, maxBlur: 0.6 },
     progressiveBlur: {
       enabled: false,
       from: "bottom",
