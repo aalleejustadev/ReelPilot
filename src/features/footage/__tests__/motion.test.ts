@@ -174,7 +174,7 @@ describe("applying an AI plan", () => {
     ])
     expect(next.presentation.lens.depthOfField).toMatchObject({
       enabled: true,
-      fStop: 2,
+      fStop: 4,
     })
     expect(planSummary(clean, scope)).toBe(
       "Product launch look · still parts sped up · 1 line of text · 1 graphic · an end card · cinematic lens"

@@ -18,23 +18,23 @@ export const lensLooks: LensLook[] = [
   {
     id: "shallow",
     title: "Shallow focus",
-    hint: "f/1.4: what the camera looks at pops",
+    hint: "f/2: what the camera looks at pops",
     lens: {
       ...noLens,
-      depthOfField: { enabled: true, fStop: 1.4, maxBlur: 1.6 },
+      depthOfField: { enabled: true, fStop: 2, maxBlur: 0.7 },
     },
   },
   {
     id: "cinematic",
     title: "Cinematic",
-    hint: "f/2, the screen soft top and bottom",
+    hint: "f/4, the screen soft top and bottom",
     lens: {
-      depthOfField: { enabled: true, fStop: 2, maxBlur: 1.2 },
+      depthOfField: { enabled: true, fStop: 4, maxBlur: 0.45 },
       progressiveBlur: {
         enabled: true,
         from: "both",
-        strength: 0.6,
-        reach: 0.22,
+        strength: 0.4,
+        reach: 0.15,
       },
     },
   },
