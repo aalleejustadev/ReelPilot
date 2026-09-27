@@ -155,7 +155,8 @@ export const introLabels: Record<IntroKind, string> = {
 
 export const defaultPresentation: Presentation = {
   background: { kind: "gradient", from: "#15171c", to: "#5b6170" },
-  frame: { radius: 2, shadow: true, padding: 0.1 },
+  // Owner-chosen defaults (2026-09-27): 2% corners, 2% space, shadow.
+  frame: { radius: 2, shadow: true, padding: 0.02 },
   intro: { kind: "none", durationMs: 1200 },
 }
 

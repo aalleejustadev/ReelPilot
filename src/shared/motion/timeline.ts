@@ -108,3 +108,14 @@ export function backgroundStyle(background: Presentation["background"]) {
     ? `linear-gradient(135deg, ${background.from}, ${background.to})`
     : background.from
 }
+
+/**
+ * The frame's corner radius as CSS. `radius` is a % of the stage's width,
+ * turned into one length (container units) so corners are round. A plain
+ * `border-radius: 2%` is a % of width *and* of height separately, which
+ * gives stretched, elliptical corners on a wide frame. The stage must be
+ * an inline-size container.
+ */
+export function frameRadiusCss(radius: number) {
+  return `${Number(radius.toFixed(2))}cqw`
+}

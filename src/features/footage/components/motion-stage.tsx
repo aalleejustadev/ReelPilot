@@ -8,6 +8,7 @@ import {
   backgroundStyle,
   cameraStyle,
   cameraTimeline,
+  frameRadiusCss,
   type Presentation,
   type TimedShot,
 } from "@/shared/motion"
@@ -129,7 +130,9 @@ export function MotionStage({
     // rectangle of the chosen shape that fits inside (container units).
     <div className="[container-type:size] flex size-full items-center justify-center">
       <div
-        className="relative overflow-hidden rounded-lg shadow-sm"
+        // An inline-size container, so the frame's radius can be a % of
+        // the stage's width that stays round (see frameRadiusCss).
+        className="[container-type:inline-size] relative overflow-hidden rounded-lg shadow-sm"
         style={{
           aspectRatio: stageAspects[aspect],
           width: `min(100cqw, calc(100cqh * ${w} / ${h}))`,
@@ -148,7 +151,7 @@ export function MotionStage({
               pickingFocus && "cursor-crosshair"
             )}
             style={{
-              borderRadius: `${frame.radius}%`,
+              borderRadius: frameRadiusCss(frame.radius),
               boxShadow: frame.shadow
                 ? "0 30px 60px -12px rgb(0 0 0 / 0.55)"
                 : "none",

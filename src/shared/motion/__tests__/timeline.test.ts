@@ -99,6 +99,13 @@ describe("styles", () => {
     })
   })
 
+  it("gives the frame round corners, not stretched ones", async () => {
+    const { frameRadiusCss } = await import("../timeline")
+    // One length for both directions (container units), never a bare %.
+    expect(frameRadiusCss(2)).toBe("2cqw")
+    expect(frameRadiusCss(3.456)).toBe("3.46cqw")
+  })
+
   it("draws solid and gradient backgrounds", () => {
     expect(
       backgroundStyle({ kind: "solid", from: "#111111", to: "#222222" })
