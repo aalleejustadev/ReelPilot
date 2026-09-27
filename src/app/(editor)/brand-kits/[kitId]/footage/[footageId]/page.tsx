@@ -80,6 +80,7 @@ export default async function FootageEditorPage({
           readOnly={!canEdit}
           kitId={kitId}
           kitName={kit.name}
+          kitFonts={kit.fonts}
         />
       )
     }

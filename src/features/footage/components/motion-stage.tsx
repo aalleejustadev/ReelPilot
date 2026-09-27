@@ -12,6 +12,7 @@ import {
   stageSizes,
   type FootageStageProps,
 } from "@/remotion/compositions/FootageStage"
+import type { StageFonts } from "@/remotion/components/TextLayer"
 import type { Presentation, TimedShot } from "@/shared/motion"
 
 export const stageAspects = {
@@ -42,6 +43,8 @@ export function MotionStage({
   onTimeChange,
   onPlayingChange,
   onVideoError,
+  fonts,
+  accents,
 }: {
   playerRef: React.RefObject<PlayerRef | null>
   videoUrl: string
@@ -62,6 +65,8 @@ export function MotionStage({
   onPlayingChange: (playing: boolean) => void
   /** The video stopped loading (e.g. its signed link expired). */
   onVideoError?: () => void
+  fonts: StageFonts
+  accents: string[]
 }) {
   const size = stageSizes[aspect]
   // Where playback was, so switching shape (a new Player) keeps the spot.
@@ -79,6 +84,8 @@ export function MotionStage({
       reduceMotion,
       onPickFocus,
       onVideoError,
+      fonts,
+      accents,
     }),
     [
       videoUrl,
@@ -92,6 +99,8 @@ export function MotionStage({
       reduceMotion,
       onPickFocus,
       onVideoError,
+      fonts,
+      accents,
     ]
   )
 

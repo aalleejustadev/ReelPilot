@@ -53,21 +53,36 @@ const archivoBlack = Archivo_Black({
 })
 const playfairDisplay = Playfair_Display({ subsets: ["latin"], preload: false })
 
-/** Class that renders text in the named font (for previews only). */
-export const fontPreviewClass: Record<AdFontName, string> = {
-  Inter: inter.className,
-  Montserrat: montserrat.className,
-  Poppins: poppins.className,
-  Roboto: roboto.className,
-  "Open Sans": openSans.className,
-  Lato: lato.className,
-  "DM Sans": dmSans.className,
-  Nunito: nunito.className,
-  Raleway: raleway.className,
-  Rubik: rubik.className,
-  Oswald: oswald.className,
-  "Bebas Neue": bebasNeue.className,
-  Anton: anton.className,
-  "Archivo Black": archivoBlack.className,
-  "Playfair Display": playfairDisplay.className,
-}
+const faces = {
+  Inter: inter,
+  Montserrat: montserrat,
+  Poppins: poppins,
+  Roboto: roboto,
+  "Open Sans": openSans,
+  Lato: lato,
+  "DM Sans": dmSans,
+  Nunito: nunito,
+  Raleway: raleway,
+  Rubik: rubik,
+  Oswald: oswald,
+  "Bebas Neue": bebasNeue,
+  Anton: anton,
+  "Archivo Black": archivoBlack,
+  "Playfair Display": playfairDisplay,
+} satisfies Record<
+  AdFontName,
+  { className: string; style: { fontFamily: string } }
+>
+
+/** Class that renders text in the named font (menus, previews). */
+export const adFontClass = Object.fromEntries(
+  Object.entries(faces).map(([name, face]) => [name, face.className])
+) as Record<AdFontName, string>
+
+/**
+ * CSS font-family for the named font (the stage's text). Self-hosted by
+ * next/font; the file downloads the first time the font is shown.
+ */
+export const adFontFamily = Object.fromEntries(
+  Object.entries(faces).map(([name, face]) => [name, face.style.fontFamily])
+) as Record<AdFontName, string>

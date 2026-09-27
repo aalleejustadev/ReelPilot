@@ -1,6 +1,7 @@
 "use client"
 
 import { adFonts, toAdFont } from "@/shared/config/ad-fonts"
+import { adFontClass } from "@/shared/lib/ad-font-faces"
 import { cn } from "@/shared/lib/utils"
 import { Field, FieldError, FieldLabel } from "@/shared/ui/field"
 import {
@@ -13,14 +14,12 @@ import {
   SelectValue,
 } from "@/shared/ui/select"
 
-import { fontPreviewClass } from "../lib/font-previews"
-
 const categories = [...new Set(adFonts.map((font) => font.category))]
 
 // Each option's label is set in its own font, in the menu and the trigger.
 const items = adFonts.map((font) => ({
   value: font.name,
-  label: <span className={fontPreviewClass[font.name]}>{font.name}</span>,
+  label: <span className={adFontClass[font.name]}>{font.name}</span>,
 }))
 
 /** Pick one of the ad fonts, with a live preview of `sample` below. */
@@ -66,9 +65,7 @@ export function FontField({
                 .filter((item) => item.category === category)
                 .map((item) => (
                   <SelectItem key={item.name} value={item.name}>
-                    <span className={fontPreviewClass[item.name]}>
-                      {item.name}
-                    </span>
+                    <span className={adFontClass[item.name]}>{item.name}</span>
                   </SelectItem>
                 ))}
             </SelectGroup>
@@ -79,7 +76,7 @@ export function FontField({
         {font ? (
           <p
             className={cn(
-              fontPreviewClass[font.name],
+              adFontClass[font.name],
               "break-words",
               role === "heading" ? "text-2xl leading-tight" : "text-base"
             )}

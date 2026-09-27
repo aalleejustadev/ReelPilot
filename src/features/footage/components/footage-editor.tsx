@@ -12,6 +12,7 @@ import {
   ScissorsIcon,
   SparklesIcon,
   SquareIcon,
+  TypeIcon,
   Undo2Icon,
   VideoIcon,
   WandSparklesIcon,
@@ -32,6 +33,7 @@ import {
   joinWithPrevious,
   outputDuration,
   partsOf,
+  plainText,
   shotLabel,
   splitAt,
   toOutputNearest,
@@ -41,7 +43,11 @@ import {
   type ClipEdit,
   type Presentation,
   type Shot,
+  type TextItem,
 } from "@/shared/motion"
+import type { StageFonts } from "@/remotion/components/TextLayer"
+import { adFonts, toAdFont } from "@/shared/config/ad-fonts"
+import { adFontFamily } from "@/shared/lib/ad-font-faces"
 import { Button } from "@/shared/ui/button"
 import { LinkButton } from "@/shared/ui/link-button"
 import { Spinner } from "@/shared/ui/spinner"
@@ -68,6 +74,7 @@ import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
 import { CutsPanel } from "./cuts-panel"
+import { TextPanel, type TextPreset } from "./text-panel"
 import { DeleteClipButton } from "./delete-clip-button"
 import {
   DirectPanel,
@@ -93,11 +100,12 @@ function historyReducer(history: History<Motion>, action: HistoryAction) {
   return commit(history, action.next, { coalesceKey: action.coalesceKey })
 }
 
-type Tool = "effects" | "shot" | "cuts" | "style" | "ai" | "moments"
+type Tool = "effects" | "shot" | "cuts" | "text" | "style" | "ai" | "moments"
 const tools: { id: Tool; label: string; icon: React.ComponentType }[] = [
   { id: "effects", label: "Effects", icon: WandSparklesIcon },
   { id: "shot", label: "Shot", icon: VideoIcon },
   { id: "cuts", label: "Cuts", icon: ScissorsIcon },
+  { id: "text", label: "Text", icon: TypeIcon },
   { id: "style", label: "Style", icon: PaletteIcon },
   { id: "ai", label: "AI", icon: SparklesIcon },
   { id: "moments", label: "Moments", icon: ListIcon },
@@ -162,6 +170,7 @@ export function FootageEditor({
   readOnly,
   kitId,
   kitName,
+  kitFonts,
 }: {
   clip: FootageDetail
   videoUrl: string
@@ -172,6 +181,8 @@ export function FootageEditor({
   readOnly: boolean
   kitId: string
   kitName: string
+  /** The brand kit's fonts (names from the ad font list). */
+  kitFonts: { heading?: string; body?: string }
 }) {
   const playerRef = useRef<PlayerRef>(null)
   const [links, renewLinks] = useStableLinks({
@@ -455,6 +466,70 @@ export function FootageEditor({
   useEffect(() => {
     splitRef.current = splitAtPlayhead
   })
+
+  // ── Text ──
+  const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
+  const stageFonts = useMemo<StageFonts>(() => {
+    const heading = toAdFont(kitFonts.heading ?? "") ?? "Inter"
+    const body = toAdFont(kitFonts.body ?? "") ?? heading
+    return {
+      heading: `${adFontFamily[heading]}, system-ui, sans-serif`,
+      headingWeight:
+        adFonts.find((font) => font.name === heading)?.headingWeight ?? 700,
+      body: `${adFontFamily[body]}, system-ui, sans-serif`,
+    }
+  }, [kitFonts.heading, kitFonts.body])
+  const accents = useMemo(
+    () => [...brandColors, ...(analysis?.palette.accents ?? [])],
+    [brandColors, analysis]
+  )
+
+  function setTexts(texts: TextItem[], control: string) {
+    changePresentation({ ...presentation, texts }, `text:${control}`)
+  }
+
+  function newText(patch: Partial<TextItem>): TextItem {
+    return {
+      id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      atMs: Math.round(sourceMs),
+      durationMs: 2500,
+      text: "Your headline here",
+      role: "headline",
+      animation: null,
+      x: 0.5,
+      y: 0.14,
+      align: "center",
+      emphasis: "",
+      ...patch,
+    }
+  }
+
+  function addText(preset: TextPreset | { text: string }) {
+    const added =
+      typeof preset === "object"
+        ? [newText({ text: preset.text })]
+        : preset === "title"
+          ? [
+              newText({ role: "kicker", text: "New", y: 0.1 }),
+              newText({ text: "Your headline here", y: 0.19 }),
+            ]
+          : preset === "label"
+            ? [newText({ role: "label", text: "Feature name", y: 0.86 })]
+            : preset === "caption"
+              ? [
+                  newText({
+                    role: "caption",
+                    text: "Say what’s happening here",
+                    y: 0.88,
+                  }),
+                ]
+              : [newText({})]
+    setTexts([...presentation.texts, ...added], `add:${added[0]!.id}`)
+    setSelectedTextId(added.at(-1)!.id)
+    // Show it: pause where it lands, a moment into its entrance.
+    playerRef.current?.pause()
+    seek(sourceMs + 600)
+  }
 
   function treatStillStretches(action: "speed" | "cut") {
     // A little of each still stretch stays at normal speed, so the cut
@@ -817,6 +892,51 @@ export function FootageEditor({
                   onIdle={treatStillStretches}
                 />
               </TabsContent>
+              <TabsContent value="text">
+                <TextPanel
+                  items={presentation.texts}
+                  selectedId={selectedTextId}
+                  videoAnimation={presentation.textStyle.animation}
+                  playheadMs={sourceMs}
+                  fonts={stageFonts}
+                  aiHeadline={
+                    selected
+                      ? (parseStoredInsight(selected.insight)?.headline ?? null)
+                      : null
+                  }
+                  onVideoAnimation={(animation) =>
+                    changePresentation(
+                      { ...presentation, textStyle: { animation } },
+                      "text-style"
+                    )
+                  }
+                  onAdd={addText}
+                  onAddText={(text) => addText({ text })}
+                  onSelect={(id) => {
+                    setSelectedTextId(id)
+                    const item = presentation.texts.find((t) => t.id === id)
+                    if (item) {
+                      playerRef.current?.pause()
+                      seek(item.atMs + 900)
+                    }
+                  }}
+                  onUpdate={(id, patch, control) =>
+                    setTexts(
+                      presentation.texts.map((item) =>
+                        item.id === id ? { ...item, ...patch } : item
+                      ),
+                      `${id}:${control}`
+                    )
+                  }
+                  onRemove={(id) => {
+                    setTexts(
+                      presentation.texts.filter((item) => item.id !== id),
+                      `remove:${id}`
+                    )
+                    setSelectedTextId(null)
+                  }}
+                />
+              </TabsContent>
               <TabsContent value="shot">
                 <ShotPanel
                   moment={selected}
@@ -905,6 +1025,8 @@ export function FootageEditor({
               presentation={presentation}
               shots={timedShots}
               durationMs={durationMs}
+              fonts={stageFonts}
+              accents={accents}
               videoWidth={clip.width ?? 1920}
               videoHeight={clip.height ?? 1080}
               aspect={aspect}
@@ -1022,6 +1144,20 @@ export function FootageEditor({
           selectedId={selectedId}
           idle={analysis?.idle}
           clipParts={clipParts}
+          texts={presentation.texts.map((item) => {
+            const startAd = toOutputNearest(edit, durationMs, item.atMs)
+            return {
+              id: item.id,
+              startMs: item.atMs,
+              endMs: toSource(edit, durationMs, startAd + item.durationMs),
+              label: plainText(item.text),
+            }
+          })}
+          selectedText={tool === "text" ? selectedTextId : null}
+          onSelectText={(id) => {
+            setSelectedTextId(id)
+            if (!readOnly) setTool("text")
+          }}
           selectedPart={tool === "cuts" ? selectedPart : null}
           onSelectPart={(index) => {
             setSelectedPart(index)

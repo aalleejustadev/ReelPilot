@@ -36,6 +36,9 @@ export function ClipTimeline({
   clipParts = [],
   selectedPart = null,
   onSelectPart,
+  texts = [],
+  selectedText = null,
+  onSelectText,
   onSeek,
   onScrubbingChange,
   onSelect,
@@ -53,6 +56,10 @@ export function ClipTimeline({
   clipParts?: TimedPart[]
   selectedPart?: number | null
   onSelectPart?: (index: number) => void
+  /** Text items, in footage time. */
+  texts?: { id: string; startMs: number; endMs: number; label: string }[]
+  selectedText?: string | null
+  onSelectText?: (id: string) => void
   onSeek: (ms: number) => void
   /** True while the user drags, so playback can pause and resume. */
   onScrubbingChange: (scrubbing: boolean) => void
@@ -395,6 +402,32 @@ export function ClipTimeline({
                     ]
                       .filter(Boolean)
                       .join(" · ") || `Part ${part.index + 1}`}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Text on the ad. */}
+      {texts.length > 0 && (
+        <div className="relative h-6" aria-hidden>
+          <div className="absolute inset-x-3 inset-y-0">
+            {texts.map((text) => (
+              <button
+                key={text.id}
+                type="button"
+                tabIndex={-1}
+                className={cn(
+                  "absolute inset-y-0 truncate rounded-sm border border-border bg-card px-1.5 text-left text-xs font-medium",
+                  text.id === selectedText && "ring-2 ring-ring"
+                )}
+                style={{
+                  left: `${clampPercent(text.startMs, durationMs)}%`,
+                  width: `${Math.max(1, clampPercent(text.endMs - text.startMs, durationMs))}%`,
+                }}
+                onClick={() => onSelectText?.(text.id)}
+              >
+                {text.label}
               </button>
             ))}
           </div>

@@ -21,6 +21,12 @@ import {
   type Transition,
 } from "@/shared/motion"
 
+import {
+  defaultStageFonts,
+  TextLayer,
+  type StageFonts,
+} from "../components/TextLayer"
+
 /** Frames per second of the stage (footage is converted to 30fps). */
 export const stageFps = 30
 
@@ -54,6 +60,9 @@ export type FootageStageProps = {
   onPickFocus?: (point: { x: number; y: number }) => void
   /** The video stopped loading (e.g. its signed link expired). */
   onVideoError?: () => void
+  /** The brand kit's fonts for text, and accent colours (best first). */
+  fonts?: StageFonts
+  accents?: string[]
 }
 
 /** The ad's length for these props (cuts, speed and transitions). */
@@ -91,6 +100,8 @@ export function FootageStage({
   reduceMotion = false,
   onPickFocus,
   onVideoError,
+  fonts = defaultStageFonts,
+  accents = [],
 }: FootageStageProps) {
   const frameNumber = useCurrentFrame()
   const { fps, width } = useVideoConfig()
@@ -207,6 +218,17 @@ export function FootageStage({
           })}
         </div>
       </AbsoluteFill>
+      {!flat && (
+        <TextLayer
+          items={presentation.texts}
+          animation={presentation.textStyle.animation}
+          edit={edit}
+          durationMs={durationMs}
+          fonts={fonts}
+          background={presentation.background}
+          accents={accents}
+        />
+      )}
     </AbsoluteFill>
   )
 }

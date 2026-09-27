@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { clipEditSchema } from "./edit"
+import { textItemSchema, textLimits, textStyleSchema } from "./text"
 
 /**
  * How the screen recording is shown at a moment: rotations in degrees,
@@ -80,5 +81,8 @@ export const presentationSchema = z.object({
   motionBlur: z.boolean().default(true),
   /** Cuts, speed and transitions; none = the whole clip as recorded. */
   edit: clipEditSchema.default({ parts: [] }),
+  /** The video's text style, and its text items. */
+  textStyle: textStyleSchema.default({ animation: "word-rise" }),
+  texts: z.array(textItemSchema).max(textLimits.items).default([]),
 })
 export type Presentation = z.output<typeof presentationSchema>

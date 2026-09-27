@@ -452,3 +452,61 @@ test("cut, speed up and add transitions between parts", async ({
   await expect(page.getByText("Still stretches play at 4×")).toBeVisible()
   expect(consoleProblems).toEqual([])
 })
+
+test("add text in brand style, animated in, kept after a reload", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const stage = page.getByTestId("motion-stage")
+  const saved = page.getByText("Saved", { exact: true })
+
+  await tools.getByRole("tab", { name: "Text" }).click()
+  await page.getByRole("button", { name: /^Title card/ }).click()
+  const items = page.getByRole("list", { name: "Text items" })
+  await expect(items.getByRole("listitem")).toHaveCount(2)
+  // The headline is selected: write it and highlight the benefit.
+  await page
+    .getByRole("textbox", { name: "Text", exact: true })
+    .fill("Chase invoices automatically")
+  await page
+    .getByRole("textbox", { name: "Highlight words" })
+    .fill("automatically")
+  await page.getByRole("button", { name: "Bottom", exact: true }).click()
+  // One style for the whole video.
+  await page.getByRole("button", { name: /^Blur resolve/ }).click()
+  await expect(
+    page.getByRole("button", { name: /^Blur resolve/ })
+  ).toHaveAttribute("aria-pressed", "true")
+  await expect(saved).toBeVisible()
+  // The stage shows it (paused just after it comes in).
+  await expect(stage.getByText("Chase invoices automatically")).toBeVisible()
+  await expectNoViolations(page)
+
+  await page.reload()
+  await page
+    .getByRole("tablist", { name: "Editor tools" })
+    .getByRole("tab", { name: "Text" })
+    .click()
+  await expect(items.getByText("Chase invoices automatically")).toBeVisible()
+  await items.getByRole("button", { name: /Chase invoices/ }).click()
+  await expect(
+    page.getByRole("textbox", { name: "Highlight words" })
+  ).toHaveValue("automatically")
+  await expect(stage.getByText("Chase invoices automatically")).toBeVisible()
+  // Removing it takes it off the stage.
+  await page.getByRole("button", { name: "Remove", exact: true }).click()
+  await expect(items.getByRole("listitem")).toHaveCount(1)
+  await expect(stage.getByText("Chase invoices automatically")).toBeHidden()
+  expect(consoleProblems).toEqual([])
+})

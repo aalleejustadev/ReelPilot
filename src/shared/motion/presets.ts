@@ -193,6 +193,8 @@ export const defaultPresentation: Presentation = {
   intro: { kind: "none", durationMs: 1200 },
   motionBlur: true,
   edit: { parts: [] },
+  textStyle: { animation: "word-rise" },
+  texts: [],
 }
 
 /** The preset a camera matches exactly, if any. */
