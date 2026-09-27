@@ -610,7 +610,14 @@ function OverlayTracks({
         return (
           <div key={track} className={rowClass}>
             <span className={labelClass}>
-              {isNew && items.length > 0 ? "New layer" : `Layer ${track + 1}`}
+              {isNew && items.length > 0 ? (
+                <>
+                  <span className="sm:hidden">New</span>
+                  <span className="hidden sm:inline">New layer</span>
+                </>
+              ) : (
+                `Layer ${track + 1}`
+              )}
             </span>
             <div
               data-track={track}
