@@ -557,6 +557,8 @@ test("lens: depth of field on angled shots, progressive blur on the screen", asy
   await expect(
     stage.getByTestId("progressive-blur").locator("> div")
   ).toHaveCount(6)
+  // Saves go out 500ms after the last change: let it start, then finish.
+  await page.waitForTimeout(700)
   await expect(page.getByText("Saved", { exact: true })).toBeVisible()
   await expectNoViolations(page)
 
