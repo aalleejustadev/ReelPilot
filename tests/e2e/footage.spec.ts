@@ -891,3 +891,93 @@ test("playback never freezes at a cut, even on a slow connection", async ({
   expect(longestStuckMs).toBeLessThan(1000)
   expect(consoleProblems).toEqual([])
 })
+
+test("text slides and split screens, and Space plays from anywhere", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}, info) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const stage = page.getByTestId("motion-stage")
+  const frame = page.getByTestId("camera-frame")
+  const list = page.getByRole("list", { name: "Graphics on the ad" })
+
+  // A text slide: words on their own, over the whole stage.
+  await tools.getByRole("tab", { name: "Text" }).click()
+  await page.getByRole("button", { name: /^Text slide Words on/ }).click()
+  await page.getByRole("textbox", { name: "Title" }).fill("Meet Acme")
+  await expect(stage.getByText("Meet Acme")).toBeVisible()
+  const slide = stage.locator('[data-layout="slide"]')
+  expect((await slide.boundingBox())!.width).toBeCloseTo(
+    (await stage.boundingBox())!.width,
+    0
+  )
+  await stage.screenshot({ path: info.outputPath("slide.png") })
+
+  // A split screen 4s later: the video glides into the left half…
+  await page.getByRole("slider", { name: "Playhead" }).focus()
+  await page.keyboard.press("Home")
+  for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowRight")
+  await tools.getByRole("tab", { name: "Text" }).click()
+  await page.getByRole("button", { name: /^Split screen Video on one/ }).click()
+  await page.getByRole("textbox", { name: "Title" }).fill("Ship in minutes")
+  await expect(stage.getByText("Ship in minutes")).toBeVisible()
+  const centreX = async (locator: Locator) => {
+    const box = (await locator.boundingBox())!
+    return box.x + box.width / 2
+  }
+  const stageBox = (await stage.boundingBox())!
+  const middle = stageBox.x + stageBox.width / 2
+  const portrait = stageBox.height > stageBox.width
+  if (!portrait) {
+    await expect
+      .poll(async () => (await frame.boundingBox())!.width)
+      .toBeLessThan(stageBox.width * 0.5)
+    await expect.poll(() => centreX(frame)).toBeLessThan(middle)
+  }
+  await stage.screenshot({ path: info.outputPath("split-left.png") })
+  // …or the right one.
+  await page.getByRole("button", { name: "Right", exact: true }).click()
+  if (!portrait) {
+    await expect.poll(() => centreX(frame)).toBeGreaterThan(middle)
+  }
+  await stage.screenshot({ path: info.outputPath("split-right.png") })
+
+  // Space plays and pauses even with a button focused.
+  await page.getByRole("button", { name: "Right", exact: true }).focus()
+  await page.keyboard.press("Space")
+  await expect(
+    page.getByRole("button", { name: "Pause", exact: true })
+  ).toBeVisible()
+  await page.keyboard.press("Space")
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true })
+  ).toBeVisible()
+  // The button itself wasn't pressed by Space.
+  await expect(
+    page.getByRole("button", { name: "Right", exact: true })
+  ).toHaveAttribute("aria-pressed", "true")
+  // The playhead runs over every row of the timeline.
+  await expect(page.getByTestId("playhead-line")).toBeVisible()
+
+  await page.waitForTimeout(700)
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+  await expectNoViolations(page)
+  await page.reload()
+  await page
+    .getByRole("tablist", { name: "Editor tools" })
+    .getByRole("tab", { name: "Graphics" })
+    .click()
+  await expect(list.getByText("Text slide · Meet Acme")).toBeVisible()
+  await expect(list.getByText("Split screen · Ship in minutes")).toBeVisible()
+  expect(consoleProblems).toEqual([])
+})

@@ -22,6 +22,9 @@ export const graphicKinds = [
   "lower-third",
   "logo",
   "end-card",
+  // Layouts: the whole stage
+  "slide",
+  "split",
 ] as const
 export type GraphicKind = (typeof graphicKinds)[number]
 
@@ -140,9 +143,27 @@ export const graphicInfo: Record<
     text: "Headline",
     secondary: "Button",
   },
+  slide: {
+    label: "Text slide",
+    hint: "A full-screen title card, no video.",
+    durationMs: 2600,
+    text: "Title",
+    secondary: "Line",
+  },
+  split: {
+    label: "Split screen",
+    hint: "The video on one side, your words on the other.",
+    durationMs: 4000,
+    text: "Title",
+    secondary: "Line",
+  },
 }
 
-export const graphicLimits = { items: 30, text: 80 } as const
+/** Graphics that take over the stage's layout (not placed or dragged). */
+export const isLayoutGraphic = (kind: GraphicKind) =>
+  kind === "slide" || kind === "split"
+
+export const graphicLimits = { items: 30, text: 140 } as const
 
 const unit = z.number().min(0).max(1)
 
@@ -167,9 +188,9 @@ export type FocusSettings = z.infer<typeof focusSchema>
 export const defaultFocus: FocusSettings = {
   shape: "rounded",
   invert: false,
-  strength: 1,
-  feather: 3,
-  dim: 0.15,
+  strength: 0.6,
+  feather: 4,
+  dim: 0.1,
 }
 export type GraphicBox = z.infer<typeof graphicBoxSchema>
 
@@ -182,7 +203,10 @@ export const graphicItemSchema = z.object({
   box: graphicBoxSchema.default({ x: 0.38, y: 0.4, w: 0.24, h: 0.2 }),
   text: z.string().max(graphicLimits.text).default(""),
   secondary: z.string().max(graphicLimits.text).default(""),
-  /** Callouts: which side of the box the label sits on. */
+  /**
+   * Callouts: which side of the box the label sits on. Splits: the
+   * video's side (left, or top when the stage stacks; right = bottom).
+   */
   side: z.enum(["auto", "left", "right", "top", "bottom"]).default("auto"),
   /** Layer: higher tracks draw over lower ones (0 sits on the video). */
   track: z.number().int().min(0).max(9).default(0),

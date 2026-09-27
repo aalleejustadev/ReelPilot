@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
 
 import {
+  acceptableCoc,
   apertureFor,
   defaultLens,
   depthBlurAt,
@@ -51,26 +52,33 @@ describe("depth", () => {
     ).toEqual([])
   })
 
-  it("matches the thin lens: c = A·|z|/P in the frame's pixels, linear in distance", () => {
+  it("matches the thin lens past the acceptable circle of confusion", () => {
     const turned = pose({ turn: 28 })
     const at = (dx: number, fStop = 2) =>
       depthBlurAt({ ...stage, pose: turned, dx, dy: 0, fStop })
-    const z = Math.sin((28 * Math.PI) / 180) * 900
-    expect(at(900)).toBeCloseTo((apertureFor(2, 1920) * z * 0.42) / 2688, 6)
+    const coc = (dx: number, fStop = 2) =>
+      (apertureFor(fStop, 1920) * Math.sin((28 * Math.PI) / 180) * dx) / 2688
+    const sharp = acceptableCoc(1920)
+    expect(at(900)).toBeCloseTo((coc(900) - sharp) * 0.42, 6)
     expect(at(-900)).toBeCloseTo(at(900)) // in front or behind, the same
-    expect(at(600) / at(300)).toBeCloseTo(2)
-    // Wider aperture (smaller f-number), more blur: f/1.4 ≈ 2× f/2.8.
-    expect(at(900, 1.4) / at(900, 2.8)).toBeCloseTo(2)
-    // Zoom doesn't change it: the lens model cancels it out.
-    expect(
-      depthBlurAt({
-        ...stage,
-        pose: pose({ turn: 28, zoom: 2 }),
-        dx: 900,
-        dy: 0,
-        fStop: 2,
-      })
-    ).toBeCloseTo(at(900))
+    // Past the sharp zone blur grows linearly with distance…
+    expect(at(600) - at(300)).toBeCloseTo(coc(300) * 0.42, 6)
+    // …and a band around the focus plane stays perfectly sharp.
+    const edgeOfZone = (sharp * 2688) / (apertureFor(2, 1920) * Math.sin((28 * Math.PI) / 180))
+    expect(at(edgeOfZone * 0.9)).toBe(0)
+    expect(at(edgeOfZone * 1.2)).toBeGreaterThan(0)
+    // Wider aperture (smaller f-number), more blur and a thinner zone.
+    expect(at(900, 1.4)).toBeGreaterThan(2 * at(900, 2.8))
+    // Zooming in (a longer lens) narrows the sharp zone.
+    const zoomed = depthBlurAt({
+      ...stage,
+      pose: pose({ turn: 28, zoom: 2 }),
+      dx: 900,
+      dy: 0,
+      fStop: 2,
+    })
+    expect(zoomed).toBeGreaterThan(at(900))
+    expect(zoomed).toBeCloseTo((coc(900) - sharp / 2) * 0.42, 6)
   })
 })
 
@@ -92,6 +100,19 @@ describe("depth of field layers", () => {
     expect(total).toBeCloseTo(edge, 2) // the far edge, under the cap
     // Horizontal depth: the mask runs across (≈ ±90°) from the focus line.
     expect(layers[0]!.mask).toMatch(/^linear-gradient\((-?90\.00|270\.00)deg/)
+  })
+
+  it("keeps the sharp zone clear: the first band starts where blur does", () => {
+    const [first] = depthOfFieldLayers(input)
+    // Blur starts at d₀ = acceptable CoC / CoC-per-px either side of focus.
+    const perPx =
+      (apertureFor(1.4, 1920) * Math.sin((28 * Math.PI) / 180)) / 2688
+    const d0 = acceptableCoc(1920) / perPx
+    const stops = [...first!.mask.matchAll(/transparent (-?[\d.]+)px/g)].map(
+      (m) => Number(m[1])
+    )
+    expect(stops).toHaveLength(2)
+    expect(stops[1]! - stops[0]!).toBeCloseTo(2 * d0, 0)
   })
 
   it("never blurs more than the cap", () => {

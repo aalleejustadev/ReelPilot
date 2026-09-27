@@ -14,8 +14,10 @@ import {
   depthOfFieldLayers,
   flatPose,
   frameGeometry,
+  layoutTransform,
   perspectiveFor,
   stageCamera,
+  stageLayoutAt,
   outputDuration,
   outputLayout,
   progressiveBlurLayers,
@@ -149,9 +151,16 @@ export function FootageStage({
   )
   const poseAt = useMemo(
     () => stageCamera({ presentation, shots, durationMs, reduceMotion }),
-    // The camera depends on the edit and intro, not text or style.
+    // The camera depends on the edit, intro and splits, not text or style.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [shots, edit, durationMs, presentation.intro, reduceMotion]
+    [
+      shots,
+      edit,
+      durationMs,
+      presentation.intro,
+      presentation.graphics,
+      reduceMotion,
+    ]
   )
 
   const timeMs = (frameNumber / fps) * 1000
@@ -174,6 +183,22 @@ export function FootageStage({
     videoHeight,
   })
   const perspectivePx = perspectiveFor(width)
+  // Split screens glide the whole view into the video's half.
+  const layoutMove = flat
+    ? undefined
+    : layoutTransform(
+        stageLayoutAt({
+          graphics: presentation.graphics,
+          edit,
+          durationMs,
+          adMs: timeMs,
+          width,
+          height,
+          padding: frame.padding,
+          videoWidth,
+          videoHeight,
+        })
+      )
   const depthLayers =
     lens.depthOfField.enabled && !flat
       ? depthOfFieldLayers({
@@ -249,6 +274,7 @@ export function FootageStage({
           justifyContent: "center",
           perspective: `${perspectivePx}px`,
           padding: `${frame.padding * 100}%`,
+          transform: layoutMove,
         }}
       >
         <div
@@ -383,7 +409,11 @@ export function FootageStage({
       </AbsoluteFill>
       {!flat && (
         <>
-          <StageGraphics items={stageItems} {...stageBrand} />
+          <StageGraphics
+            items={stageItems}
+            {...stageBrand}
+            animation={presentation.textStyle.animation}
+          />
           <TextLayer
             items={presentation.texts}
             animation={presentation.textStyle.animation}

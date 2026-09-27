@@ -3,7 +3,9 @@
 import {
   AlignCenterIcon,
   ClockIcon,
+  Columns2Icon,
   PlusIcon,
+  PresentationIcon,
   SparklesIcon,
   Trash2Icon,
 } from "lucide-react"
@@ -16,6 +18,7 @@ import {
 } from "@/remotion/components/TextLayer"
 import { cn } from "@/shared/lib/utils"
 import {
+  graphicInfo,
   plainText,
   textAnimationLabels,
   textAnimations,
@@ -149,6 +152,7 @@ export function TextPanel({
   onVideoAnimation,
   onAdd,
   onAddText,
+  onAddLayout,
   onSelect,
   onUpdate,
   onRemove,
@@ -163,6 +167,8 @@ export function TextPanel({
   onVideoAnimation: (animation: TextAnimation) => void
   onAdd: (preset: TextPreset) => void
   onAddText: (text: string) => void
+  /** A text slide or split screen (a graphic that takes the stage). */
+  onAddLayout: (kind: "slide" | "split") => void
   onSelect: (id: string) => void
   onUpdate: (id: string, patch: Partial<TextItem>, control: string) => void
   onRemove: (id: string) => void
@@ -219,6 +225,46 @@ export function TextPanel({
             </span>
           </Button>
         )}
+      </section>
+
+      <section
+        className="flex flex-col gap-2"
+        aria-labelledby="text-layouts-heading"
+      >
+        <h3 id="text-layouts-heading" className="text-sm font-medium">
+          Slides and split screens
+        </h3>
+        <div className="grid grid-cols-2 gap-2">
+          {(
+            [
+              {
+                kind: "slide",
+                Icon: PresentationIcon,
+                hint: "Words on their own, no video",
+              },
+              {
+                kind: "split",
+                Icon: Columns2Icon,
+                hint: "Video on one side, words on the other",
+              },
+            ] as const
+          ).map(({ kind, Icon, hint }) => (
+            <button
+              key={kind}
+              type="button"
+              title="Click to add at the playhead, or drag onto the timeline"
+              {...draggablePreset({ type: "graphic", kind })}
+              onClick={() => onAddLayout(kind)}
+              className="flex flex-col gap-0.5 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50"
+            >
+              <span className="flex items-center gap-1.5 text-sm font-medium">
+                <Icon aria-hidden className="size-3.5" />
+                {graphicInfo[kind].label}
+              </span>
+              <span className="text-xs text-muted-foreground">{hint}</span>
+            </button>
+          ))}
+        </div>
       </section>
 
       <section

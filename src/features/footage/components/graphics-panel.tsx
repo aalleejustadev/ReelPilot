@@ -4,6 +4,7 @@ import {
   AwardIcon,
   CircleDashedIcon,
   ClockIcon,
+  Columns2Icon,
   CrosshairIcon,
   EyeOffIcon,
   FlagIcon,
@@ -12,6 +13,7 @@ import {
   MessageSquareIcon,
   MousePointerClickIcon,
   PanelBottomIcon,
+  PresentationIcon,
   SearchIcon,
   SparklesIcon,
   SunIcon,
@@ -26,6 +28,7 @@ import {
   graphicInfo,
   graphicKinds,
   graphicLimits,
+  isLayoutGraphic,
   isScreenGraphic,
   type FocusShape,
   type GraphicItem,
@@ -62,7 +65,29 @@ const icons: Record<
   "lower-third": PanelBottomIcon,
   logo: AwardIcon,
   "end-card": FlagIcon,
+  slide: PresentationIcon,
+  split: Columns2Icon,
 }
+
+const groups = [
+  {
+    title: "Add a layout",
+    hint: "Text slides and split screens take over the whole stage.",
+    kinds: graphicKinds.filter(isLayoutGraphic),
+  },
+  {
+    title: "Add on the screen",
+    hint: null,
+    kinds: graphicKinds.filter(isScreenGraphic),
+  },
+  {
+    title: "Add on the stage",
+    hint: null,
+    kinds: graphicKinds.filter(
+      (kind) => !isScreenGraphic(kind) && !isLayoutGraphic(kind)
+    ),
+  },
+]
 
 /** Motion graphics (§7.4b F): per-moment templates, a gallery, and settings. */
 export function GraphicsPanel({
@@ -155,42 +180,41 @@ export function GraphicsPanel({
         </section>
       )}
 
-      {(["On the screen", "On the stage"] as const).map((group) => (
-        <section key={group} className="flex flex-col gap-2" aria-label={group}>
-          <h3 className="text-sm font-medium">
-            {group === "On the screen"
-              ? "Add on the screen"
-              : "Add on the stage"}
-          </h3>
+      {groups.map((group) => (
+        <section
+          key={group.title}
+          className="flex flex-col gap-2"
+          aria-label={group.title}
+        >
+          <h3 className="text-sm font-medium">{group.title}</h3>
+          {group.hint && (
+            <p className="-mt-1 text-xs text-muted-foreground">{group.hint}</p>
+          )}
           <div className="grid grid-cols-2 gap-2">
-            {graphicKinds
-              .filter(
-                (kind) => isScreenGraphic(kind) === (group === "On the screen")
-              )
-              .map((kind) => {
-                const Icon = icons[kind]
-                return (
-                  <button
-                    key={kind}
-                    type="button"
-                    disabled={full}
-                    title="Click to add at the playhead, or drag onto the timeline"
-                    {...draggablePreset({ type: "graphic", kind })}
-                    onClick={() => onAdd(kind)}
-                    className="flex items-start gap-2 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
-                  >
-                    <Icon className="mt-0.5 size-4 shrink-0" />
-                    <span className="flex flex-col gap-0.5">
-                      <span className="text-sm font-medium">
-                        {graphicInfo[kind].label}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {graphicInfo[kind].hint}
-                      </span>
+            {group.kinds.map((kind) => {
+              const Icon = icons[kind]
+              return (
+                <button
+                  key={kind}
+                  type="button"
+                  disabled={full}
+                  title="Click to add at the playhead, or drag onto the timeline"
+                  {...draggablePreset({ type: "graphic", kind })}
+                  onClick={() => onAdd(kind)}
+                  className="flex items-start gap-2 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
+                >
+                  <Icon className="mt-0.5 size-4 shrink-0" />
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">
+                      {graphicInfo[kind].label}
                     </span>
-                  </button>
-                )
-              })}
+                    <span className="text-xs text-muted-foreground">
+                      {graphicInfo[kind].hint}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </section>
       ))}
@@ -280,7 +304,9 @@ function GraphicInspector({
                   ? "12 hours"
                   : item.kind === "end-card"
                     ? "Try it free today"
-                    : ""
+                    : isLayoutGraphic(item.kind)
+                      ? "Ship faster"
+                      : ""
             }
             onChange={(event) => onUpdate({ text: event.target.value }, "text")}
           />
@@ -293,7 +319,13 @@ function GraphicInspector({
             id="graphic-secondary"
             value={item.secondary}
             maxLength={graphicLimits.text}
-            placeholder={item.kind === "end-card" ? "Get started" : ""}
+            placeholder={
+              item.kind === "end-card"
+                ? "Get started"
+                : isLayoutGraphic(item.kind)
+                  ? "Optional line under the title"
+                  : ""
+            }
             onChange={(event) =>
               onUpdate({ secondary: event.target.value }, "secondary")
             }
@@ -375,6 +407,33 @@ function GraphicInspector({
               )
             )}
           </ToggleGroup>
+        </Field>
+      )}
+
+      {item.kind === "split" && (
+        <Field>
+          <span className="text-sm font-medium">Video side</span>
+          <ToggleGroup
+            aria-label="Video side"
+            variant="outline"
+            className="grid grid-cols-2 gap-1"
+            value={[item.side === "right" ? "right" : "left"]}
+            onValueChange={(values) => {
+              const side = values[0] as "left" | "right" | undefined
+              if (side) onUpdate({ side }, "side")
+            }}
+          >
+            <ToggleGroupItem value="left" className="w-full text-xs">
+              Left
+            </ToggleGroupItem>
+            <ToggleGroupItem value="right" className="w-full text-xs">
+              Right
+            </ToggleGroupItem>
+          </ToggleGroup>
+          <FieldDescription>
+            Your words fill the other side. On tall and square videos the video
+            goes on top (Left) or at the bottom (Right).
+          </FieldDescription>
         </Field>
       )}
 

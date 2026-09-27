@@ -2,6 +2,7 @@ import {
   boxAround,
   defaultFocus,
   graphicInfo,
+  isLayoutGraphic,
   type GraphicBox,
   type GraphicItem,
   type GraphicKind,
@@ -107,9 +108,15 @@ export function newGraphic(
     kind,
     durationMs: graphicInfo[kind].durationMs,
     box: boxAround(0.5, 0.5),
-    text: "",
-    secondary: "",
-    side: "auto",
+    // Layouts start with words to edit, so they read as what they are.
+    text:
+      kind === "slide"
+        ? "Your big idea"
+        : kind === "split"
+          ? "Say what it does"
+          : "",
+    secondary: isLayoutGraphic(kind) ? "One line that backs it up" : "",
+    side: kind === "split" ? "left" : "auto",
     track: 0,
     at: null,
     focus: defaultFocus,

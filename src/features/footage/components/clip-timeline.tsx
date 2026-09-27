@@ -198,7 +198,20 @@ export function ClipTimeline({
     "truncate text-right text-[11px] font-medium text-muted-foreground"
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="relative flex flex-col gap-1.5">
+      {/* The playhead: one line through every row, above everything (the
+          label column and the rows' 12px insets are left out, so it sits
+          exactly on the time it shows). */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-3 left-[calc(3rem+0.5rem+0.75rem)] z-40 sm:left-[calc(4rem+0.5rem+0.75rem)]"
+      >
+        <span
+          data-testid="playhead-line"
+          className="absolute top-5 bottom-0 -ml-px w-0.5 bg-tally shadow-[0_0_0_1px_var(--background)]"
+          style={{ left: `${playhead}%` }}
+        />
+      </div>
       <div className={row}>
         <span />
         {/* Ruler: second marks and the playhead's handle (press or drag it,
@@ -247,13 +260,13 @@ export function ClipTimeline({
             aria-valuemax={durationMs}
             aria-valuenow={currentMs}
             aria-valuetext={formatTimecode(currentMs)}
-            className="group absolute inset-y-0 z-20 -ml-3 flex w-6 cursor-ew-resize items-end justify-center outline-none"
+            className="group absolute inset-y-0 z-50 -ml-3 flex w-6 cursor-ew-resize items-end justify-center outline-none"
             style={{ left: `${playhead}%` }}
             onKeyDown={onKeyDown}
           >
             <span
               aria-hidden
-              className="mb-0.5 size-4 rounded-full bg-foreground ring-2 ring-background group-focus-visible:ring-4 group-focus-visible:ring-ring/60"
+              className="mb-0.5 size-4 rounded-full bg-tally ring-2 ring-background group-focus-visible:ring-4 group-focus-visible:ring-ring/60"
             />
           </div>
         </div>
@@ -394,15 +407,6 @@ export function ClipTimeline({
                 )}
               </button>
             ))}
-
-            {/* The playhead's line; its handle lives in the ruler above, so
-            it never covers a moment. */}
-            <span
-              aria-hidden
-              data-testid="playhead-line"
-              className="pointer-events-none absolute inset-y-0 z-20 -ml-px w-0.5 bg-foreground ring-1 ring-background"
-              style={{ left: `${playhead}%` }}
-            />
           </div>
         </div>
       </div>

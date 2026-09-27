@@ -64,9 +64,19 @@ export function textColors(
     accents.find(
       (color): color is string => !!color && contrast(color, reference) >= 3
     ) ?? fallbackAccent
+  // For marks drawn straight on the stage (a slide's rule): the accent
+  // only if it stands out from both ends of the actual background.
+  const stageAccent =
+    [accent, ...accents].find(
+      (color): color is string =>
+        !!color &&
+        contrast(color, background.from) >= 3 &&
+        contrast(color, background.to) >= 3
+    ) ?? base
   return {
     base,
     accent,
+    stageAccent,
     onAccent: readableOn(accent),
     shadow: base === "#ffffff",
   }

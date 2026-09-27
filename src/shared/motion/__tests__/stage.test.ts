@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest"
 
-import { flatCamera } from "../presets"
-import { frameGeometry, frameProjection, perspectiveFor } from "../stage"
+import { defaultPresentation, flatCamera } from "../presets"
+import { graphicItemSchema } from "../graphics"
+import {
+  frameGeometry,
+  frameProjection,
+  perspectiveFor,
+  splitAreas,
+  splitInMs,
+  splitProgress,
+  stageCamera,
+  stageLayoutAt,
+} from "../stage"
 
 const geometry = frameGeometry({
   width: 1920,
@@ -91,5 +101,124 @@ describe("frameProjection", () => {
     const right = turned.toStage(w, h).y - turned.toStage(w, 0).y
     expect(right).toBeLessThan(left)
     expect(perspectiveFor(1920)).toBe(2688)
+  })
+})
+
+describe("split screens", () => {
+  const split = (side: "left" | "right", atMs = 1000, durationMs = 4000) =>
+    graphicItemSchema.parse({
+      id: "s",
+      kind: "split",
+      atMs,
+      durationMs,
+      side,
+    })
+  const base = {
+    edit: { parts: [] },
+    durationMs: 10_000,
+    width: 1920,
+    height: 1080,
+    padding: 0.1,
+    videoWidth: 1440,
+    videoHeight: 900,
+  }
+
+  it("splits wide stages side by side and stacks tall or square ones", () => {
+    const wide = splitAreas({ width: 1920, height: 1080, side: "right" })
+    expect(wide.stacked).toBe(false)
+    expect(wide.video).toEqual({ x: 960, y: 0, w: 960, h: 1080 })
+    expect(wide.text.x).toBe(0)
+    const tall = splitAreas({ width: 1080, height: 1920, side: "left" })
+    expect(tall.stacked).toBe(true)
+    expect(tall.video).toEqual({ x: 0, y: 0, w: 1080, h: 960 })
+    expect(
+      splitAreas({ width: 1080, height: 1080, side: "auto" }).stacked
+    ).toBe(true)
+  })
+
+  it("glides in and out, and holds in between", () => {
+    expect(splitProgress(1000, 4000, 999)).toBe(0)
+    expect(splitProgress(1000, 4000, 1000 + splitInMs / 2)).toBeCloseTo(0.5)
+    expect(splitProgress(1000, 4000, 3000)).toBe(1)
+    expect(splitProgress(1000, 4000, 5000)).toBe(0)
+  })
+
+  it("fits the frame inside the video's half, on the chosen side", () => {
+    const at = (side: "left" | "right") =>
+      stageLayoutAt({ ...base, graphics: [split(side)], adMs: 3000 })
+    const left = at("left")
+    const right = at("right")
+    const full = frameGeometry(base)
+    const width = full.frameWidth * left.scale
+    expect(width).toBeLessThan(960)
+    expect(width).toBeGreaterThan(780)
+    // Centred in its half.
+    expect(960 + left.dx).toBeCloseTo(480, 0)
+    expect(960 + right.dx).toBeCloseTo(1440, 0)
+    expect(left.dy).toBeCloseTo(0)
+    // Nothing moves outside the split.
+    expect(
+      stageLayoutAt({ ...base, graphics: [split("left")], adMs: 8000 })
+    ).toEqual({
+      scale: 1,
+      dx: 0,
+      dy: 0,
+    })
+  })
+
+  it("keeps the frame's projection exact while split", () => {
+    const layout = stageLayoutAt({
+      ...base,
+      graphics: [split("right")],
+      adMs: 3000,
+    })
+    const geometry = frameGeometry(base)
+    const projection = frameProjection({
+      pose: { ...flatCamera, x: 0, y: 0, turn: 20, tilt: 8, zoom: 1.3 },
+      geometry,
+      width: 1920,
+      height: 1080,
+      layout,
+    })
+    const onStage = projection.toStage(400, 300)
+    const back = projection.toFrame(onStage.x, onStage.y)
+    expect(back.x).toBeCloseTo(400, 6)
+    expect(back.y).toBeCloseTo(300, 6)
+    // The frame's centre lands in the right half.
+    const centre = projection.toStage(
+      geometry.frameWidth / 2,
+      geometry.frameHeight / 2
+    )
+    expect(centre.x).toBeGreaterThan(960)
+  })
+
+  it("settles the camera during a split, so the video fits its half", () => {
+    const shots = [
+      {
+        atMs: 0,
+        shot: {
+          camera: { ...flatCamera, zoom: 1.6, turn: 20, focusX: 0.3 },
+          transitionMs: 0,
+          easing: "smooth" as const,
+          drift: 0,
+        },
+      },
+    ]
+    const presentation = {
+      ...defaultPresentation,
+      intro: { kind: "none" as const, durationMs: 0 },
+    }
+    const plain = stageCamera({ presentation, shots, durationMs: 10_000 })
+    const withSplit = stageCamera({
+      presentation: { ...presentation, graphics: [split("left", 2000, 4000)] },
+      shots,
+      durationMs: 10_000,
+    })
+    expect(plain(4000).zoom).toBeCloseTo(1.6)
+    expect(withSplit(4000).zoom).toBeCloseTo(1)
+    expect(withSplit(4000).turn).toBeCloseTo(8)
+    // Before and after, the shot is untouched.
+    expect(withSplit(1000)).toEqual(plain(1000))
+    expect(withSplit(7000)).toEqual(plain(7000))
   })
 })

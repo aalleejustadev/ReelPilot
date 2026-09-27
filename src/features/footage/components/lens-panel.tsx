@@ -106,9 +106,9 @@ export function LensPanel({
               Depth of field
             </FieldLabel>
             <FieldDescription id="dof-hint">
-              The camera’s focus point stays sharp. Angled shots soften toward
-              the parts leaning away or toward you; a screen facing the camera
-              is all in focus, as with a real lens.
+              A band around the camera’s focus point stays sharp. On angled
+              shots the parts leaning away or toward you soften gradually; a
+              screen facing the camera is all in focus, as with a real lens.
             </FieldDescription>
           </FieldContent>
         </Field>
@@ -138,7 +138,8 @@ export function LensPanel({
                 ))}
               </ToggleGroup>
               <FieldDescription>
-                Smaller numbers open the lens: a shallower, softer focus.
+                Smaller numbers open the lens: a thinner sharp zone around the
+                focus point and softer surroundings.
               </FieldDescription>
             </Field>
             <SliderField

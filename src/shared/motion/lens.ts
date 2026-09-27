@@ -18,6 +18,11 @@ import type { CameraPose } from "./presets"
  * With z = zoom·(gx·dx + gy·dy) for a rotated plane, that is exactly
  * A·|gx·dx + gy·dy| / P: linear in the frame's coordinates, so straight
  * gradient masks reproduce it (no approximation but the layer count).
+ *
+ * Like a real lens, a band around the focus plane stays sharp: blur only
+ * shows once the circle of confusion passes the acceptable one (the
+ * "depth of field" proper), so the subject reads crisply and the image
+ * softens gradually away from it instead of from a single sharp line.
  */
 export const fStops = [1.4, 2, 2.8, 4, 5.6, 8] as const
 export type FStop = (typeof fStops)[number]
@@ -42,7 +47,7 @@ export const lensSchema = z.object({
       /** Most blur allowed, in % of the stage's width. */
       maxBlur: z.number().min(0.2).max(3),
     })
-    .default({ enabled: false, fStop: 2.8, maxBlur: 1.2 }),
+    .default({ enabled: false, fStop: 2.8, maxBlur: 0.6 }),
   progressiveBlur: z
     .object({
       enabled: z.boolean(),
@@ -75,6 +80,13 @@ const layerCount = 6
  */
 export const apertureFor = (fStop: number, stageWidth: number) =>
   (stageWidth * 0.1225) / fStop
+
+/**
+ * The largest circle of confusion that still reads as sharp, in stage px:
+ * 1/800 of the width (2.4 px at 1080p), a little looser than print's
+ * d/1500 because video is watched moving and scaled down.
+ */
+export const acceptableCoc = (stageWidth: number) => stageWidth / 800
 
 /** CSS blur (a Gaussian's σ) that looks like a circle of confusion `c`. */
 const sigmaFor = (coc: number) => coc * 0.42
@@ -113,7 +125,9 @@ export function depthBlurAt(input: {
     (apertureFor(input.fStop, input.stageWidth) *
       Math.abs(gx * input.dx + gy * input.dy)) /
     input.perspectivePx
-  return sigmaFor(coc)
+  // The acceptable circle in the frame's own pixels (the zoom magnifies).
+  const sharp = acceptableCoc(input.stageWidth) / input.pose.zoom
+  return sigmaFor(Math.max(0, coc - sharp))
 }
 
 const px = (n: number) => `${n.toFixed(2)}px`
@@ -160,7 +174,9 @@ export function depthOfFieldLayers(input: {
   // The farthest the frame gets from the focus line, and its blur.
   const reach = Math.max(focus, line - focus)
   const cap = (input.maxBlur / 100) * input.stageWidth
-  const top = Math.min(cap, slope * reach)
+  // Blur past the sharp zone: σ(d) = slope·d − offset, 0 inside ±d₀.
+  const offset = sigmaFor(acceptableCoc(input.stageWidth) / pose.zoom)
+  const top = Math.min(cap, slope * reach - offset)
   if (top < 0.5) return []
 
   const targets = Array.from(
@@ -169,8 +185,8 @@ export function depthOfFieldLayers(input: {
   )
   const steps = increments(targets)
   return targets.map((target, i) => {
-    const inner = (targets[i - 1] ?? 0) / slope
-    const outer = target / slope
+    const inner = ((targets[i - 1] ?? 0) + offset) / slope
+    const outer = (target + offset) / slope
     const mask = `linear-gradient(${((theta * 180) / Math.PI).toFixed(2)}deg, #000 0px, #000 ${px(focus - outer)}, transparent ${px(focus - inner)}, transparent ${px(focus + inner)}, #000 ${px(focus + outer)}, #000 ${px(line)})`
     return { blurPx: Number(steps[i]!.toFixed(3)), mask }
   })

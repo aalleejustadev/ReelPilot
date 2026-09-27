@@ -51,6 +51,7 @@ import {
   graphicInfo,
   graphicKinds,
   type GraphicKind,
+  isLayoutGraphic,
   isScreenGraphic,
   type GraphicItem,
 } from "@/shared/motion"
@@ -164,6 +165,27 @@ const noSubscribe = () => () => {}
 /** Playback through the Remotion Player (frames at the stage's fps). */
 const playerTime = (player: PlayerRef | null) =>
   player ? (player.getCurrentFrame() / stageFps) * 1000 : 0
+
+/** Where Space types a space: text fields, not buttons or sliders. */
+function isTypingText(target: EventTarget | null) {
+  const el = target as HTMLElement | null
+  if (!el) return false
+  if (el.closest("textarea, [contenteditable=true], [contenteditable='']"))
+    return true
+  const input = el.closest("input")
+  return Boolean(
+    input &&
+    ![
+      "checkbox",
+      "radio",
+      "range",
+      "button",
+      "submit",
+      "color",
+      "file",
+    ].includes(input.type)
+  )
+}
 
 /**
  * Signed links change on every server render (each refresh re-signs
@@ -779,7 +801,7 @@ export function FootageEditor({
       ...(isScreenGraphic(kind) && {
         box: boxFor(selectedAim, selectedInsight),
       }),
-      text: kind === "keys" ? "⌘ K" : "",
+      ...(kind === "keys" && { text: "⌘ K" }),
     })
   }
   function addGraphics(added: GraphicItem[]) {
@@ -788,8 +810,8 @@ export function FootageEditor({
     setSelectedGraphicId(added.at(-1)!.id)
     setTool("graphics")
     playerRef.current?.pause()
-    // Show it a moment into its entrance.
-    seek(added[0]!.atMs + 500)
+    // Show it a moment into its entrance (past a split's glide).
+    seek(added[0]!.atMs + (isLayoutGraphic(added[0]!.kind) ? 1100 : 500))
   }
   function applyGraphicTemplate(template: GraphicTemplateId, label?: string) {
     if (!selected) return
@@ -992,12 +1014,6 @@ export function FootageEditor({
       } else if (mod && key === "y") {
         event.preventDefault()
         stepHistory("redo")
-      } else if (
-        key === " " &&
-        !(event.target as HTMLElement)?.closest("button, [role=slider]")
-      ) {
-        event.preventDefault()
-        togglePlay()
       } else if (key === "s" && !mod && !event.altKey) {
         event.preventDefault()
         splitRef.current()
@@ -1009,6 +1025,26 @@ export function FootageEditor({
     window.addEventListener("keydown", onKey)
     return () => window.removeEventListener("keydown", onKey)
   }, [readOnly, stepHistory, togglePlay])
+
+  // Space plays and pauses wherever focus is (a button, a tab, a select,
+  // the stage), except while typing text. Captured before anything else,
+  // and the keyup too: buttons would otherwise click on Space's keyup.
+  useEffect(() => {
+    const onSpace = (event: KeyboardEvent) => {
+      if (event.key !== " " || event.metaKey || event.ctrlKey || event.altKey)
+        return
+      if (isTypingText(event.target)) return
+      event.preventDefault()
+      event.stopPropagation()
+      if (event.type === "keydown" && !event.repeat) togglePlay()
+    }
+    window.addEventListener("keydown", onSpace, { capture: true })
+    window.addEventListener("keyup", onSpace, { capture: true })
+    return () => {
+      window.removeEventListener("keydown", onSpace, { capture: true })
+      window.removeEventListener("keyup", onSpace, { capture: true })
+    }
+  }, [togglePlay])
 
   function addAtCurrentTime() {
     const atMs = Math.round(
@@ -1299,6 +1335,7 @@ export function FootageEditor({
                   }
                   onAdd={addText}
                   onAddText={(text) => addText({ text })}
+                  onAddLayout={(kind) => addGraphics([makeGraphic(kind)])}
                   onSelect={(id) => {
                     setSelectedTextId(id)
                     const item = presentation.texts.find((t) => t.id === id)

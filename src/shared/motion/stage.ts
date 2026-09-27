@@ -1,4 +1,10 @@
-import { outputDuration, toOutput } from "./edit"
+import {
+  outputDuration,
+  toOutput,
+  toOutputNearest,
+  type ClipEdit,
+} from "./edit"
+import type { GraphicItem } from "./graphics"
 import { flatCamera, type CameraPose } from "./presets"
 import type { Presentation } from "./schema"
 import { cameraTimeline, type TimedShot } from "./timeline"
@@ -38,6 +44,122 @@ export function frameGeometry(input: {
 }
 export type FrameGeometry = ReturnType<typeof frameGeometry>
 
+// ── Split layouts: the video on one side, text on the other ───────────────
+
+/** How long the frame takes to glide into a split, and back out. */
+export const splitInMs = 650
+export const splitOutMs = 550
+
+type Rect = { x: number; y: number; w: number; h: number }
+
+/**
+ * A split's two areas in stage px. Wide stages split side by side (the
+ * video left or right); tall and square ones stack (left = video on top),
+ * where a half-width column would leave a landscape video tiny.
+ */
+export function splitAreas(input: {
+  width: number
+  height: number
+  side: GraphicItem["side"]
+}): { video: Rect; text: Rect; stacked: boolean } {
+  const { width: w, height: h } = input
+  const first = input.side !== "right" && input.side !== "bottom"
+  const stacked = w / h < 1.3
+  if (stacked) {
+    const top = { x: 0, y: 0, w, h: h / 2 }
+    const bottom = { x: 0, y: h / 2, w, h: h / 2 }
+    return first
+      ? { video: top, text: bottom, stacked }
+      : { video: bottom, text: top, stacked }
+  }
+  const left = { x: 0, y: 0, w: w / 2, h }
+  const right = { x: w / 2, y: 0, w: w / 2, h }
+  return first
+    ? { video: left, text: right, stacked }
+    : { video: right, text: left, stacked }
+}
+
+/** The frame's 2D move on the stage: scale about the centre, then shift. */
+export type StageLayout = { scale: number; dx: number; dy: number }
+export const fullLayout: StageLayout = { scale: 1, dx: 0, dy: 0 }
+
+const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2
+const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
+
+/** How far into its split a graphic is at `adMs` (0 = full, 1 = split). */
+export function splitProgress(startMs: number, lengthMs: number, adMs: number) {
+  if (adMs < startMs || adMs >= startMs + lengthMs) return 0
+  const inMs = Math.min(splitInMs, lengthMs / 2)
+  const outMs = Math.min(splitOutMs, lengthMs / 2)
+  return easeInOutCubic(
+    clamp01(
+      Math.min((adMs - startMs) / inMs, (startMs + lengthMs - adMs) / outMs)
+    )
+  )
+}
+
+/**
+ * Where the frame sits at `adMs`: full stage, or gliding into (or out of)
+ * the video's half of a split. The frame keeps its size and camera; the
+ * whole view scales into the half, so every effect on it stays exact.
+ */
+export function stageLayoutAt(input: {
+  graphics: GraphicItem[]
+  edit: ClipEdit
+  durationMs: number
+  adMs: number
+  width: number
+  height: number
+  padding: number
+  videoWidth: number
+  videoHeight: number
+}): StageLayout {
+  // The top layer's split wins if two overlap.
+  const active = input.graphics
+    .filter((g) => g.kind === "split")
+    .map((g) => ({
+      item: g,
+      t: splitProgress(
+        toOutputNearest(input.edit, input.durationMs, g.atMs),
+        g.durationMs,
+        input.adMs
+      ),
+    }))
+    .filter((entry) => entry.t > 0)
+    .sort((a, b) => b.item.track - a.item.track)[0]
+  if (!active) return fullLayout
+  const { width, height, videoWidth, videoHeight } = input
+  const full = frameGeometry({ ...input })
+  const area = splitAreas({ width, height, side: active.item.side }).video
+  // Keep the stage's padding (in stage px), a little tighter at the seam.
+  const pad = Math.max(0.025, input.padding * 0.4) * width
+  const half = frameGeometry({
+    width: area.w,
+    height: area.h,
+    padding: pad / area.w,
+    videoWidth,
+    videoHeight,
+  })
+  const target = {
+    scale: half.frameWidth / full.frameWidth,
+    dx: area.x + half.left + half.frameWidth / 2 - width / 2,
+    dy: area.y + half.top + half.frameHeight / 2 - height / 2,
+  }
+  const t = active.t
+  return {
+    scale: 1 + (target.scale - 1) * t,
+    dx: target.dx * t,
+    dy: target.dy * t,
+  }
+}
+
+/** A layout as CSS on an element filling the stage (origin = centre). */
+export const layoutTransform = (layout: StageLayout) =>
+  layout.scale === 1 && layout.dx === 0 && layout.dy === 0
+    ? undefined
+    : `translate(${layout.dx.toFixed(2)}px, ${layout.dy.toFixed(2)}px) scale(${layout.scale.toFixed(5)})`
+
 /**
  * The camera at any time of the ad: moments in cut footage drop out, the
  * rest move to ad time. Reduced motion cuts between shots.
@@ -65,7 +187,38 @@ export function stageCamera(input: {
   const intro = input.reduceMotion
     ? { ...input.presentation.intro, kind: "none" as const }
     : input.presentation.intro
-  return cameraTimeline(timed, intro, outputDuration(edit, input.durationMs))
+  const timeline = cameraTimeline(
+    timed,
+    intro,
+    outputDuration(edit, input.durationMs)
+  )
+  const splits = input.presentation.graphics
+    .filter((g) => g.kind === "split")
+    .map((g) => ({
+      startMs: toOutputNearest(edit, input.durationMs, g.atMs),
+      lengthMs: g.durationMs,
+    }))
+  if (splits.length === 0) return timeline
+  // In a split the camera settles, so the whole video sits in its half:
+  // zoom and pan ease out, angles soften to a gentle 3D tilt.
+  return (atMs: number): CameraPose => {
+    const pose = timeline(atMs)
+    const t = Math.max(
+      ...splits.map((s) => splitProgress(s.startMs, s.lengthMs, atMs))
+    )
+    if (t === 0) return pose
+    const k = 1 - t
+    const soft = 1 - 0.6 * t
+    return {
+      ...pose,
+      zoom: 1 + (pose.zoom - 1) * k,
+      x: pose.x * k,
+      y: pose.y * k,
+      tilt: pose.tilt * soft,
+      turn: pose.turn * soft,
+      roll: pose.roll * k,
+    }
+  }
 }
 
 export const flatPose: CameraPose = { ...flatCamera, x: 0, y: 0 }
@@ -84,8 +237,11 @@ export function frameProjection(input: {
   geometry: FrameGeometry
   width: number
   height: number
+  /** A split's move of the whole view (default: none). */
+  layout?: StageLayout
 }) {
   const { pose, geometry: g } = input
+  const L = input.layout ?? fullLayout
   const P = perspectiveFor(input.width)
   const rad = Math.PI / 180
   const [a, b, c] = [pose.tilt * rad, pose.turn * rad, pose.roll * rad]
@@ -179,10 +335,20 @@ export function frameProjection(input: {
       y: (m[1]![0]! * x + m[1]![1]! * y + m[1]![2]!) / w,
     }
   }
+  // The split's move, about the stage's centre.
+  const out = (p: { x: number; y: number }) => ({
+    x: cx + (p.x - cx) * L.scale + L.dx,
+    y: cy + (p.y - cy) * L.scale + L.dy,
+  })
   return {
     /** A point on the frame (its own px) → on the stage (composition px). */
-    toStage: (u: number, v: number) => apply(H, u, v),
+    toStage: (u: number, v: number) => out(apply(H, u, v)),
     /** A point on the stage → the point of the frame under it. */
-    toFrame: (x: number, y: number) => apply(inv, x, y),
+    toFrame: (x: number, y: number) =>
+      apply(
+        inv,
+        cx + (x - L.dx - cx) / L.scale,
+        cy + (y - L.dy - cy) / L.scale
+      ),
   }
 }

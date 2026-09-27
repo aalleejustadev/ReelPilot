@@ -9,12 +9,15 @@ import {
 import {
   calloutSide,
   countNumbers,
+  isLayoutGraphic,
   keycaps,
   toOutputNearest,
   type ClipEdit,
   type GraphicItem,
+  type TextAnimation,
 } from "@/shared/motion"
 
+import { SplitText, TextSlide } from "./Layouts"
 import type { Colors, StageFonts } from "./TextLayer"
 
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
@@ -567,6 +570,7 @@ export function StageGraphics({
   brandName,
   siteLabel,
   background,
+  animation,
 }: {
   items: Timed[]
   colors: Colors
@@ -575,6 +579,8 @@ export function StageGraphics({
   brandName: string
   siteLabel: string
   background: string
+  /** The video's text style, for slides and splits. */
+  animation: TextAnimation
 }) {
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
@@ -594,6 +600,7 @@ export function StageGraphics({
             brandName={brandName}
             siteLabel={siteLabel}
             background={background}
+            animation={animation}
           />
         </Sequence>
       ))}
@@ -645,7 +652,8 @@ function StageGraphicPlaced(
   props: Omit<React.ComponentProps<typeof StageGraphic>, "placed">
 ) {
   const { item } = props
-  const at = item.kind === "end-card" ? null : item.at
+  const at =
+    item.kind === "end-card" || isLayoutGraphic(item.kind) ? null : item.at
   return (
     <div
       style={{
@@ -699,6 +707,7 @@ function StageGraphic({
   brandName,
   siteLabel,
   background,
+  animation,
 }: {
   item: GraphicItem
   frames: number
@@ -708,6 +717,7 @@ function StageGraphic({
   brandName: string
   siteLabel: string
   background: string
+  animation: TextAnimation
   placed: boolean
 }) {
   const frame = useCurrentFrame()
@@ -979,6 +989,27 @@ function StageGraphic({
         </AbsoluteFill>
       )
     }
+    case "slide":
+      return (
+        <TextSlide
+          item={item}
+          frames={frames}
+          colors={colors}
+          fonts={fonts}
+          background={background}
+          animation={animation}
+        />
+      )
+    case "split":
+      return (
+        <SplitText
+          item={item}
+          frames={frames}
+          colors={colors}
+          fonts={fonts}
+          animation={animation}
+        />
+      )
     default:
       return null
   }

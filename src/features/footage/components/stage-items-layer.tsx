@@ -7,8 +7,10 @@ import { stageFps } from "@/remotion/compositions/FootageStage"
 import {
   frameGeometry,
   frameProjection,
+  isLayoutGraphic,
   isScreenGraphic,
   stageCamera,
+  stageLayoutAt,
   toOutputNearest,
   type GraphicBox,
   type GraphicItem,
@@ -40,6 +42,27 @@ const snapTo = (value: number, points: number[]) => {
     ? { value, snapped: null }
     : { value: near, snapped: near }
 }
+/** Where a split has moved the frame to (the composition does the same). */
+const layoutAt = (
+  p: Presentation,
+  durationMs: number,
+  adMs: number,
+  size: {
+    width: number
+    height: number
+    videoWidth: number
+    videoHeight: number
+  }
+) =>
+  stageLayoutAt({
+    graphics: p.graphics,
+    edit: p.edit,
+    durationMs,
+    adMs,
+    padding: p.frame.padding,
+    ...size,
+  })
+
 const clamp = (n: number, min: number, max: number) =>
   Math.min(max, Math.max(min, n))
 
@@ -145,7 +168,18 @@ export function StageItemsLayer({
           durationMs: d,
           reduceMotion,
         })(adMs)
-        const projection = frameProjection({ pose, geometry, width, height })
+        const projection = frameProjection({
+          pose,
+          geometry,
+          width,
+          height,
+          layout: layoutAt(p, d, adMs, {
+            width,
+            height,
+            videoWidth,
+            videoHeight,
+          }),
+        })
         const next: Target[] = []
         for (const text of p.texts) {
           if (!visible(text.atMs, text.durationMs)) continue
@@ -177,7 +211,8 @@ export function StageItemsLayer({
                 id: graphic.id,
                 kind: "stage",
                 corners,
-                draggable: graphic.kind !== "end-card",
+                draggable:
+                  graphic.kind !== "end-card" && !isLayoutGraphic(graphic.kind),
               })
             }
           }
@@ -272,7 +307,18 @@ export function StageItemsLayer({
         durationMs,
         reduceMotion,
       })(adMs)
-      const projection = frameProjection({ pose, geometry, width, height })
+      const projection = frameProjection({
+        pose,
+        geometry,
+        width,
+        height,
+        layout: layoutAt(p, durationMs, adMs, {
+          width,
+          height,
+          videoWidth,
+          videoHeight,
+        }),
+      })
       const from = projection.toFrame(current.start.x, current.start.y)
       const to = projection.toFrame(point.x, point.y)
       const fw = geometry.frameWidth
