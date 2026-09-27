@@ -916,6 +916,15 @@ test("text slides and split screens, and Space plays from anywhere", async ({
   await page.getByRole("button", { name: /^Text slide Words on/ }).click()
   await page.getByRole("textbox", { name: "Title" }).fill("Meet Acme")
   await expect(stage.getByText("Meet Acme")).toBeVisible()
+  // Its title and line each have their own size.
+  const titleHeight = async () =>
+    (await stage.getByText("Meet Acme").boundingBox())!.height
+  const before = await titleHeight()
+  await page.getByRole("slider", { name: "Title size" }).focus()
+  for (let i = 0; i < 10; i++) await page.keyboard.press("ArrowRight")
+  await expect(page.getByText("150%", { exact: true })).toBeVisible()
+  await expect.poll(titleHeight).toBeGreaterThan(before * 1.3)
+  await expect(page.getByRole("slider", { name: "Line size" })).toBeVisible()
   const slide = stage.locator('[data-layout="slide"]')
   expect((await slide.boundingBox())!.width).toBeCloseTo(
     (await stage.boundingBox())!.width,
@@ -978,6 +987,8 @@ test("text slides and split screens, and Space plays from anywhere", async ({
     .getByRole("tab", { name: "Graphics" })
     .click()
   await expect(list.getByText("Text slide · Meet Acme")).toBeVisible()
+  await list.getByText("Text slide · Meet Acme").click()
+  await expect(page.getByText("150%", { exact: true })).toBeVisible()
   await expect(list.getByText("Split screen · Ship in minutes")).toBeVisible()
   expect(consoleProblems).toEqual([])
 })

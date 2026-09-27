@@ -616,6 +616,7 @@ export function FootageEditor({
       align: "center",
       emphasis: "",
       track: 0,
+      size: 1,
       ...patch,
     }
   }

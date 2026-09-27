@@ -483,9 +483,9 @@ function Callout({
           color: "#15171c",
           fontFamily: fonts.body,
           fontWeight: 650,
-          fontSize: 2.6 * u,
+          fontSize: 2.6 * u * item.textSize,
           lineHeight: 1.2,
-          padding: `${0.7 * u}px ${1.4 * u}px`,
+          padding: `${0.7 * u * item.textSize}px ${1.4 * u * item.textSize}px`,
           borderRadius: 999,
           whiteSpace: "nowrap",
           boxShadow: `0 ${0.4 * u}px ${1.4 * u}px rgb(0 0 0 / 0.3), inset 0 0 0 ${0.18 * u}px ${colors.accent}`,
@@ -736,6 +736,8 @@ function StageGraphic({
   switch (item.kind) {
     case "keys": {
       const caps = keycaps(item.text || "⌘ K")
+      // Keycaps scale as a whole with the text size.
+      const ku = su * item.textSize
       return (
         <div
           {...id}
@@ -745,7 +747,7 @@ function StageGraphic({
             bottom: "9%",
             translate: placed ? undefined : "-50% 0",
             display: "flex",
-            gap: 1.4 * su,
+            gap: 1.4 * ku,
             opacity: presence(frame, frames, 4),
           })}
         >
@@ -755,21 +757,21 @@ function StageGraphic({
               <span
                 key={i}
                 style={{
-                  minWidth: 7.5 * su,
-                  height: 7.5 * su,
-                  padding: `0 ${2 * su}px`,
+                  minWidth: 7.5 * ku,
+                  height: 7.5 * ku,
+                  padding: `0 ${2 * ku}px`,
                   display: "inline-flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  borderRadius: 1.3 * su,
+                  borderRadius: 1.3 * ku,
                   background: "linear-gradient(#ffffff, #eceef1)",
-                  borderBottom: `${0.6 * su}px solid #c4c8cf`,
-                  boxShadow: `0 ${0.8 * su}px ${2 * su}px rgb(0 0 0 / 0.35)`,
+                  borderBottom: `${0.6 * ku}px solid #c4c8cf`,
+                  boxShadow: `0 ${0.8 * ku}px ${2 * ku}px rgb(0 0 0 / 0.35)`,
                   color: "#15171c",
                   fontFamily: fonts.body,
                   fontWeight: 700,
-                  fontSize: 3.6 * su,
-                  transform: `translateY(${((1 - t) * su).toFixed(2)}px) scale(${(0.6 + 0.4 * t).toFixed(3)})`,
+                  fontSize: 3.6 * ku,
+                  transform: `translateY(${((1 - t) * ku).toFixed(2)}px) scale(${(0.6 + 0.4 * t).toFixed(3)})`,
                   opacity: clamp01(t * 2),
                 }}
               >
@@ -803,7 +805,7 @@ function StageGraphic({
             style={{
               fontFamily: fonts.heading,
               fontWeight: fonts.headingWeight,
-              fontSize: 7 * su,
+              fontSize: 7 * su * item.textSize,
               lineHeight: 1,
               fontVariantNumeric: "tabular-nums",
               color: colors.accent === "#ffffff" ? "#15171c" : undefined,
@@ -815,7 +817,7 @@ function StageGraphic({
             <div
               style={{
                 fontFamily: fonts.body,
-                fontSize: 2.4 * su,
+                fontSize: 2.4 * su * item.secondarySize,
                 marginTop: 0.8 * su,
                 color: "#5b6170",
               }}
@@ -855,7 +857,7 @@ function StageGraphic({
               style={{
                 fontFamily: fonts.heading,
                 fontWeight: fonts.headingWeight,
-                fontSize: 3.8 * su,
+                fontSize: 3.8 * su * item.textSize,
                 color: colors.base,
                 textShadow: colors.shadow
                   ? "0 0.04em 0.35em rgb(0 0 0 / 0.35)"
@@ -869,7 +871,7 @@ function StageGraphic({
               <div
                 style={{
                   fontFamily: fonts.body,
-                  fontSize: 2.4 * su,
+                  fontSize: 2.4 * su * item.secondarySize,
                   color: colors.base,
                   marginTop: 0.4 * su,
                   ...rise(10),
@@ -941,7 +943,7 @@ function StageGraphic({
             style={{
               fontFamily: fonts.heading,
               fontWeight: fonts.headingWeight,
-              fontSize: 6 * su,
+              fontSize: 6 * su * item.textSize,
               lineHeight: 1.08,
               color: colors.base,
               maxWidth: "80%",
@@ -954,13 +956,13 @@ function StageGraphic({
             style={{
               position: "relative",
               overflow: "hidden",
-              padding: `${1.6 * su}px ${4 * su}px`,
+              padding: `${1.6 * su * item.secondarySize}px ${4 * su * item.secondarySize}px`,
               borderRadius: 999,
               background: colors.accent,
               color: colors.onAccent,
               fontFamily: fonts.body,
               fontWeight: 700,
-              fontSize: 3 * su,
+              fontSize: 3 * su * item.secondarySize,
               ...rise(14),
             }}
           >

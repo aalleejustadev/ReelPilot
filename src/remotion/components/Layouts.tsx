@@ -31,6 +31,7 @@ const asText = (
   align: "center",
   emphasis: "",
   track: item.track,
+  size: 1,
 })
 
 type LayoutProps = {
@@ -95,7 +96,7 @@ export function TextSlide({
         style={{
           fontFamily: fonts.heading,
           fontWeight: fonts.headingWeight,
-          fontSize: (tall ? 10 : 9) * su,
+          fontSize: (tall ? 10 : 9) * su * item.textSize,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
           color: colors.base,
@@ -114,7 +115,7 @@ export function TextSlide({
         <div
           style={{
             fontFamily: fonts.body,
-            fontSize: (tall ? 4.2 : 3.6) * su,
+            fontSize: (tall ? 4.2 : 3.6) * su * item.secondarySize,
             lineHeight: 1.35,
             color: colors.base,
             opacity: 0.78 * line * words,
@@ -188,7 +189,7 @@ export function SplitText({
         style={{
           fontFamily: fonts.heading,
           fontWeight: fonts.headingWeight,
-          fontSize: (stacked ? 7 : 6) * su,
+          fontSize: (stacked ? 7 : 6) * su * item.textSize,
           lineHeight: 1.06,
           letterSpacing: "-0.02em",
           color: colors.base,
@@ -209,7 +210,7 @@ export function SplitText({
         <div
           style={{
             fontFamily: fonts.body,
-            fontSize: (stacked ? 3.4 : 2.7) * su,
+            fontSize: (stacked ? 3.4 : 2.7) * su * item.secondarySize,
             lineHeight: 1.4,
             color: colors.base,
             opacity: 0.78 * line,

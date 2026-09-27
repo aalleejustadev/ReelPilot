@@ -30,6 +30,7 @@ import {
   graphicLimits,
   isLayoutGraphic,
   isScreenGraphic,
+  textSizeRange,
   type FocusShape,
   type GraphicItem,
   type GraphicKind,
@@ -312,6 +313,17 @@ function GraphicInspector({
           />
         </Field>
       )}
+      {info.text && (
+        <SliderField
+          label={`${info.text} size`}
+          value={item.textSize}
+          min={textSizeRange.min}
+          max={textSizeRange.max}
+          step={0.05}
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(textSize) => onUpdate({ textSize }, "text-size")}
+        />
+      )}
       {info.secondary && (
         <Field>
           <FieldLabel htmlFor="graphic-secondary">{info.secondary}</FieldLabel>
@@ -331,6 +343,19 @@ function GraphicInspector({
             }
           />
         </Field>
+      )}
+      {info.secondary && (
+        <SliderField
+          label={`${info.secondary} size`}
+          value={item.secondarySize}
+          min={textSizeRange.min}
+          max={textSizeRange.max}
+          step={0.05}
+          format={(value) => `${Math.round(value * 100)}%`}
+          onChange={(secondarySize) =>
+            onUpdate({ secondarySize }, "secondary-size")
+          }
+        />
       )}
 
       {onScreen && (

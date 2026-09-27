@@ -86,3 +86,50 @@ describe("text items", () => {
     })
   })
 })
+
+describe("text sizes", () => {
+  it("read as the designed size on items saved before sizes existed", () => {
+    const parsed = presentationSchema.parse({
+      ...defaultPresentation,
+      texts: [
+        {
+          id: "t",
+          atMs: 0,
+          durationMs: 2000,
+          text: "Hello",
+          role: "headline",
+          x: 0.5,
+          y: 0.5,
+          align: "center",
+        },
+      ],
+      graphics: [{ id: "g", kind: "stat", atMs: 0, durationMs: 2000 }],
+    })
+    expect(parsed.texts[0]!.size).toBe(1)
+    expect(parsed.graphics[0]!.textSize).toBe(1)
+    expect(parsed.graphics[0]!.secondarySize).toBe(1)
+  })
+
+  it("stay within 50%–250%", () => {
+    const text = (size: number) =>
+      presentationSchema.safeParse({
+        ...defaultPresentation,
+        texts: [
+          {
+            id: "t",
+            atMs: 0,
+            durationMs: 2000,
+            text: "Hello",
+            role: "headline",
+            x: 0.5,
+            y: 0.5,
+            align: "center",
+            size,
+          },
+        ],
+      }).success
+    expect(text(2.5)).toBe(true)
+    expect(text(3)).toBe(false)
+    expect(text(0.4)).toBe(false)
+  })
+})

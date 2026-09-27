@@ -120,6 +120,8 @@ export function newGraphic(
     track: 0,
     at: null,
     focus: defaultFocus,
+    textSize: 1,
+    secondarySize: 1,
     ...patch,
   }
 }

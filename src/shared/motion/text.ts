@@ -62,6 +62,9 @@ export const textRoleLabels: Record<TextRole, string> = {
 
 export const textLimits = { items: 30, text: 140, emphasis: 60 } as const
 
+/** Text size, as a multiple of each kind's designed size. */
+export const textSizeRange = { min: 0.5, max: 2.5 } as const
+
 const unit = z.number().min(0).max(1)
 
 export const textItemSchema = z.object({
@@ -82,6 +85,8 @@ export const textItemSchema = z.object({
   emphasis: z.string().max(textLimits.emphasis).default(""),
   /** Layer: higher tracks draw over lower ones (0 sits on the video). */
   track: z.number().int().min(0).max(9).default(0),
+  /** Size, × the role's own (1 = as designed). */
+  size: z.number().min(textSizeRange.min).max(textSizeRange.max).default(1),
 })
 export type TextItem = z.output<typeof textItemSchema>
 

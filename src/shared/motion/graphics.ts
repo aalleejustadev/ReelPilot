@@ -1,5 +1,7 @@
 import { z } from "zod"
 
+import { textSizeRange } from "./text"
+
 /**
  * Motion graphics (§7.4b F). Screen graphics are pinned to a box on the
  * recording (0–1 of the frame) and move with the camera, so they stay on
@@ -214,6 +216,13 @@ export const graphicItemSchema = z.object({
   at: z.object({ x: unit, y: unit }).nullable().default(null),
   /** Focus areas only. */
   focus: focusSchema.default(defaultFocus),
+  /** Size of `text` and of `secondary`, × the kind's designed size. */
+  textSize: z.number().min(textSizeRange.min).max(textSizeRange.max).default(1),
+  secondarySize: z
+    .number()
+    .min(textSizeRange.min)
+    .max(textSizeRange.max)
+    .default(1),
 })
 export type GraphicItem = z.output<typeof graphicItemSchema>
 

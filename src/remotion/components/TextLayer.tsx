@@ -231,7 +231,7 @@ export function TextItemView({
       : item.role === "caption"
         ? 500
         : 650,
-    fontSize: `${role.size * unit}px`,
+    fontSize: `${role.size * unit * item.size}px`,
     lineHeight: role.lineHeight,
     letterSpacing: role.tracking,
     textTransform: item.role === "kicker" ? "uppercase" : undefined,

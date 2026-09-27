@@ -25,6 +25,7 @@ import {
   textLimits,
   textRoleLabels,
   textRoles,
+  textSizeRange,
   type TextAnimation,
   type TextItem,
   type TextRole,
@@ -106,6 +107,7 @@ function AnimationPreview({
     align: "center",
     emphasis: animation === "marker-sweep" ? "faster" : "",
     track: 0,
+    size: 1,
   }
   const colors = textColors(
     { kind: "solid", from: "#15171c", to: "#15171c" },
@@ -482,6 +484,16 @@ function TextInspector({
           </Select>
         </Field>
       </div>
+
+      <SliderField
+        label="Text size"
+        value={item.size}
+        min={textSizeRange.min}
+        max={textSizeRange.max}
+        step={0.05}
+        format={(value) => `${Math.round(value * 100)}%`}
+        onChange={(size) => onUpdate({ size }, "size")}
+      />
 
       <Field>
         <span className="text-sm font-medium" id="text-item-place">
