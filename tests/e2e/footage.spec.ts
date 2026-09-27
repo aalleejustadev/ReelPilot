@@ -606,7 +606,9 @@ test("turn a moment into graphics, place them, and close on an end card", async 
   await tools.getByRole("tab", { name: "Graphics" }).click()
   await page.getByRole("button", { name: /^Spotlight \+ label/ }).click()
   await expect(list.getByRole("listitem")).toHaveCount(2)
-  await page.getByRole("textbox", { name: "Label" }).fill("Colour bars")
+  await page
+    .getByRole("textbox", { name: "Label", exact: true })
+    .fill("Colour bars")
   await expect(stage.getByText("Colour bars")).toBeVisible()
 
   // Place it: click the middle of the (flat) video.
@@ -616,7 +618,9 @@ test("turn a moment into graphics, place them, and close on an end card", async 
 
   // An end card closes the ad.
   await page.getByRole("button", { name: /^End card/ }).click()
-  await page.getByRole("textbox", { name: "Headline" }).fill("Try Acme free")
+  await page
+    .getByRole("textbox", { name: "Headline", exact: true })
+    .fill("Try Acme free")
   await expect(stage.getByText("Try Acme free")).toBeVisible()
   await expect(page.getByText("Saved", { exact: true })).toBeVisible()
   await expectNoViolations(page)
@@ -914,7 +918,9 @@ test("text slides and split screens, and Space plays from anywhere", async ({
   // A text slide: words on their own, over the whole stage.
   await tools.getByRole("tab", { name: "Text" }).click()
   await page.getByRole("button", { name: /^Text slide Words on/ }).click()
-  await page.getByRole("textbox", { name: "Title" }).fill("Meet Acme")
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill("Meet Acme")
   await expect(stage.getByText("Meet Acme")).toBeVisible()
   // Its title and line each have their own size.
   const titleHeight = async () =>
@@ -938,7 +944,9 @@ test("text slides and split screens, and Space plays from anywhere", async ({
   for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowRight")
   await tools.getByRole("tab", { name: "Text" }).click()
   await page.getByRole("button", { name: /^Split screen Video on one/ }).click()
-  await page.getByRole("textbox", { name: "Title" }).fill("Ship in minutes")
+  await page
+    .getByRole("textbox", { name: "Title", exact: true })
+    .fill("Ship in minutes")
   await expect(stage.getByText("Ship in minutes")).toBeVisible()
   const centreX = async (locator: Locator) => {
     const box = (await locator.boundingBox())!
@@ -990,5 +998,94 @@ test("text slides and split screens, and Space plays from anywhere", async ({
   await list.getByText("Text slide · Meet Acme").click()
   await expect(page.getByText("150%", { exact: true })).toBeVisible()
   await expect(list.getByText("Split screen · Ship in minutes")).toBeVisible()
+  expect(consoleProblems).toEqual([])
+})
+
+test("colour any text, give it a background, and watch full screen", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const stage = page.getByTestId("motion-stage")
+
+  await tools.getByRole("tab", { name: "Text" }).click()
+  await page.getByRole("button", { name: /^Title card/ }).click()
+  await page
+    .getByRole("textbox", { name: "Text", exact: true })
+    .fill("Ship it today")
+  const onStage = stage.locator("[data-item-id]", { hasText: "Ship it today" })
+  const style = (property: "color" | "backgroundColor") =>
+    onStage.evaluate((el, p) => getComputedStyle(el)[p], property)
+
+  // A swatch colours the text; any colour can be a box behind it, and
+  // Auto keeps the text readable on it.
+  await page
+    .getByRole("group", { name: "Text colour" })
+    .getByRole("button", { name: "Use #15171c" })
+    .click()
+  await expect.poll(() => style("color")).toBe("rgb(21, 23, 28)")
+  await page
+    .getByRole("group", { name: "Text colour" })
+    .getByRole("button", { name: "Auto" })
+    .click()
+  await page.getByLabel("Pick any background").fill("#fde047")
+  await expect.poll(() => style("backgroundColor")).toBe("rgb(253, 224, 71)")
+  await expect.poll(() => style("color")).toBe("rgb(21, 23, 28)")
+
+  // Graphics too: a text slide's title in any colour, on its own colour.
+  await page.getByRole("button", { name: /^Text slide Words on/ }).click()
+  await page.getByLabel("Pick any title colour").fill("#22c55e")
+  await page.getByLabel("Pick any background").fill("#111827")
+  const slide = stage.locator('[data-layout="slide"]')
+  await expect
+    .poll(() => slide.evaluate((el) => getComputedStyle(el).backgroundColor))
+    .toBe("rgb(17, 24, 39)")
+  await expect(slide.getByText("Your big idea")).toBeVisible()
+  await expect
+    .poll(() =>
+      slide
+        .getByText("Your big idea")
+        .evaluate((el) => getComputedStyle(el.closest("div")!).color)
+    )
+    .toBe("rgb(34, 197, 94)")
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+  await expectNoViolations(page)
+
+  // Full screen: the stage alone, with its own controls; Space still plays.
+  await page.getByRole("button", { name: "Full screen" }).click()
+  const box = page.getByTestId("stage-box")
+  await expect(box).toHaveAttribute("data-fullscreen", "true")
+  const controls = page.getByTestId("fullscreen-controls")
+  await expect(controls.getByRole("button", { name: "Play" })).toBeVisible()
+  const viewport = page.viewportSize()!
+  const stageBox = (await stage.boundingBox())!
+  expect(
+    Math.max(stageBox.width / viewport.width, stageBox.height / viewport.height)
+  ).toBeGreaterThan(0.98)
+  await page.keyboard.press("Space")
+  await expect(controls.getByRole("button", { name: "Pause" })).toBeAttached()
+  // While playing, the controls fade once the pointer rests.
+  await expect(controls).not.toHaveAttribute("data-shown", "true", {
+    timeout: 6000,
+  })
+  await page.keyboard.press("Space")
+  await expect(controls).toHaveAttribute("data-shown", "true")
+  await page.keyboard.press("Escape")
+  await expect(box).not.toHaveAttribute("data-fullscreen", "true")
+  // F goes back in.
+  await page.keyboard.press("f")
+  await expect(box).toHaveAttribute("data-fullscreen", "true")
+  await controls.getByRole("button", { name: "Exit full screen" }).click()
+  await expect(box).not.toHaveAttribute("data-fullscreen", "true")
   expect(consoleProblems).toEqual([])
 })

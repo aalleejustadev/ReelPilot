@@ -122,6 +122,9 @@ export function newGraphic(
     focus: defaultFocus,
     textSize: 1,
     secondarySize: 1,
+    textColor: null,
+    secondaryColor: null,
+    backgroundColor: null,
     ...patch,
   }
 }

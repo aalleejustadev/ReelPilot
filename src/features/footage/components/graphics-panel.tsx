@@ -46,7 +46,7 @@ import {
   graphicTemplates,
   type GraphicTemplateId,
 } from "../lib/graphic-templates"
-import { PanelHeading, SliderField } from "./editor-panels"
+import { PanelHeading, SliderField, TextColorField } from "./editor-panels"
 import { draggablePreset, LayerControl } from "./layer-control"
 
 const icons: Record<
@@ -69,6 +69,18 @@ const icons: Record<
   slide: PresentationIcon,
   split: Columns2Icon,
 }
+
+/** Graphics with a surface behind their words, which can be recoloured. */
+const hasSurface = (kind: GraphicKind) =>
+  [
+    "callout",
+    "keys",
+    "stat",
+    "lower-third",
+    "end-card",
+    "slide",
+    "split",
+  ].includes(kind)
 
 const groups = [
   {
@@ -105,6 +117,7 @@ export function GraphicsPanel({
   onUpdate,
   onRemove,
   onTogglePick,
+  swatches,
 }: {
   items: GraphicItem[]
   selectedId: string | null
@@ -120,6 +133,8 @@ export function GraphicsPanel({
   onUpdate: (id: string, patch: Partial<GraphicItem>, control: string) => void
   onRemove: (id: string) => void
   onTogglePick: () => void
+  /** Colours offered for text (white, ink, the brand's). */
+  swatches: string[]
 }) {
   const [isAsking, startAsk] = useTransition()
   const selected = items.find((item) => item.id === selectedId) ?? null
@@ -256,6 +271,7 @@ export function GraphicsPanel({
           item={selected}
           playheadMs={playheadMs}
           isPicking={isPicking}
+          swatches={swatches}
           onUpdate={(patch, control) => onUpdate(selected.id, patch, control)}
           onRemove={() => onRemove(selected.id)}
           onTogglePick={onTogglePick}
@@ -269,6 +285,7 @@ function GraphicInspector({
   item,
   playheadMs,
   isPicking,
+  swatches,
   onUpdate,
   onRemove,
   onTogglePick,
@@ -276,6 +293,7 @@ function GraphicInspector({
   item: GraphicItem
   playheadMs: number
   isPicking: boolean
+  swatches: string[]
   onUpdate: (patch: Partial<GraphicItem>, control: string) => void
   onRemove: () => void
   onTogglePick: () => void
@@ -324,6 +342,14 @@ function GraphicInspector({
           onChange={(textSize) => onUpdate({ textSize }, "text-size")}
         />
       )}
+      {info.text && (
+        <TextColorField
+          label={`${info.text} colour`}
+          value={item.textColor}
+          swatches={swatches}
+          onChange={(textColor) => onUpdate({ textColor }, "text-color")}
+        />
+      )}
       {info.secondary && (
         <Field>
           <FieldLabel htmlFor="graphic-secondary">{info.secondary}</FieldLabel>
@@ -354,6 +380,26 @@ function GraphicInspector({
           format={(value) => `${Math.round(value * 100)}%`}
           onChange={(secondarySize) =>
             onUpdate({ secondarySize }, "secondary-size")
+          }
+        />
+      )}
+      {info.secondary && (
+        <TextColorField
+          label={`${info.secondary} colour`}
+          value={item.secondaryColor}
+          swatches={swatches}
+          onChange={(secondaryColor) =>
+            onUpdate({ secondaryColor }, "secondary-color")
+          }
+        />
+      )}
+      {hasSurface(item.kind) && (
+        <TextColorField
+          label="Background"
+          value={item.backgroundColor}
+          swatches={swatches}
+          onChange={(backgroundColor) =>
+            onUpdate({ backgroundColor }, "background-color")
           }
         />
       )}

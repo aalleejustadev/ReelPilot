@@ -11,6 +11,7 @@ import {
   countNumbers,
   isLayoutGraphic,
   keycaps,
+  readableOn,
   toOutputNearest,
   type ClipEdit,
   type GraphicItem,
@@ -38,6 +39,10 @@ function presence(frame: number, total: number, inFrames = 8) {
 }
 
 type Timed = { item: GraphicItem; from: number; frames: number }
+
+/** Text on an owner-picked surface reads white or ink; else `fallback`. */
+const inkOn = (surface: string | null, fallback: string) =>
+  surface ? readableOn(surface) : fallback
 
 /** Graphics in ad frames (start from footage time; length in ad time). */
 export function timedGraphics(
@@ -479,8 +484,8 @@ function Callout({
           top: label.y,
           transform: `translate(${label.tx}, ${label.ty}) scale(${(0.85 + 0.15 * pop).toFixed(3)})`,
           opacity: clamp01(pop),
-          background: "#ffffff",
-          color: "#15171c",
+          background: item.backgroundColor ?? "#ffffff",
+          color: item.textColor ?? inkOn(item.backgroundColor, "#15171c"),
           fontFamily: fonts.body,
           fontWeight: 650,
           fontSize: 2.6 * u * item.textSize,
@@ -724,7 +729,11 @@ function StageGraphic({
   const { width, height } = useVideoConfig()
   const id = placed ? {} : { "data-item-id": item.id }
   const su = Math.min(width, height) / 100
-  const shown = presence(frame, frames, 10)
+  // The end card closes the ad: it comes in and holds to the last frame.
+  const shown =
+    item.kind === "end-card"
+      ? easeOutCubic(frame / 10)
+      : presence(frame, frames, 10)
   const rise = (delay: number, frames = 12) => {
     const t = easeOutCubic((frame - delay) / frames)
     return {
@@ -764,10 +773,12 @@ function StageGraphic({
                   alignItems: "center",
                   justifyContent: "center",
                   borderRadius: 1.3 * ku,
-                  background: "linear-gradient(#ffffff, #eceef1)",
+                  background:
+                    item.backgroundColor ?? "linear-gradient(#ffffff, #eceef1)",
                   borderBottom: `${0.6 * ku}px solid #c4c8cf`,
                   boxShadow: `0 ${0.8 * ku}px ${2 * ku}px rgb(0 0 0 / 0.35)`,
-                  color: "#15171c",
+                  color:
+                    item.textColor ?? inkOn(item.backgroundColor, "#15171c"),
                   fontFamily: fonts.body,
                   fontWeight: 700,
                   fontSize: 3.6 * ku,
@@ -794,9 +805,9 @@ function StageGraphic({
             top: "8%",
             padding: `${2.2 * su}px ${3 * su}px`,
             borderRadius: 2 * su,
-            background: "rgb(255 255 255 / 0.96)",
+            background: item.backgroundColor ?? "rgb(255 255 255 / 0.96)",
             boxShadow: `0 ${1.2 * su}px ${4 * su}px rgb(0 0 0 / 0.35)`,
-            color: "#15171c",
+            color: inkOn(item.backgroundColor, "#15171c"),
             ...rise(0, 14),
             filter: `blur(${((1 - easeOutCubic(frame / 14)) * 0.6 * su).toFixed(2)}px)`,
           })}
@@ -808,7 +819,9 @@ function StageGraphic({
               fontSize: 7 * su * item.textSize,
               lineHeight: 1,
               fontVariantNumeric: "tabular-nums",
-              color: colors.accent === "#ffffff" ? "#15171c" : undefined,
+              color:
+                item.textColor ??
+                (colors.accent === "#ffffff" ? "#15171c" : undefined),
             }}
           >
             {value}
@@ -819,7 +832,8 @@ function StageGraphic({
                 fontFamily: fonts.body,
                 fontSize: 2.4 * su * item.secondarySize,
                 marginTop: 0.8 * su,
-                color: "#5b6170",
+                color:
+                  item.secondaryColor ?? inkOn(item.backgroundColor, "#5b6170"),
               }}
             >
               {item.secondary}
@@ -830,6 +844,7 @@ function StageGraphic({
     }
     case "lower-third": {
       const bar = easeOutCubic(frame / 8)
+      const ink = inkOn(item.backgroundColor, colors.base)
       return (
         <div
           {...id}
@@ -841,6 +856,11 @@ function StageGraphic({
             alignItems: "stretch",
             gap: 1.6 * su,
             opacity: shown,
+            ...(item.backgroundColor && {
+              background: item.backgroundColor,
+              padding: `${1.4 * su}px ${2.2 * su}px`,
+              borderRadius: 1.2 * su,
+            }),
           })}
         >
           <span
@@ -858,10 +878,11 @@ function StageGraphic({
                 fontFamily: fonts.heading,
                 fontWeight: fonts.headingWeight,
                 fontSize: 3.8 * su * item.textSize,
-                color: colors.base,
-                textShadow: colors.shadow
-                  ? "0 0.04em 0.35em rgb(0 0 0 / 0.35)"
-                  : undefined,
+                color: item.textColor ?? ink,
+                textShadow:
+                  colors.shadow && !item.backgroundColor
+                    ? "0 0.04em 0.35em rgb(0 0 0 / 0.35)"
+                    : undefined,
                 ...rise(6),
               }}
             >
@@ -872,7 +893,7 @@ function StageGraphic({
                 style={{
                   fontFamily: fonts.body,
                   fontSize: 2.4 * su * item.secondarySize,
-                  color: colors.base,
+                  color: item.secondaryColor ?? ink,
                   marginTop: 0.4 * su,
                   ...rise(10),
                   opacity: 0.8 * rise(10).opacity,
@@ -917,11 +938,12 @@ function StageGraphic({
     case "end-card": {
       // A light sweep across the button every 1.5s.
       const sweep = ((frame % 45) / 45) * 260 - 80
+      const ink = inkOn(item.backgroundColor, colors.base)
       return (
         <AbsoluteFill
           data-item-id={item.id}
           style={{
-            background,
+            background: item.backgroundColor ?? background,
             opacity: easeOutCubic(frame / 12),
             alignItems: "center",
             justifyContent: "center",
@@ -936,7 +958,7 @@ function StageGraphic({
               brandName={brandName}
               fonts={fonts}
               height={9 * su}
-              color={colors.base}
+              color={ink}
             />
           </div>
           <div
@@ -945,7 +967,7 @@ function StageGraphic({
               fontWeight: fonts.headingWeight,
               fontSize: 6 * su * item.textSize,
               lineHeight: 1.08,
-              color: colors.base,
+              color: item.textColor ?? ink,
               maxWidth: "80%",
               ...rise(9),
             }}
@@ -959,7 +981,7 @@ function StageGraphic({
               padding: `${1.6 * su * item.secondarySize}px ${4 * su * item.secondarySize}px`,
               borderRadius: 999,
               background: colors.accent,
-              color: colors.onAccent,
+              color: item.secondaryColor ?? colors.onAccent,
               fontFamily: fonts.body,
               fontWeight: 700,
               fontSize: 3 * su * item.secondarySize,
@@ -980,7 +1002,7 @@ function StageGraphic({
               style={{
                 fontFamily: fonts.body,
                 fontSize: 2.4 * su,
-                color: colors.base,
+                color: ink,
                 ...rise(18),
                 opacity: 0.75 * rise(18).opacity,
               }}

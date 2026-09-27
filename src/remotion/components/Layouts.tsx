@@ -1,6 +1,7 @@
 import { AbsoluteFill, useCurrentFrame, useVideoConfig } from "remotion"
 
 import {
+  readableOn,
   splitAreas,
   splitInMs,
   splitOutMs,
@@ -32,6 +33,9 @@ const asText = (
   emphasis: "",
   track: item.track,
   size: 1,
+  color: null,
+  highlightColor: null,
+  background: null,
 })
 
 type LayoutProps = {
@@ -60,6 +64,9 @@ export function TextSlide({
   const { width, height } = useVideoConfig()
   const su = Math.min(width, height) / 100
   const tall = height > width
+  const ink = item.backgroundColor
+    ? readableOn(item.backgroundColor)
+    : colors.base
   const fade = Math.min(
     easeOutCubic(frame / 9),
     easeOutCubic((frames - frame) / 9)
@@ -72,7 +79,7 @@ export function TextSlide({
       data-item-id={item.id}
       data-layout="slide"
       style={{
-        background,
+        background: item.backgroundColor ?? background,
         opacity: fade,
         alignItems: "center",
         justifyContent: "center",
@@ -99,7 +106,7 @@ export function TextSlide({
           fontSize: (tall ? 10 : 9) * su * item.textSize,
           lineHeight: 1.05,
           letterSpacing: "-0.02em",
-          color: colors.base,
+          color: item.textColor ?? ink,
           opacity: words,
           textWrap: "balance",
         }}
@@ -117,7 +124,7 @@ export function TextSlide({
             fontFamily: fonts.body,
             fontSize: (tall ? 4.2 : 3.6) * su * item.secondarySize,
             lineHeight: 1.35,
-            color: colors.base,
+            color: item.secondaryColor ?? ink,
             opacity: 0.78 * line * words,
             transform: `translateY(${((1 - line) * 1.2 * su).toFixed(2)}px)`,
             maxWidth: "70ch",
@@ -160,6 +167,9 @@ export function SplitText({
   const shown = Math.min(1, easeOutCubic((frames - frame) / outFrames))
   const line = easeOutCubic((frame - delay - 10) / 14)
   const onLeft = area.x === 0 && !stacked
+  const ink = item.backgroundColor
+    ? readableOn(item.backgroundColor)
+    : colors.base
   return (
     <div
       data-item-id={item.id}
@@ -183,6 +193,7 @@ export function SplitText({
             ? `0 3% 0 9%`
             : `0 9% 0 3%`,
         opacity: shown,
+        background: item.backgroundColor ?? undefined,
       }}
     >
       <div
@@ -192,10 +203,11 @@ export function SplitText({
           fontSize: (stacked ? 7 : 6) * su * item.textSize,
           lineHeight: 1.06,
           letterSpacing: "-0.02em",
-          color: colors.base,
-          textShadow: colors.shadow
-            ? "0 0.04em 0.35em rgb(0 0 0 / 0.3)"
-            : undefined,
+          color: item.textColor ?? ink,
+          textShadow:
+            colors.shadow && !item.backgroundColor
+              ? "0 0.04em 0.35em rgb(0 0 0 / 0.3)"
+              : undefined,
           textWrap: "balance",
         }}
       >
@@ -212,7 +224,7 @@ export function SplitText({
             fontFamily: fonts.body,
             fontSize: (stacked ? 3.4 : 2.7) * su * item.secondarySize,
             lineHeight: 1.4,
-            color: colors.base,
+            color: item.secondaryColor ?? ink,
             opacity: 0.78 * line,
             transform: `translateY(${((1 - line) * 1.2 * su).toFixed(2)}px)`,
             textWrap: "pretty",

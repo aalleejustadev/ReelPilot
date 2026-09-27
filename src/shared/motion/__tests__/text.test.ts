@@ -133,3 +133,48 @@ describe("text sizes", () => {
     expect(text(0.4)).toBe(false)
   })
 })
+
+describe("text colours", () => {
+  const base = {
+    id: "t",
+    atMs: 0,
+    durationMs: 2000,
+    text: "Hello",
+    role: "headline",
+    x: 0.5,
+    y: 0.5,
+    align: "center",
+  }
+  it("are automatic unless set, and stored lower-case", () => {
+    const parsed = presentationSchema.parse({
+      ...defaultPresentation,
+      texts: [
+        base,
+        { ...base, id: "u", color: "#FDE047", background: "#111827" },
+      ],
+      graphics: [{ id: "g", kind: "slide", atMs: 0, durationMs: 2000 }],
+    })
+    expect(parsed.texts[0]).toMatchObject({
+      color: null,
+      highlightColor: null,
+      background: null,
+    })
+    expect(parsed.texts[1]!.color).toBe("#fde047")
+    expect(parsed.graphics[0]).toMatchObject({
+      textColor: null,
+      secondaryColor: null,
+      backgroundColor: null,
+    })
+  })
+
+  it("must be #rrggbb", () => {
+    const withColor = (color: string) =>
+      presentationSchema.safeParse({
+        ...defaultPresentation,
+        texts: [{ ...base, color }],
+      }).success
+    expect(withColor("#12abef")).toBe(true)
+    expect(withColor("red")).toBe(false)
+    expect(withColor("#fff")).toBe(false)
+  })
+})

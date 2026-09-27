@@ -7,6 +7,7 @@ import {
   FilmIcon,
   ListIcon,
   PaletteIcon,
+  MaximizeIcon,
   PauseIcon,
   PlayIcon,
   Redo2Icon,
@@ -103,15 +104,18 @@ import { GraphicsPanel } from "./graphics-panel"
 import { LensPanel } from "./lens-panel"
 import { TextPanel, type TextPreset } from "./text-panel"
 import { DeleteClipButton } from "./delete-clip-button"
+import { FullscreenControls } from "./fullscreen-controls"
 import {
   DirectPanel,
   EffectsPanel,
   ShotPanel,
   StylePanel,
+  textSwatches,
 } from "./editor-panels"
 import { MomentsPanel } from "./moments-panel"
 import { MotionStage, stageAspects, type StageAspect } from "./motion-stage"
 import { stageFps } from "@/remotion/compositions/FootageStage"
+import { cn } from "@/shared/lib/utils"
 import { RefreshWhileProcessing } from "./refresh-while-processing"
 
 type Marker = FootageDetail["markers"][number]
@@ -594,6 +598,7 @@ export function FootageEditor({
       body: `${adFontFamily[body]}, system-ui, sans-serif`,
     }
   }, [kitFonts.heading, kitFonts.body])
+  const swatches = useMemo(() => textSwatches(brandColors), [brandColors])
   const accents = useMemo(
     () => [...brandColors, ...(analysis?.palette.accents ?? [])],
     [brandColors, analysis]
@@ -617,6 +622,9 @@ export function FootageEditor({
       emphasis: "",
       track: 0,
       size: 1,
+      color: null,
+      highlightColor: null,
+      background: null,
       ...patch,
     }
   }
@@ -1065,6 +1073,59 @@ export function FootageEditor({
     })
   }
 
+  // Full screen: the stage alone, edge to edge, to watch the ad as it'll
+  // look. Native full screen where the browser allows it on an element;
+  // else (iPhone Safari) the stage fills the window.
+  const stageBoxRef = useRef<HTMLDivElement>(null)
+  const [fullscreen, setFullscreen] = useState(false)
+  const enterFullscreen = useCallback(() => {
+    setFullscreen(true)
+    const box = stageBoxRef.current
+    if (box && document.fullscreenEnabled && !document.fullscreenElement) {
+      box.requestFullscreen().catch(() => {
+        // Refused (e.g. not from a user gesture): the window fill stays.
+      })
+    }
+  }, [])
+  // Exits we asked for: their "left full screen" event arrives later, and
+  // must not close a full screen entered again in the meantime (F right
+  // after Esc).
+  const ownExits = useRef(0)
+  const exitFullscreen = useCallback(() => {
+    setFullscreen(false)
+    if (document.fullscreenElement) {
+      ownExits.current++
+      document.exitFullscreen().catch(() => ownExits.current--)
+    }
+  }, [])
+  useEffect(() => {
+    // The browser leaving native full screen by itself (its Esc or its
+    // own control) closes ours too.
+    const onChange = () => {
+      if (document.fullscreenElement) return
+      if (ownExits.current > 0) ownExits.current--
+      else setFullscreen(false)
+    }
+    document.addEventListener("fullscreenchange", onChange)
+    return () => document.removeEventListener("fullscreenchange", onChange)
+  }, [])
+  useEffect(() => {
+    // F toggles full screen; Esc leaves the window fill.
+    const onKey = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      if (isTypingText(event.target)) return
+      if (event.key === "f" || event.key === "F") {
+        event.preventDefault()
+        if (fullscreen) exitFullscreen()
+        else enterFullscreen()
+      } else if (event.key === "Escape" && fullscreen) {
+        exitFullscreen()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [fullscreen, enterFullscreen, exitFullscreen])
+
   // Keep the open tool's tab in view in the phone's scrolling row.
   const railRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -1337,6 +1398,7 @@ export function FootageEditor({
                   onAdd={addText}
                   onAddText={(text) => addText({ text })}
                   onAddLayout={(kind) => addGraphics([makeGraphic(kind)])}
+                  swatches={swatches}
                   onSelect={(id) => {
                     setSelectedTextId(id)
                     const item = presentation.texts.find((t) => t.id === id)
@@ -1380,6 +1442,7 @@ export function FootageEditor({
                   onApplyTemplate={(template) => applyGraphicTemplate(template)}
                   onAskAi={askAiForGraphic}
                   onAdd={(kind) => addGraphics([makeGraphic(kind)])}
+                  swatches={swatches}
                   onSelect={(id) => {
                     setSelectedGraphicId(id)
                     const item = presentation.graphics.find((g) => g.id === id)
@@ -1510,8 +1573,18 @@ export function FootageEditor({
           tabIndex={-1}
           className="order-1 flex min-h-0 min-w-0 flex-1 flex-col outline-none lg:order-none"
         >
-          <div className="h-[50vh] bg-muted/60 p-4 sm:p-6 lg:h-auto lg:min-h-0 lg:flex-1">
+          <div
+            ref={stageBoxRef}
+            data-testid="stage-box"
+            data-fullscreen={fullscreen || undefined}
+            className={cn(
+              fullscreen
+                ? "fixed inset-0 z-50 bg-black"
+                : "h-[50vh] bg-muted/60 p-4 sm:p-6 lg:h-auto lg:min-h-0 lg:flex-1"
+            )}
+          >
             <MotionStage
+              bare={fullscreen}
               playerRef={playerRef}
               videoUrl={links.videoUrl}
               posterUrl={links.posterUrl}
@@ -1528,7 +1601,7 @@ export function FootageEditor({
               onPickFocus={onPickFocus}
               playbackRate={rate}
               playing={isPlaying && rate > 0}
-              interactive={!readOnly && !isPlaying}
+              interactive={!readOnly && !isPlaying && !fullscreen}
               selectedItemId={
                 tool === "text"
                   ? selectedTextId
@@ -1559,6 +1632,16 @@ export function FootageEditor({
               // The Player keeps its frame; the fresh link loads there.
               onVideoError={renewLinks}
             />
+            {fullscreen && (
+              <FullscreenControls
+                isPlaying={isPlaying}
+                currentMs={currentMs}
+                durationMs={adDurationMs}
+                onTogglePlay={togglePlay}
+                onSeek={seekAd}
+                onExit={exitFullscreen}
+              />
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t bg-card px-3 py-2 sm:gap-3 sm:px-4">
             <Button
@@ -1595,11 +1678,21 @@ export function FootageEditor({
                 Reduced motion: the preview cuts between shots.
               </span>
             )}
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="ml-auto"
+              aria-label="Full screen"
+              title="Full screen (F)"
+              onClick={enterFullscreen}
+            >
+              <MaximizeIcon />
+            </Button>
             <ToggleGroup
               aria-label="Preview shape"
               variant="outline"
               size="sm"
-              className="ml-auto"
               value={[aspect]}
               onValueChange={(values) => {
                 const next = values[0] as StageAspect | undefined

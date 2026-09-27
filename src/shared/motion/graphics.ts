@@ -1,6 +1,6 @@
 import { z } from "zod"
 
-import { textSizeRange } from "./text"
+import { hexColorSchema, textSizeRange } from "./text"
 
 /**
  * Motion graphics (§7.4b F). Screen graphics are pinned to a box on the
@@ -223,6 +223,11 @@ export const graphicItemSchema = z.object({
     .min(textSizeRange.min)
     .max(textSizeRange.max)
     .default(1),
+  /** Colour of `text` and of `secondary`; null = the kind's own. */
+  textColor: hexColorSchema.nullable().default(null),
+  secondaryColor: hexColorSchema.nullable().default(null),
+  /** Its surface (pill, card, keycaps, slide or column); null = its own. */
+  backgroundColor: hexColorSchema.nullable().default(null),
 })
 export type GraphicItem = z.output<typeof graphicItemSchema>
 

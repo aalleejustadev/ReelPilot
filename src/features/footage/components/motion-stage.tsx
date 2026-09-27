@@ -14,6 +14,8 @@ import {
 } from "@/remotion/compositions/FootageStage"
 import type { StageFonts } from "@/remotion/components/TextLayer"
 
+import { cn } from "@/shared/lib/utils"
+
 import { StageItemsLayer, type ItemPatch } from "./stage-items-layer"
 import type { Presentation, TimedShot } from "@/shared/motion"
 
@@ -56,6 +58,7 @@ export function MotionStage({
   onSelectItem,
   onMoveItem,
   interactive = false,
+  bare = false,
 }: {
   playerRef: React.RefObject<PlayerRef | null>
   videoUrl: string
@@ -90,6 +93,8 @@ export function MotionStage({
   onSelectItem?: (id: string) => void
   onMoveItem?: (id: string, patch: ItemPatch) => void
   interactive?: boolean
+  /** Full screen: no rounded corners or shadow around the stage. */
+  bare?: boolean
 }) {
   const size = stageSizes[aspect]
   // Where playback was, so switching shape (a new Player) keeps the spot.
@@ -176,7 +181,10 @@ export function MotionStage({
     // rectangle of the chosen shape that fits inside (container units).
     <div className="[container-type:size] flex size-full items-center justify-center">
       <div
-        className="relative overflow-hidden rounded-lg shadow-sm select-none"
+        className={cn(
+          "relative overflow-hidden select-none",
+          !bare && "rounded-lg shadow-sm"
+        )}
         style={{
           aspectRatio: stageAspects[aspect],
           width: `min(100cqw, calc(100cqh * ${w} / ${h}))`,

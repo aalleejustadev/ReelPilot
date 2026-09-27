@@ -3,13 +3,14 @@
 import {
   CopyIcon,
   CrosshairIcon,
+  PipetteIcon,
   RotateCcwIcon,
   ScanSearchIcon,
   ShuffleIcon,
   SparklesIcon,
   TrashIcon,
 } from "lucide-react"
-import { useState } from "react"
+import { useId, useState, useSyncExternalStore } from "react"
 
 import { cn } from "@/shared/lib/utils"
 import {
@@ -556,6 +557,147 @@ export function ShotPanel({
         </FieldGroup>
       )}
     </div>
+  )
+}
+
+// ── Text colours ───────────────────────────────────────────────────────────
+
+/** White, ink, then the brand's colours: the swatches a text colour offers. */
+export function textSwatches(brandColors: string[]) {
+  return [
+    ...new Set([
+      "#ffffff",
+      "#15171c",
+      ...brandColors.map((c) => c.toLowerCase()),
+    ]),
+  ].slice(0, 7)
+}
+
+type EyeDropperResult = { sRGBHex: string }
+type EyeDropperApi = new () => { open: () => Promise<EyeDropperResult> }
+
+/** The browser's eyedropper (Chrome, Edge), if it has one. */
+const eyeDropper = () =>
+  (globalThis as { EyeDropper?: EyeDropperApi }).EyeDropper ?? null
+
+/** "#abcdef", or "rgb(1, 2, 3)" as some browsers report it, as #rrggbb. */
+function toHex(color: string) {
+  if (/^#[0-9a-f]{6}$/i.test(color)) return color.toLowerCase()
+  const rgb = color.match(/\d+/g)?.slice(0, 3).map(Number)
+  if (!rgb || rgb.length < 3) return null
+  return `#${rgb.map((n) => n.toString(16).padStart(2, "0")).join("")}`
+}
+
+/**
+ * A text colour: Auto (the kind's own, readable colour), a swatch, any
+ * colour from the system picker, or one picked off the screen — the video
+ * included — with the eyedropper where the browser has one.
+ */
+export function TextColorField({
+  label,
+  value,
+  swatches,
+  onChange,
+}: {
+  label: string
+  /** null = automatic. */
+  value: string | null
+  swatches: string[]
+  onChange: (value: string | null) => void
+}) {
+  const id = useId()
+  const custom = value !== null && !swatches.includes(value)
+  // Known only in the browser (false while server rendering).
+  const canPick = useSyncExternalStore(
+    () => () => {},
+    () => eyeDropper() !== null,
+    () => false
+  )
+  const pick = async () => {
+    const Dropper = eyeDropper()
+    if (!Dropper) return
+    try {
+      const hex = toHex((await new Dropper().open()).sRGBHex)
+      if (hex) onChange(hex)
+    } catch {
+      // Escape cancels the pick.
+    }
+  }
+  const ring = "ring-2 ring-ring ring-offset-2 ring-offset-background"
+  return (
+    <Field className="gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium" id={id}>
+          {label}
+        </span>
+        <span className="font-mono text-sm text-muted-foreground">
+          {value ?? "Auto"}
+        </span>
+      </div>
+      <div
+        role="group"
+        aria-labelledby={id}
+        className="flex flex-wrap items-center gap-2"
+      >
+        <Button
+          type="button"
+          size="sm"
+          variant={value === null ? "secondary" : "outline"}
+          aria-pressed={value === null}
+          onClick={() => onChange(null)}
+        >
+          Auto
+        </Button>
+        {swatches.map((color) => (
+          <button
+            key={color}
+            type="button"
+            aria-label={`Use ${color}`}
+            aria-pressed={value === color}
+            onClick={() => onChange(color)}
+            className={cn(
+              "size-7 rounded-full border outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+              value === color && ring
+            )}
+            style={{ backgroundColor: color }}
+          />
+        ))}
+        {/* Any colour: the native picker over a rainbow swatch. */}
+        <span className="relative size-7 shrink-0">
+          <input
+            type="color"
+            aria-label={`Pick any ${label.toLowerCase()}`}
+            value={value ?? "#ffffff"}
+            onChange={(event) => onChange(event.target.value.toLowerCase())}
+            className="peer absolute inset-0 size-full cursor-pointer opacity-0"
+          />
+          <span
+            aria-hidden
+            className={cn(
+              "pointer-events-none absolute inset-0 rounded-full border peer-focus-visible:ring-3 peer-focus-visible:ring-ring/50",
+              custom && ring
+            )}
+            style={{
+              background: custom
+                ? value
+                : "conic-gradient(#f43f5e, #f59e0b, #84cc16, #06b6d4, #6366f1, #d946ef, #f43f5e)",
+            }}
+          />
+        </span>
+        {canPick && (
+          <Button
+            type="button"
+            size="icon-sm"
+            variant="outline"
+            aria-label={`Pick ${label.toLowerCase()} from the screen`}
+            title="Pick a colour from anywhere on screen, the video included"
+            onClick={pick}
+          >
+            <PipetteIcon />
+          </Button>
+        )}
+      </div>
+    </Field>
   )
 }
 

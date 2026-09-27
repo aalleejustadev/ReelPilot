@@ -62,6 +62,12 @@ export const textRoleLabels: Record<TextRole, string> = {
 
 export const textLimits = { items: 30, text: 140, emphasis: 60 } as const
 
+/** A #rrggbb colour (stored lower-case). */
+export const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-f]{6}$/i)
+  .transform((value) => value.toLowerCase())
+
 /** Text size, as a multiple of each kind's designed size. */
 export const textSizeRange = { min: 0.5, max: 2.5 } as const
 
@@ -87,6 +93,11 @@ export const textItemSchema = z.object({
   track: z.number().int().min(0).max(9).default(0),
   /** Size, × the role's own (1 = as designed). */
   size: z.number().min(textSizeRange.min).max(textSizeRange.max).default(1),
+  /** Its colour and its highlighted words' colour; null = automatic. */
+  color: hexColorSchema.nullable().default(null),
+  highlightColor: hexColorSchema.nullable().default(null),
+  /** A box behind the text (labels and captions: their own); null = none. */
+  background: hexColorSchema.nullable().default(null),
 })
 export type TextItem = z.output<typeof textItemSchema>
 

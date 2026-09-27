@@ -235,13 +235,17 @@ export function TextItemView({
     lineHeight: role.lineHeight,
     letterSpacing: role.tracking,
     textTransform: item.role === "kicker" ? "uppercase" : undefined,
-    color: pill
-      ? readableOn(colors.base === "#ffffff" ? "#ffffff" : "#15171c")
-      : item.role === "kicker"
-        ? colors.accent
-        : scrim
-          ? "#ffffff"
-          : colors.base,
+    color:
+      item.color ??
+      (item.background
+        ? readableOn(item.background)
+        : pill
+          ? readableOn(colors.base === "#ffffff" ? "#ffffff" : "#15171c")
+          : item.role === "kicker"
+            ? colors.accent
+            : scrim
+              ? "#ffffff"
+              : colors.base),
     textShadow:
       colors.shadow && !pill && !scrim
         ? "0 0.04em 0.35em rgb(0 0 0 / 0.35)"
@@ -260,6 +264,13 @@ export function TextItemView({
       padding: "0.3em 0.7em",
       borderRadius: "0.35em",
     }),
+    // The owner's box behind the text (a label keeps its pill shape).
+    ...(item.background && {
+      background: item.background,
+      padding: pill ? "0.35em 0.8em" : "0.3em 0.6em",
+      borderRadius: pill ? "999px" : "0.3em",
+      textShadow: undefined,
+    }),
   }
 
   return (
@@ -273,7 +284,15 @@ export function TextItemView({
         item={item}
         animation={animation}
         frame={frame}
-        colors={colors}
+        colors={
+          item.highlightColor
+            ? {
+                ...colors,
+                accent: item.highlightColor,
+                onAccent: readableOn(item.highlightColor),
+              }
+            : colors
+        }
       />
     </div>
   )

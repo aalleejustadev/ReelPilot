@@ -24,6 +24,7 @@ function shortcuts(mod: string) {
         ["L", "Play forwards (press again to go faster)"],
         [", / .", "One frame back / forward"],
         ["← / →", "Move the playhead 0.1s (Shift: 1s), on the timeline"],
+        ["F", "Full screen (Esc to leave)"],
       ],
     },
     {

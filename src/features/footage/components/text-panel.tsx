@@ -44,7 +44,7 @@ import {
 import { Textarea } from "@/shared/ui/textarea"
 
 import { formatTimecode } from "../lib/format"
-import { PanelHeading, SliderField } from "./editor-panels"
+import { PanelHeading, SliderField, TextColorField } from "./editor-panels"
 import { draggablePreset, LayerControl } from "./layer-control"
 
 /** Ready-made text to add at the playhead. */
@@ -108,6 +108,9 @@ function AnimationPreview({
     emphasis: animation === "marker-sweep" ? "faster" : "",
     track: 0,
     size: 1,
+    color: null,
+    highlightColor: null,
+    background: null,
   }
   const colors = textColors(
     { kind: "solid", from: "#15171c", to: "#15171c" },
@@ -158,6 +161,7 @@ export function TextPanel({
   onSelect,
   onUpdate,
   onRemove,
+  swatches,
 }: {
   items: TextItem[]
   selectedId: string | null
@@ -171,6 +175,8 @@ export function TextPanel({
   onAddText: (text: string) => void
   /** A text slide or split screen (a graphic that takes the stage). */
   onAddLayout: (kind: "slide" | "split") => void
+  /** Colours offered for text (white, ink, the brand's). */
+  swatches: string[]
   onSelect: (id: string) => void
   onUpdate: (id: string, patch: Partial<TextItem>, control: string) => void
   onRemove: (id: string) => void
@@ -338,6 +344,7 @@ export function TextPanel({
           item={selected}
           videoAnimation={videoAnimation}
           playheadMs={playheadMs}
+          swatches={swatches}
           onUpdate={(patch, control) => onUpdate(selected.id, patch, control)}
           onRemove={() => onRemove(selected.id)}
         />
@@ -350,12 +357,14 @@ function TextInspector({
   item,
   videoAnimation,
   playheadMs,
+  swatches,
   onUpdate,
   onRemove,
 }: {
   item: TextItem
   videoAnimation: TextAnimation
   playheadMs: number
+  swatches: string[]
   onUpdate: (patch: Partial<TextItem>, control: string) => void
   onRemove: () => void
 }) {
@@ -493,6 +502,26 @@ function TextInspector({
         step={0.05}
         format={(value) => `${Math.round(value * 100)}%`}
         onChange={(size) => onUpdate({ size }, "size")}
+      />
+      <TextColorField
+        label="Text colour"
+        value={item.color}
+        swatches={swatches}
+        onChange={(color) => onUpdate({ color }, "color")}
+      />
+      <TextColorField
+        label="Highlight colour"
+        value={item.highlightColor}
+        swatches={swatches}
+        onChange={(highlightColor) =>
+          onUpdate({ highlightColor }, "highlight-color")
+        }
+      />
+      <TextColorField
+        label="Background"
+        value={item.background}
+        swatches={swatches}
+        onChange={(background) => onUpdate({ background }, "background")}
       />
 
       <Field>

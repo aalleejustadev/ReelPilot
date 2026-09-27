@@ -108,6 +108,9 @@ export function applyPlan(
           // Text sits over the graphics; the end card over everything.
           track: 1,
           size: 1,
+          color: null,
+          highlightColor: null,
+          background: null,
           emphasis: t.text.toLowerCase().includes(t.emphasis.toLowerCase())
             ? t.emphasis
             : "",
