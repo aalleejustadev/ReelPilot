@@ -105,6 +105,8 @@ export function applyPlan(
           animation: null,
           ...textSpots[t.role],
           align: "center" as const,
+          // Text sits over the graphics; the end card over everything.
+          track: 1,
           emphasis: t.text.toLowerCase().includes(t.emphasis.toLowerCase())
             ? t.emphasis
             : "",
@@ -141,6 +143,7 @@ export function applyPlan(
           durationMs: 3000,
           text: plan.endCard.headline,
           secondary: plan.endCard.cta,
+          track: 2,
         })
       )
     }

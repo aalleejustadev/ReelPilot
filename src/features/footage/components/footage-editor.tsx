@@ -47,7 +47,10 @@ import {
   type Shot,
   type TextItem,
   boxAround,
+  freeTrack,
   graphicInfo,
+  graphicKinds,
+  type GraphicKind,
   isScreenGraphic,
   type GraphicItem,
 } from "@/shared/motion"
@@ -90,8 +93,9 @@ import { parseStoredInsight } from "../lib/insight"
 import { parseStoredShot } from "../lib/motion"
 import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
-import { ClipTimeline } from "./clip-timeline"
+import { ClipTimeline, type OverlayBlock } from "./clip-timeline"
 import { CutsPanel } from "./cuts-panel"
+import type { DragPayload } from "./layer-control"
 import { ShortcutsDialog } from "./shortcuts-dialog"
 import { GraphicsPanel } from "./graphics-panel"
 import { LensPanel } from "./lens-panel"
@@ -132,15 +136,18 @@ type Tool =
   | "ai"
   | "moments"
 const tools: { id: Tool; label: string; icon: React.ComponentType }[] = [
-  { id: "effects", label: "Effects", icon: WandSparklesIcon },
-  { id: "shot", label: "Shot", icon: VideoIcon },
+  // In the order a first edit usually goes: let the AI (or a look) do the
+  // heavy lifting, check the moments, then refine camera, cuts, text,
+  // graphics, lens and style.
+  { id: "ai", label: "AI", icon: SparklesIcon },
+  { id: "effects", label: "Looks", icon: WandSparklesIcon },
+  { id: "moments", label: "Moments", icon: ListIcon },
+  { id: "shot", label: "Camera", icon: VideoIcon },
   { id: "cuts", label: "Cuts", icon: ScissorsIcon },
   { id: "text", label: "Text", icon: TypeIcon },
   { id: "graphics", label: "Graphics", icon: ShapesIcon },
   { id: "lens", label: "Lens", icon: ApertureIcon },
   { id: "style", label: "Style", icon: PaletteIcon },
-  { id: "ai", label: "AI", icon: SparklesIcon },
-  { id: "moments", label: "Moments", icon: ListIcon },
 ]
 
 function subscribeReducedMotion(onChange: () => void) {
@@ -547,12 +554,20 @@ export function FootageEditor({
       y: 0.14,
       align: "center",
       emphasis: "",
+      track: 0,
       ...patch,
     }
   }
 
-  function addText(preset: TextPreset | { text: string }) {
-    const added =
+  function addText(
+    preset: TextPreset | { text: string },
+    place: { atMs?: number; track?: number } = {}
+  ) {
+    const atMs = Math.round(place.atMs ?? sourceMs)
+    const track = place.track ?? freeTrackAt(atMs, 2500)
+    const at = (items: TextItem[]) =>
+      items.map((item) => ({ ...item, atMs, track }))
+    const added = at(
       typeof preset === "object"
         ? [newText({ text: preset.text })]
         : preset === "title"
@@ -571,11 +586,109 @@ export function FootageEditor({
                   }),
                 ]
               : [newText({})]
+    )
     setTexts([...presentation.texts, ...added], `add:${added[0]!.id}`)
     setSelectedTextId(added.at(-1)!.id)
+    setTool("text")
     // Show it: pause where it lands, a moment into its entrance.
     playerRef.current?.pause()
-    seek(sourceMs + 600)
+    seek(atMs + 600)
+  }
+
+  // ── Layers (text and graphics on the timeline) ──
+  /** Every text and graphic as a block, in footage time. */
+  const overlays: OverlayBlock[] = [
+    ...presentation.texts.map((item) => ({
+      id: item.id,
+      type: "text" as const,
+      track: item.track,
+      startMs: item.atMs,
+      endMs: toSource(
+        edit,
+        durationMs,
+        toOutputNearest(edit, durationMs, item.atMs) + item.durationMs
+      ),
+      label: plainText(item.text),
+    })),
+    ...presentation.graphics.map((item) => ({
+      id: item.id,
+      type: "graphic" as const,
+      track: item.track,
+      startMs: item.atMs,
+      endMs: toSource(
+        edit,
+        durationMs,
+        toOutputNearest(edit, durationMs, item.atMs) + item.durationMs
+      ),
+      label: item.text
+        ? `${graphicInfo[item.kind].label} · ${item.text}`
+        : graphicInfo[item.kind].label,
+    })),
+  ]
+  /** The lowest layer free from `atMs` for `lengthMs` of ad time. */
+  function freeTrackAt(atMs: number, lengthMs: number) {
+    const end = toSource(
+      edit,
+      durationMs,
+      toOutputNearest(edit, durationMs, atMs) + lengthMs
+    )
+    return freeTrack(overlays, atMs, Math.max(1, end - atMs))
+  }
+  function selectOverlay(id: string) {
+    const text = presentation.texts.find((t) => t.id === id)
+    if (text) {
+      setSelectedTextId(id)
+      if (!readOnly) setTool("text")
+      return
+    }
+    setSelectedGraphicId(id)
+    if (!readOnly) setTool("graphics")
+  }
+  function moveOverlay(id: string, atMs: number, track: number) {
+    if (presentation.texts.some((t) => t.id === id)) {
+      setTexts(
+        presentation.texts.map((t) =>
+          t.id === id ? { ...t, atMs, track } : t
+        ),
+        `${id}:time`
+      )
+      setSelectedTextId(id)
+    } else {
+      updateGraphic(id, { atMs, track }, "time")
+      setSelectedGraphicId(id)
+    }
+  }
+  function resizeOverlay(id: string, endMs: number) {
+    const text = presentation.texts.find((t) => t.id === id)
+    if (text) {
+      setTexts(
+        presentation.texts.map((t) =>
+          t.id === id
+            ? { ...t, durationMs: adLengthBetween(text.atMs, endMs, 600) }
+            : t
+        ),
+        `${id}:duration`
+      )
+      return
+    }
+    const item = presentation.graphics.find((g) => g.id === id)
+    if (item) {
+      updateGraphic(
+        id,
+        { durationMs: adLengthBetween(item.atMs, endMs, 400) },
+        "duration"
+      )
+    }
+  }
+  /** A preset dragged from a panel onto a layer. */
+  function dropItem(payload: DragPayload, atMs: number, track: number) {
+    if (payload.type === "text") {
+      addText(payload.preset as TextPreset, { atMs, track })
+      return
+    }
+    const kind = payload.kind as GraphicKind
+    if (!graphicKinds.includes(kind)) return
+    addGraphics([makeGraphic(kind, { atMs, track })])
   }
 
   /** Delete: the selected text or graphic, in their tools. */
@@ -615,24 +728,44 @@ export function FootageEditor({
       `${id}:${control}`
     )
   }
+  /** A new graphic of `kind`, aimed at the selected moment's action. */
+  function makeGraphic(
+    kind: GraphicKind,
+    place: { atMs?: number; track?: number } = {}
+  ) {
+    const atMs = Math.round(place.atMs ?? sourceMs)
+    return newGraphic(kind, {
+      atMs,
+      track: place.track ?? freeTrackAt(atMs, graphicInfo[kind].durationMs),
+      ...(isScreenGraphic(kind) && {
+        box: boxFor(selectedAim, selectedInsight),
+      }),
+      text: kind === "keys" ? "⌘ K" : "",
+    })
+  }
   function addGraphics(added: GraphicItem[]) {
     if (added.length === 0) return
     setGraphics([...presentation.graphics, ...added], `add:${added[0]!.id}`)
     setSelectedGraphicId(added.at(-1)!.id)
+    setTool("graphics")
     playerRef.current?.pause()
     // Show it a moment into its entrance.
     seek(added[0]!.atMs + 500)
   }
   function applyGraphicTemplate(template: GraphicTemplateId, label?: string) {
     if (!selected) return
-    addGraphics(
-      buildTemplate(template, {
-        atMs: selected.atMs,
-        box: boxFor(selectedAim, selectedInsight),
-        insight: selectedInsight,
-        label,
-      })
+    const made = buildTemplate(template, {
+      atMs: selected.atMs,
+      box: boxFor(selectedAim, selectedInsight),
+      insight: selectedInsight,
+      label,
+    })
+    // The set shares one free layer (its own kinds stack inside it).
+    const track = freeTrackAt(
+      selected.atMs,
+      Math.max(...made.map((g) => g.durationMs + g.atMs - selected.atMs))
     )
+    addGraphics(made.map((g) => ({ ...g, track })))
   }
   async function askAiForGraphic() {
     if (!selected) return
@@ -1169,17 +1302,7 @@ export function FootageEditor({
                   isPicking={pickingGraphic !== null}
                   onApplyTemplate={(template) => applyGraphicTemplate(template)}
                   onAskAi={askAiForGraphic}
-                  onAdd={(kind) =>
-                    addGraphics([
-                      newGraphic(kind, {
-                        atMs: Math.round(sourceMs),
-                        ...(isScreenGraphic(kind) && {
-                          box: boxFor(selectedAim, selectedInsight),
-                        }),
-                        text: kind === "keys" ? "⌘ K" : "",
-                      }),
-                    ])
-                  }
+                  onAdd={(kind) => addGraphics([makeGraphic(kind)])}
                   onSelect={(id) => {
                     setSelectedGraphicId(id)
                     const item = presentation.graphics.find((g) => g.id === id)
@@ -1207,6 +1330,13 @@ export function FootageEditor({
               <TabsContent value="lens">
                 <LensPanel
                   lens={presentation.lens}
+                  motionBlur={presentation.motionBlur}
+                  onMotionBlur={(motionBlur) =>
+                    changePresentation(
+                      { ...presentation, motionBlur },
+                      "motion-blur"
+                    )
+                  }
                   shotIsFlat={(() => {
                     const camera = selected ? shotOf(selected)?.camera : null
                     return (
@@ -1320,17 +1450,29 @@ export function FootageEditor({
               pickingFocus={pickingFocus || pickingGraphic !== null}
               onPickFocus={onPickFocus}
               playbackRate={rate}
-              selectedTextId={
-                tool === "text" && !readOnly ? selectedTextId : null
+              interactive={!readOnly && !isPlaying}
+              selectedItemId={
+                tool === "text"
+                  ? selectedTextId
+                  : tool === "graphics"
+                    ? selectedGraphicId
+                    : null
               }
-              onMoveText={(id, point) =>
-                setTexts(
-                  presentation.texts.map((t) =>
-                    t.id === id ? { ...t, ...point } : t
-                  ),
-                  `${id}:place`
-                )
-              }
+              onSelectItem={selectOverlay}
+              onMoveItem={(id, patch) => {
+                if (patch.kind === "text") {
+                  setTexts(
+                    presentation.texts.map((t) =>
+                      t.id === id ? { ...t, x: patch.x, y: patch.y } : t
+                    ),
+                    `${id}:place`
+                  )
+                } else if (patch.kind === "stage") {
+                  updateGraphic(id, { at: patch.at }, "place")
+                } else {
+                  updateGraphic(id, { box: patch.box }, "place")
+                }
+              }}
               logoUrl={kitLogoUrl}
               brandName={kitName}
               siteLabel={kitSite}
@@ -1453,70 +1595,20 @@ export function FootageEditor({
           selectedId={selectedId}
           idle={analysis?.idle}
           clipParts={clipParts}
-          texts={presentation.texts.map((item) => {
-            const startAd = toOutputNearest(edit, durationMs, item.atMs)
-            return {
-              id: item.id,
-              startMs: item.atMs,
-              endMs: toSource(edit, durationMs, startAd + item.durationMs),
-              label: plainText(item.text),
-            }
-          })}
-          selectedText={tool === "text" ? selectedTextId : null}
-          graphics={presentation.graphics.map((item) => {
-            const startAd = toOutputNearest(edit, durationMs, item.atMs)
-            return {
-              id: item.id,
-              startMs: item.atMs,
-              endMs: toSource(edit, durationMs, startAd + item.durationMs),
-              label: graphicInfo[item.kind].label,
-            }
-          })}
-          selectedGraphic={tool === "graphics" ? selectedGraphicId : null}
-          onSelectGraphic={(id) => {
-            setSelectedGraphicId(id)
-            if (!readOnly) setTool("graphics")
-          }}
+          overlays={overlays}
+          selectedOverlay={
+            tool === "text"
+              ? selectedTextId
+              : tool === "graphics"
+                ? selectedGraphicId
+                : null
+          }
+          onSelectOverlay={selectOverlay}
           {...(!readOnly && {
-            onMoveText: (id, atMs) => {
-              setTexts(
-                presentation.texts.map((t) =>
-                  t.id === id ? { ...t, atMs } : t
-                ),
-                `${id}:time`
-              )
-            },
-            onResizeText: (id, endMs) => {
-              const item = presentation.texts.find((t) => t.id === id)
-              if (!item) return
-              setTexts(
-                presentation.texts.map((t) =>
-                  t.id === id
-                    ? {
-                        ...t,
-                        durationMs: adLengthBetween(item.atMs, endMs, 600),
-                      }
-                    : t
-                ),
-                `${id}:duration`
-              )
-            },
-            onMoveGraphic: (id, atMs) => updateGraphic(id, { atMs }, "time"),
-            onResizeGraphic: (id, endMs) => {
-              const item = presentation.graphics.find((g) => g.id === id)
-              if (item) {
-                updateGraphic(
-                  id,
-                  { durationMs: adLengthBetween(item.atMs, endMs, 400) },
-                  "duration"
-                )
-              }
-            },
+            onMoveOverlay: moveOverlay,
+            onResizeOverlay: resizeOverlay,
+            onDropItem: dropItem,
           })}
-          onSelectText={(id) => {
-            setSelectedTextId(id)
-            if (!readOnly) setTool("text")
-          }}
           selectedPart={tool === "cuts" ? selectedPart : null}
           onSelectPart={(index) => {
             setSelectedPart(index)

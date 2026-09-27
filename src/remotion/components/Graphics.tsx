@@ -54,6 +54,44 @@ export function timedGraphics(
 
 // ── On the screen (inside the frame, moving with the camera) ──────────────
 
+/** Stacking inside the frame: layer first, then kind (lens = +2). */
+export function screenZ(item: GraphicItem) {
+  const under = ["spotlight", "privacy", "focus"].includes(item.kind)
+  return item.track * 10 + (under ? 1 : item.kind === "magnifier" ? 2 : 3)
+}
+
+/**
+ * An SVG mask (as a CSS url) for a focus area: `inside` shows the shape,
+ * otherwise everything but it; feathered with a real Gaussian.
+ */
+export function focusMask(input: {
+  width: number
+  height: number
+  box: { x: number; y: number; w: number; h: number }
+  shape: "circle" | "rounded" | "rect"
+  feather: number
+  inside: boolean
+}) {
+  const { width: w, height: h, box } = input
+  const x = box.x * w
+  const y = box.y * h
+  const bw = box.w * w
+  const bh = box.h * h
+  const shape =
+    input.shape === "circle"
+      ? `<ellipse cx="${(x + bw / 2).toFixed(1)}" cy="${(y + bh / 2).toFixed(1)}" rx="${(bw / 2).toFixed(1)}" ry="${(bh / 2).toFixed(1)}"/>`
+      : `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="${input.shape === "rounded" ? (Math.min(bw, bh) * 0.16).toFixed(1) : 0}"/>`
+  const blur =
+    input.feather > 0
+      ? `<filter id="f" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="${(input.feather / 2).toFixed(2)}"/></filter>`
+      : ""
+  const soft = input.feather > 0 ? ' filter="url(#f)"' : ""
+  const svg = input.inside
+    ? `<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(0)}" height="${h.toFixed(0)}"><defs>${blur}</defs><g fill="#000"${soft}>${shape}</g></svg>`
+    : `<svg xmlns="http://www.w3.org/2000/svg" width="${w.toFixed(0)}" height="${h.toFixed(0)}"><defs>${blur}<mask id="m"><rect width="100%" height="100%" fill="#fff"/><g fill="#000"${soft}>${shape}</g></mask></defs><rect width="100%" height="100%" fill="#000" mask="url(#m)"/></svg>`
+  return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`
+}
+
 /**
  * Graphics pinned to the recording. Drawn in the frame's own pixels
  * (`width`×`height`), so they follow every camera move exactly.
@@ -64,12 +102,15 @@ export function ScreenGraphics({
   height,
   colors,
   fonts,
+  stageWidth,
 }: {
   items: Timed[]
   width: number
   height: number
   colors: Colors
   fonts: StageFonts
+  /** The composition's width (focus blur is a % of it). */
+  stageWidth: number
 }) {
   return (
     <>
@@ -87,6 +128,7 @@ export function ScreenGraphics({
             height={height}
             colors={colors}
             fonts={fonts}
+            stageWidth={stageWidth}
           />
         </Sequence>
       ))}
@@ -101,6 +143,7 @@ function ScreenGraphic({
   height: h,
   colors,
   fonts,
+  stageWidth,
 }: {
   item: GraphicItem
   frames: number
@@ -108,6 +151,7 @@ function ScreenGraphic({
   height: number
   colors: Colors
   fonts: StageFonts
+  stageWidth: number
 }) {
   const frame = useCurrentFrame()
   const u = w / 100
@@ -124,11 +168,55 @@ function ScreenGraphic({
     position: "absolute",
     inset: 0,
     pointerEvents: "none",
-    // Dimming and privacy under the magnifier's lens; marks above it.
-    zIndex: item.kind === "spotlight" || item.kind === "privacy" ? 1 : 3,
+    // By layer; within one, blurs and dimming under the magnifier's lens
+    // and marks above it.
+    zIndex: screenZ(item),
   }
 
   switch (item.kind) {
+    case "focus": {
+      const f = item.focus
+      // Fades by strength (opacity would stop the blur sampling what's under).
+      const t = easeOutCubic(frame / 10) * easeOutCubic((frames - frame) / 10)
+      const mask = focusMask({
+        width: w,
+        height: h,
+        box: item.box,
+        shape: f.shape,
+        feather: (f.feather / 100) * w,
+        inside: f.invert,
+      })
+      const blurPx = (f.strength / 100) * stageWidth * t
+      const layer: React.CSSProperties = {
+        position: "absolute",
+        inset: 0,
+        maskImage: mask,
+        WebkitMaskImage: mask,
+        maskSize: "100% 100%",
+        WebkitMaskSize: "100% 100%",
+        maskRepeat: "no-repeat",
+        WebkitMaskRepeat: "no-repeat",
+      }
+      return (
+        <div style={fill}>
+          <div
+            style={{
+              ...layer,
+              backdropFilter: `blur(${blurPx.toFixed(2)}px)`,
+              WebkitBackdropFilter: `blur(${blurPx.toFixed(2)}px)`,
+            }}
+          />
+          {f.dim > 0 && (
+            <div
+              style={{
+                ...layer,
+                background: `rgb(0 0 0 / ${(f.dim * t).toFixed(3)})`,
+              }}
+            />
+          )}
+        </div>
+      )
+    }
     case "ripple": {
       const ring = (delay: number) => {
         const t = clamp01((frame - delay) / 14)
@@ -349,7 +437,7 @@ function Callout({
         inset: 0,
         pointerEvents: "none",
         opacity: shown,
-        zIndex: 3,
+        zIndex: screenZ(item),
       }}
     >
       <svg
@@ -412,6 +500,7 @@ function Callout({
  * the part), so what it shows is exactly what's on screen.
  */
 export function MagnifierLens({
+  z,
   box,
   frames,
   frame,
@@ -419,6 +508,8 @@ export function MagnifierLens({
   height: h,
   video,
 }: {
+  /** Stacking in the frame (screenZ). */
+  z: number
   box: GraphicItem["box"]
   frames: number
   frame: number
@@ -442,8 +533,8 @@ export function MagnifierLens({
         height: size,
         borderRadius: "50%",
         overflow: "hidden",
-        // Above dimming, under labels (see ScreenGraphic).
-        zIndex: 2,
+        // Above dimming, under labels, by layer (see screenZ).
+        zIndex: z,
         transform: `scale(${(0.8 + 0.2 * pop).toFixed(3)})`,
         opacity: clamp01(pop) * out,
         boxShadow: `0 0 0 ${0.45 * u}px #ffffff, 0 ${1.2 * u}px ${3 * u}px rgb(0 0 0 / 0.45)`,
@@ -470,7 +561,6 @@ export function MagnifierLens({
 /** Stage graphics; the end card goes above text (it closes the ad). */
 export function StageGraphics({
   items,
-  layer,
   colors,
   fonts,
   logoUrl,
@@ -479,7 +569,6 @@ export function StageGraphics({
   background,
 }: {
   items: Timed[]
-  layer: "under-text" | "over-text"
   colors: Colors
   fonts: StageFonts
   logoUrl: string | null
@@ -487,19 +576,16 @@ export function StageGraphics({
   siteLabel: string
   background: string
 }) {
-  const own = items.filter(({ item }) =>
-    layer === "over-text" ? item.kind === "end-card" : item.kind !== "end-card"
-  )
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
-      {own.map(({ item, from, frames }) => (
+      {items.map(({ item, from, frames }) => (
         <Sequence
           key={item.id}
           from={from}
           durationInFrames={frames}
           layout="none"
         >
-          <StageGraphic
+          <StageGraphicPlaced
             item={item}
             frames={frames}
             colors={colors}
@@ -554,9 +640,59 @@ function Logo({
   )
 }
 
+/** Layer order, and a position the owner dragged it to (if any). */
+function StageGraphicPlaced(
+  props: Omit<React.ComponentProps<typeof StageGraphic>, "placed">
+) {
+  const { item } = props
+  const at = item.kind === "end-card" ? null : item.at
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        // Higher layers draw over lower ones; text on a layer sits over
+        // graphics on the same layer.
+        zIndex: 1 + item.track * 10,
+      }}
+    >
+      {at ? (
+        <div
+          data-item-id={item.id}
+          style={{
+            position: "absolute",
+            left: `${at.x * 100}%`,
+            top: `${at.y * 100}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          <StageGraphic {...props} placed />
+        </div>
+      ) : (
+        <StageGraphic {...props} placed={false} />
+      )}
+    </div>
+  )
+}
+
+/** Its own spot, or (placed) none: the wrapper positions it. */
+function spot(placed: boolean, base: React.CSSProperties): React.CSSProperties {
+  if (!placed) return base
+  const {
+    position: _p,
+    left: _l,
+    right: _r,
+    top: _t,
+    bottom: _b,
+    ...rest
+  } = base
+  return { ...rest, position: "relative" }
+}
+
 function StageGraphic({
   item,
   frames,
+  placed,
   colors,
   fonts,
   logoUrl,
@@ -572,9 +708,11 @@ function StageGraphic({
   brandName: string
   siteLabel: string
   background: string
+  placed: boolean
 }) {
   const frame = useCurrentFrame()
   const { width, height } = useVideoConfig()
+  const id = placed ? {} : { "data-item-id": item.id }
   const su = Math.min(width, height) / 100
   const shown = presence(frame, frames, 10)
   const rise = (delay: number, frames = 12) => {
@@ -590,15 +728,16 @@ function StageGraphic({
       const caps = keycaps(item.text || "⌘ K")
       return (
         <div
-          style={{
+          {...id}
+          style={spot(placed, {
             position: "absolute",
             left: "50%",
             bottom: "9%",
-            transform: "translateX(-50%)",
+            translate: placed ? undefined : "-50% 0",
             display: "flex",
             gap: 1.4 * su,
             opacity: presence(frame, frames, 4),
-          }}
+          })}
         >
           {caps.map((cap, i) => {
             const t = easeOutBack((frame - 3 * i) / 10)
@@ -636,7 +775,8 @@ function StageGraphic({
       const value = countNumbers(item.text || "12", t) ?? item.text
       return (
         <div
-          style={{
+          {...id}
+          style={spot(placed, {
             position: "absolute",
             right: "5%",
             top: "8%",
@@ -647,7 +787,7 @@ function StageGraphic({
             color: "#15171c",
             ...rise(0, 14),
             filter: `blur(${((1 - easeOutCubic(frame / 14)) * 0.6 * su).toFixed(2)}px)`,
-          }}
+          })}
         >
           <div
             style={{
@@ -680,7 +820,8 @@ function StageGraphic({
       const bar = easeOutCubic(frame / 8)
       return (
         <div
-          style={{
+          {...id}
+          style={spot(placed, {
             position: "absolute",
             left: "6%",
             bottom: "9%",
@@ -688,7 +829,7 @@ function StageGraphic({
             alignItems: "stretch",
             gap: 1.6 * su,
             opacity: shown,
-          }}
+          })}
         >
           <span
             style={{
@@ -736,7 +877,12 @@ function StageGraphic({
       const t = easeOutCubic(frame / 22)
       return (
         <AbsoluteFill
-          style={{ alignItems: "center", justifyContent: "center" }}
+          {...id}
+          style={
+            placed
+              ? { position: "relative", inset: "auto" }
+              : { alignItems: "center", justifyContent: "center" }
+          }
         >
           <div
             style={{
@@ -761,6 +907,7 @@ function StageGraphic({
       const sweep = ((frame % 45) / 45) * 260 - 80
       return (
         <AbsoluteFill
+          data-item-id={item.id}
           style={{
             background,
             opacity: easeOutCubic(frame / 12),

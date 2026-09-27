@@ -2,7 +2,7 @@
 
 import { Player, type PlayerRef } from "@remotion/player"
 import { CrosshairIcon } from "lucide-react"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 
 import {
   FootageStage,
@@ -13,6 +13,8 @@ import {
   type FootageStageProps,
 } from "@/remotion/compositions/FootageStage"
 import type { StageFonts } from "@/remotion/components/TextLayer"
+
+import { StageItemsLayer, type ItemPatch } from "./stage-items-layer"
 import type { Presentation, TimedShot } from "@/shared/motion"
 
 export const stageAspects = {
@@ -49,8 +51,10 @@ export function MotionStage({
   brandName,
   siteLabel,
   playbackRate = 1,
-  selectedTextId = null,
-  onMoveText,
+  selectedItemId = null,
+  onSelectItem,
+  onMoveItem,
+  interactive = false,
 }: {
   playerRef: React.RefObject<PlayerRef | null>
   videoUrl: string
@@ -78,9 +82,11 @@ export function MotionStage({
   siteLabel: string
   /** −4…4 (J/K/L shuttle); never 0. */
   playbackRate?: number
-  /** Text tool: the selected text, which can be dragged on the stage. */
-  selectedTextId?: string | null
-  onMoveText?: (id: string, point: { x: number; y: number }) => void
+  /** Select and drag text and graphics on the video (while paused). */
+  selectedItemId?: string | null
+  onSelectItem?: (id: string) => void
+  onMoveItem?: (id: string, patch: ItemPatch) => void
+  interactive?: boolean
 }) {
   const size = stageSizes[aspect]
   // Where playback was, so switching shape (a new Player) keeps the spot.
@@ -164,7 +170,7 @@ export function MotionStage({
     // rectangle of the chosen shape that fits inside (container units).
     <div className="[container-type:size] flex size-full items-center justify-center">
       <div
-        className="relative overflow-hidden rounded-lg shadow-sm"
+        className="relative overflow-hidden rounded-lg shadow-sm select-none"
         style={{
           aspectRatio: stageAspects[aspect],
           width: `min(100cqw, calc(100cqh * ${w} / ${h}))`,
@@ -196,13 +202,21 @@ export function MotionStage({
           acknowledgeRemotionLicense
           style={{ width: "100%", height: "100%" }}
         />
-        {selectedTextId && onMoveText && !pickingFocus && (
-          <TextDragHandle
-            textId={selectedTextId}
-            anchor={
-              presentation.texts.find((t) => t.id === selectedTextId) ?? null
-            }
-            onMove={(point) => onMoveText(selectedTextId, point)}
+        {interactive && !pickingFocus && onSelectItem && onMoveItem && (
+          <StageItemsLayer
+            key={aspect}
+            playerRef={playerRef}
+            width={w}
+            height={h}
+            presentation={presentation}
+            shots={shots}
+            durationMs={durationMs}
+            videoWidth={videoWidth}
+            videoHeight={videoHeight}
+            reduceMotion={reduceMotion}
+            selectedId={selectedItemId}
+            onSelect={onSelectItem}
+            onMove={onMoveItem}
           />
         )}
         {pickingFocus && (
@@ -214,152 +228,6 @@ export function MotionStage({
           </div>
         )}
       </div>
-    </div>
-  )
-}
-
-/** Where text snaps to while dragged: safe margins, thirds and centre. */
-const snapX = [0.08, 1 / 3, 0.5, 2 / 3, 0.92]
-const snapY = [0.12, 1 / 3, 0.5, 2 / 3, 0.88]
-const snapTo = (value: number, points: number[]) => {
-  const near = points.find((point) => Math.abs(point - value) < 0.02)
-  return near === undefined
-    ? { value, snapped: null }
-    : { value: near, snapped: near }
-}
-
-/**
- * A box around the selected text (measured from the stage itself) that
- * drags it, snapping to margins, thirds and the centre with guides.
- */
-function TextDragHandle({
-  textId,
-  anchor,
-  onMove,
-}: {
-  textId: string
-  anchor: { x: number; y: number } | null
-  onMove: (point: { x: number; y: number }) => void
-}) {
-  const layerRef = useRef<HTMLDivElement>(null)
-  const [rect, setRect] = useState<{
-    left: number
-    top: number
-    width: number
-    height: number
-  } | null>(null)
-  const [guides, setGuides] = useState<{ x: number | null; y: number | null }>({
-    x: null,
-    y: null,
-  })
-  const drag = useRef<{
-    startX: number
-    startY: number
-    x: number
-    y: number
-  } | null>(null)
-
-  // Follow the text as it animates or the playhead moves.
-  useEffect(() => {
-    let raf = 0
-    const measure = () => {
-      const layer = layerRef.current
-      const stage = layer?.parentElement
-      const text = stage?.querySelector<HTMLElement>(
-        `[data-text-id="${textId}"]`
-      )
-      if (layer && stage && text) {
-        const s = stage.getBoundingClientRect()
-        const t = text.getBoundingClientRect()
-        setRect((current) => {
-          const next = {
-            left: t.left - s.left,
-            top: t.top - s.top,
-            width: t.width,
-            height: t.height,
-          }
-          return current &&
-            Math.abs(current.left - next.left) < 0.5 &&
-            Math.abs(current.top - next.top) < 0.5 &&
-            Math.abs(current.width - next.width) < 0.5
-            ? current
-            : next
-        })
-      } else {
-        setRect(null)
-      }
-      raf = requestAnimationFrame(measure)
-    }
-    raf = requestAnimationFrame(measure)
-    return () => cancelAnimationFrame(raf)
-  }, [textId])
-
-  return (
-    <div ref={layerRef} className="pointer-events-none absolute inset-0">
-      {guides.x !== null && (
-        <span
-          className="absolute inset-y-0 w-px bg-chroma"
-          style={{ left: `${guides.x * 100}%` }}
-        />
-      )}
-      {guides.y !== null && (
-        <span
-          className="absolute inset-x-0 h-px bg-chroma"
-          style={{ top: `${guides.y * 100}%` }}
-        />
-      )}
-      {rect && anchor && (
-        <div
-          role="presentation"
-          title="Drag to move the text"
-          className="pointer-events-auto absolute cursor-move touch-none rounded-sm outline-2 outline-offset-4 outline-chroma outline-dashed"
-          style={rect}
-          onPointerDown={(event) => {
-            event.currentTarget.setPointerCapture(event.pointerId)
-            drag.current = {
-              startX: event.clientX,
-              startY: event.clientY,
-              x: anchor.x,
-              y: anchor.y,
-            }
-          }}
-          onPointerMove={(event) => {
-            const current = drag.current
-            const stage = layerRef.current?.getBoundingClientRect()
-            if (!current || !stage) return
-            const x = snapTo(
-              Math.min(
-                1,
-                Math.max(
-                  0,
-                  current.x + (event.clientX - current.startX) / stage.width
-                )
-              ),
-              snapX
-            )
-            const y = snapTo(
-              Math.min(
-                1,
-                Math.max(
-                  0,
-                  current.y + (event.clientY - current.startY) / stage.height
-                )
-              ),
-              snapY
-            )
-            setGuides({ x: x.snapped, y: y.snapped })
-            onMove({
-              x: Math.round(x.value * 1000) / 1000,
-              y: Math.round(y.value * 1000) / 1000,
-            })
-          }}
-          onPointerUp={(event) => {
-            drag.current = null
-            setGuides({ x: null, y: null })
-            event.currentTarget.releasePointerCapture(event.pointerId)
-          }}
-        />
-      )}
     </div>
   )
 }

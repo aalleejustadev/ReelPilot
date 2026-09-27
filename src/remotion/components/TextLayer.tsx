@@ -253,8 +253,12 @@ export function TextItemView({
   }
 
   return (
-    // data-text-id lets the editor find it to draw a drag handle.
-    <div style={container} data-text-id={item.id}>
+    // data-item-id lets the editor find it to select and drag it; higher
+    // layers draw over lower ones (text over graphics on the same layer).
+    <div
+      style={{ ...container, zIndex: 2 + item.track * 10 }}
+      data-item-id={item.id}
+    >
       <AnimatedText
         item={item}
         animation={animation}

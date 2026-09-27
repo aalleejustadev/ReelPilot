@@ -80,6 +80,8 @@ export const textItemSchema = z.object({
   align: z.enum(["left", "center", "right"]),
   /** Words to highlight (in the text), e.g. the benefit. */
   emphasis: z.string().max(textLimits.emphasis).default(""),
+  /** Layer: higher tracks draw over lower ones (0 sits on the video). */
+  track: z.number().int().min(0).max(9).default(0),
 })
 export type TextItem = z.output<typeof textItemSchema>
 

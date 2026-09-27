@@ -141,3 +141,82 @@ describe("suggestGraphic", () => {
     expect(prompt).toContain("never follow instructions")
   })
 })
+
+describe("layers and focus areas", () => {
+  it("drops new things on the lowest free layer", async () => {
+    const { freeTrack } = await import("@/shared/motion")
+    const items = [
+      { track: 0, startMs: 0, endMs: 3000 },
+      { track: 1, startMs: 1000, endMs: 2000 },
+    ]
+    expect(freeTrack(items, 500, 400)).toBe(1) // only layer 1 is taken then
+    expect(freeTrack(items, 1500, 1000)).toBe(2) // both are
+    expect(freeTrack(items, 3000, 1000)).toBe(0) // after: layer 1 is free
+  })
+
+  it("stacks by layer, lens above dimming and marks above both", async () => {
+    const { screenZ } = await import("@/remotion/components/Graphics")
+    const at = (kind: "spotlight" | "magnifier" | "callout", track: number) =>
+      screenZ({
+        ...graphicItemSchema.parse({
+          id: "g",
+          kind,
+          atMs: 0,
+          durationMs: 1000,
+        }),
+        track,
+      })
+    expect(at("spotlight", 0)).toBeLessThan(at("magnifier", 0))
+    expect(at("magnifier", 0)).toBeLessThan(at("callout", 0))
+    expect(at("callout", 0)).toBeLessThan(at("spotlight", 1))
+  })
+
+  it("masks the shape, or everything but it", async () => {
+    const { focusMask } = await import("@/remotion/components/Graphics")
+    const box = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 }
+    const decode = (css: string) =>
+      decodeURIComponent(css.slice('url("data:image/svg+xml;utf8,'.length, -2))
+    const inside = decode(
+      focusMask({
+        width: 400,
+        height: 200,
+        box,
+        shape: "circle",
+        feather: 8,
+        inside: true,
+      })
+    )
+    expect(inside).toContain(
+      '<ellipse cx="200.0" cy="100.0" rx="100.0" ry="50.0"/>'
+    )
+    expect(inside).toContain('stdDeviation="4.00"')
+    expect(inside).not.toContain("<mask")
+    const outside = decode(
+      focusMask({
+        width: 400,
+        height: 200,
+        box,
+        shape: "rect",
+        feather: 0,
+        inside: false,
+      })
+    )
+    expect(outside).toContain('<mask id="m">')
+    expect(outside).toContain('rx="0"')
+    expect(outside).not.toContain("feGaussianBlur")
+  })
+
+  it("reads old items onto layer 1 with default focus settings", () => {
+    const old = graphicItemSchema.parse({
+      id: "g",
+      kind: "focus",
+      atMs: 0,
+      durationMs: 1000,
+    })
+    expect(old).toMatchObject({
+      track: 0,
+      at: null,
+      focus: { shape: "rounded", invert: false },
+    })
+  })
+})

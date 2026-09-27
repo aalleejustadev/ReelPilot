@@ -11,13 +11,14 @@ import {
   backgroundStyle,
   cameraSpeed,
   cameraStyle,
-  cameraTimeline,
   depthOfFieldLayers,
-  flatCamera,
+  flatPose,
+  frameGeometry,
+  perspectiveFor,
+  stageCamera,
   outputDuration,
   outputLayout,
   progressiveBlurLayers,
-  toOutput,
   isScreenGraphic,
   type GraphicItem,
   type Presentation,
@@ -28,6 +29,7 @@ import {
 import {
   BackgroundLight,
   MagnifierLens,
+  screenZ,
   ScreenGraphics,
   StageGraphics,
   timedGraphics,
@@ -88,8 +90,6 @@ export const stageDurationMs = (props: {
   durationMs: number
 }) => outputDuration(props.presentation.edit, props.durationMs)
 
-const flatPose = { ...flatCamera, x: 0, y: 0 }
-
 /** Strongest blur, in % of the stage width (about 4px at 1080p). */
 const maxBlur = 0.22
 
@@ -130,26 +130,12 @@ export function FootageStage({
     () => outputLayout(edit, durationMs),
     [edit, durationMs]
   )
-  const poseAt = useMemo(() => {
-    // Moments in cut footage drop out; the rest move to ad time.
-    const timed = shots.flatMap((entry) => {
-      const atMs = toOutput(edit, durationMs, entry.atMs)
-      return atMs === null
-        ? []
-        : [
-            {
-              atMs,
-              shot: reduceMotion
-                ? { ...entry.shot, transitionMs: 0 }
-                : entry.shot,
-            },
-          ]
-    })
-    const intro = reduceMotion
-      ? { ...presentation.intro, kind: "none" as const }
-      : presentation.intro
-    return cameraTimeline(timed, intro, outputDuration(edit, durationMs))
-  }, [shots, edit, durationMs, presentation.intro, reduceMotion])
+  const poseAt = useMemo(
+    () => stageCamera({ presentation, shots, durationMs, reduceMotion }),
+    // The camera depends on the edit and intro, not text or style.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [shots, edit, durationMs, presentation.intro, reduceMotion]
+  )
 
   const timeMs = (frameNumber / fps) * 1000
   const pose = flat ? flatPose : poseAt(timeMs)
@@ -163,18 +149,14 @@ export function FootageStage({
   // Blur only fast moves (a slow drift stays sharp), capped.
   const blur = Math.min(maxBlur, Math.max(0, speed - 0.35) * 0.18) * unit
   const { frame, lens } = presentation
-  // The frame fits inside the padded stage by width and height (CSS
-  // padding is a % of the width on all sides).
-  const pad = frame.padding * width
-  const frameWidth = Math.max(
-    1,
-    Math.min(
-      width - 2 * pad,
-      ((height - 2 * pad) * videoWidth) / Math.max(1, videoHeight)
-    )
-  )
-  const frameHeight = (frameWidth * videoHeight) / Math.max(1, videoWidth)
-  const perspectivePx = 140 * unit
+  const { frameWidth, frameHeight } = frameGeometry({
+    width,
+    height,
+    padding: frame.padding,
+    videoWidth,
+    videoHeight,
+  })
+  const perspectivePx = perspectiveFor(width)
   const depthLayers =
     lens.depthOfField.enabled && !flat
       ? depthOfFieldLayers({
@@ -265,62 +247,75 @@ export function FootageStage({
             })
           }}
         >
-          {layout.map((part, i) => {
-            const next = layout[i + 1]
-            const from = Math.round((part.outStartMs / 1000) * fps)
-            const to = Math.round((part.outEndMs / 1000) * fps)
-            return (
-              <Sequence
-                key={part.startMs}
-                from={from}
-                durationInFrames={Math.max(1, to - from)}
-                // Loads and seeks the next part a second early: no blank
-                // frame at a cut.
-                premountFor={fps}
-              >
-                <PartLayer
-                  videoUrl={videoUrl}
-                  posterUrl={posterUrl}
-                  trimBefore={Math.round((part.startMs / 1000) * fps)}
-                  speed={part.speed}
-                  lengthMs={part.outEndMs - part.outStartMs}
-                  enter={
-                    i > 0 ? { ...part.transition, durationMs: part.inMs } : null
-                  }
-                  exit={
-                    next ? { ...next.transition, durationMs: next.inMs } : null
-                  }
-                  irisAt={{ x: pose.focusX, y: pose.focusY }}
-                  unit={unit}
-                  onVideoError={onVideoError}
-                  partFrom={from}
-                  magnifiers={magnifiers}
-                  frameWidth={frameWidth}
-                  frameHeight={frameHeight}
-                />
-              </Sequence>
-            )
-          })}
-          <BlurLayers layers={depthLayers} testId="depth-of-field" />
-          <BlurLayers layers={edgeLayers} testId="progressive-blur" />
-          {!flat && (
-            <ScreenGraphics
-              items={screenItems}
-              width={frameWidth}
-              height={frameHeight}
-              colors={colors}
-              fonts={fonts}
-            />
-          )}
+          {/* The screen's contents, clipped to its rounded corners. The
+              clip-path also makes this the blur layers' backdrop root, so
+              blurs near the edge never pull in the stage behind (an
+              overflow clip alone doesn't bound backdrop filters). */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              clipPath: `inset(0 round ${(frame.radius * unit).toFixed(2)}px)`,
+            }}
+          >
+            {layout.map((part, i) => {
+              const next = layout[i + 1]
+              const from = Math.round((part.outStartMs / 1000) * fps)
+              const to = Math.round((part.outEndMs / 1000) * fps)
+              return (
+                <Sequence
+                  key={part.startMs}
+                  from={from}
+                  durationInFrames={Math.max(1, to - from)}
+                  // Loads and seeks the next part a second early: no blank
+                  // frame at a cut.
+                  premountFor={fps}
+                >
+                  <PartLayer
+                    videoUrl={videoUrl}
+                    posterUrl={posterUrl}
+                    trimBefore={Math.round((part.startMs / 1000) * fps)}
+                    speed={part.speed}
+                    lengthMs={part.outEndMs - part.outStartMs}
+                    enter={
+                      i > 0
+                        ? { ...part.transition, durationMs: part.inMs }
+                        : null
+                    }
+                    exit={
+                      next
+                        ? { ...next.transition, durationMs: next.inMs }
+                        : null
+                    }
+                    irisAt={{ x: pose.focusX, y: pose.focusY }}
+                    unit={unit}
+                    onVideoError={onVideoError}
+                    partFrom={from}
+                    magnifiers={magnifiers}
+                    frameWidth={frameWidth}
+                    frameHeight={frameHeight}
+                  />
+                </Sequence>
+              )
+            })}
+            <BlurLayers layers={depthLayers} testId="depth-of-field" />
+            <BlurLayers layers={edgeLayers} testId="progressive-blur" />
+            {!flat && (
+              <ScreenGraphics
+                items={screenItems}
+                width={frameWidth}
+                height={frameHeight}
+                colors={colors}
+                fonts={fonts}
+                stageWidth={width}
+              />
+            )}
+          </div>
         </div>
       </AbsoluteFill>
       {!flat && (
         <>
-          <StageGraphics
-            items={stageItems}
-            layer="under-text"
-            {...stageBrand}
-          />
+          <StageGraphics items={stageItems} {...stageBrand} />
           <TextLayer
             items={presentation.texts}
             animation={presentation.textStyle.animation}
@@ -330,7 +325,6 @@ export function FootageStage({
             background={presentation.background}
             accents={accents}
           />
-          <StageGraphics items={stageItems} layer="over-text" {...stageBrand} />
         </>
       )}
     </AbsoluteFill>
@@ -471,6 +465,7 @@ function PartLayer({
         .map(({ item, from, frames }) => (
           <div key={item.id} style={{ opacity: adFrame >= from ? 1 : 0 }}>
             <MagnifierLens
+              z={screenZ(item)}
               box={item.box}
               frames={frames}
               frame={Math.max(0, adFrame - from)}

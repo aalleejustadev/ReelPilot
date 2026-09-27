@@ -1,5 +1,6 @@
 import {
   boxAround,
+  defaultFocus,
   graphicInfo,
   type GraphicBox,
   type GraphicItem,
@@ -109,6 +110,9 @@ export function newGraphic(
     text: "",
     secondary: "",
     side: "auto",
+    track: 0,
+    at: null,
+    focus: defaultFocus,
     ...patch,
   }
 }

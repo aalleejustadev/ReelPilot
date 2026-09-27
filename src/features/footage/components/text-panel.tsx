@@ -41,6 +41,7 @@ import { Textarea } from "@/shared/ui/textarea"
 
 import { formatTimecode } from "../lib/format"
 import { PanelHeading, SliderField } from "./editor-panels"
+import { draggablePreset, LayerControl } from "./layer-control"
 
 /** Ready-made text to add at the playhead. */
 export type TextPreset = "headline" | "title" | "label" | "caption"
@@ -101,6 +102,7 @@ function AnimationPreview({
     y: 0.5,
     align: "center",
     emphasis: animation === "marker-sweep" ? "faster" : "",
+    track: 0,
   }
   const colors = textColors(
     { kind: "solid", from: "#15171c", to: "#15171c" },
@@ -187,6 +189,8 @@ export function TextPanel({
             <button
               key={preset.id}
               type="button"
+              title="Click to add at the playhead, or drag onto the timeline"
+              {...draggablePreset({ type: "text", preset: preset.id })}
               onClick={() => onAdd(preset.id)}
               disabled={items.length >= textLimits.items}
               className="flex flex-col gap-0.5 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
@@ -466,6 +470,11 @@ function TextInspector({
           })}
         </div>
       </Field>
+
+      <LayerControl
+        track={item.track}
+        onChange={(track) => onUpdate({ track }, "track")}
+      />
 
       <SliderField
         label="On screen for"

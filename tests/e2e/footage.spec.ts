@@ -107,7 +107,7 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   await timeline
     .getByRole("button", { name: /^Select the moment at 0:02\.\d/ })
     .click()
-  await expect(tools.getByRole("tab", { name: "Shot" })).toHaveAttribute(
+  await expect(tools.getByRole("tab", { name: "Camera" })).toHaveAttribute(
     "aria-selected",
     "true"
   )
@@ -189,7 +189,7 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
 
   // One click on a look styles every moment; "New take" redraws it (here
   // mirrored); the Undo button steps back through both.
-  await tools.getByRole("tab", { name: "Effects" }).click()
+  await tools.getByRole("tab", { name: "Looks" }).click()
   await page.getByRole("button", { name: /^Isometric/ }).click()
   await expect(
     page.getByRole("button", { name: /^Isometric/ })
@@ -672,7 +672,8 @@ test("pro controls: shuttle keys, frame steps, and dragging on stage and timelin
   // Drag a headline on the stage: it snaps to the centre line.
   await tools.getByRole("tab", { name: "Text" }).click()
   await page.getByRole("button", { name: /^Headline/ }).click()
-  const handle = page.getByTitle("Drag to move the text")
+  // Its outline on the stage (the headline is the only item there).
+  const handle = page.locator("[data-stage-item] polygon").last()
   const box = await handle.boundingBox()
   const stage = await page.getByTestId("motion-stage").boundingBox()
   if (!box || !stage) throw new Error("No handle")
@@ -715,5 +716,111 @@ test("pro controls: shuttle keys, frame steps, and dragging on stage and timelin
   await playhead.focus()
   await page.keyboard.press("Delete")
   await expect(items).toBeHidden()
+  expect(consoleProblems).toEqual([])
+})
+
+test("layers: drop items on the timeline, stack them, and move them on the video", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}, info) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.skip(info.project.name === "mobile", "Drag and drop with a mouse")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  // Beginner order, opening on one-click looks.
+  await expect(tools.getByRole("tab")).toHaveText([
+    "AI",
+    "Looks",
+    "Moments",
+    "Camera",
+    "Cuts",
+    "Text",
+    "Graphics",
+    "Lens",
+    "Style",
+  ])
+  await expect(tools.getByRole("tab", { name: "Looks" })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  )
+
+  // Drag a focus area from the Graphics panel onto layer 1 at about 1s.
+  await tools.getByRole("tab", { name: "Graphics" }).click()
+  const layer1 = page.locator('[data-track="0"]')
+  const box = await layer1.boundingBox()
+  if (!box) throw new Error("No layer")
+  await page.getByRole("button", { name: /^Focus area/ }).dragTo(layer1, {
+    targetPosition: { x: 12 + (box.width - 24) * 0.2, y: box.height / 2 },
+  })
+  const graphics = page.getByRole("list", { name: "Graphics on the ad" })
+  await expect(graphics.getByRole("listitem")).toHaveCount(1)
+  await expect(graphics.getByText(/^0:01\.0$/)).toBeVisible()
+  // Circle, blurring inside instead.
+  await page.getByRole("button", { name: "Circle", exact: true }).click()
+  await page.getByRole("button", { name: "Inside the shape" }).click()
+  await expect(
+    page.getByText(/The shape is blurred and the rest stays sharp/)
+  ).toBeVisible()
+
+  // Drop a headline on the new layer above it: it lands on layer 2.
+  await tools.getByRole("tab", { name: "Text" }).click()
+  const newLayer = page.locator('[data-track="1"]')
+  const top = await newLayer.boundingBox()
+  if (!top) throw new Error("No new layer row")
+  await page.getByRole("button", { name: /^Headline/ }).dragTo(newLayer, {
+    targetPosition: { x: 12 + (top.width - 24) * 0.2, y: top.height / 2 },
+  })
+  await expect(page.getByText("Layer 2", { exact: true }).last()).toBeVisible()
+  await expect(
+    page.getByRole("button", { name: "Send backward" })
+  ).toBeEnabled()
+  // Send it back under the focus area's layer, then forward again.
+  await page.getByRole("button", { name: "Send backward" }).click()
+  await expect(
+    page.getByRole("button", { name: "Send backward" })
+  ).toBeDisabled()
+  await page.getByRole("button", { name: "Bring forward" }).click()
+
+  // On the video: pick the headline up and drop it on the centre line.
+  const position = page.getByLabel("Playback position")
+  await expect(position).toHaveText(/^0:01\./)
+  const headline = page.locator("[data-stage-item] polygon").last()
+  const at = await headline.boundingBox()
+  const stage = await page.getByTestId("motion-stage").boundingBox()
+  if (!at || !stage) throw new Error("No stage item")
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(at.x + at.width / 2, stage.y + stage.height * 0.505, {
+    steps: 8,
+  })
+  await page.mouse.up()
+  await expect(
+    page.getByRole("button", { name: "Centre", exact: true })
+  ).toHaveAttribute("aria-pressed", "true")
+
+  // The focus area moves across the (flat) screen when dragged.
+  await tools.getByRole("tab", { name: "Graphics" }).click()
+  await graphics.getByRole("button").first().click()
+  const where = page.getByText(/^\d+% × \d+%$/)
+  const before = await where.textContent()
+  const area = page.locator("[data-stage-item] polygon").first()
+  const areaBox = await area.boundingBox()
+  if (!areaBox) throw new Error("No focus area on stage")
+  await page.mouse.move(areaBox.x + areaBox.width / 2, areaBox.y + 6)
+  await page.mouse.down()
+  await page.mouse.move(areaBox.x + areaBox.width / 2 - 120, areaBox.y + 6, {
+    steps: 8,
+  })
+  await page.mouse.up()
+  await expect(where).not.toHaveText(before ?? "")
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
   expect(consoleProblems).toEqual([])
 })

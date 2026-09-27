@@ -28,13 +28,17 @@ const sameLens = (a: Lens, b: Lens) => JSON.stringify(a) === JSON.stringify(b)
 /** Lens effects: depth of field and progressive blur, like a real camera. */
 export function LensPanel({
   lens,
+  motionBlur,
   shotIsFlat,
   onChange,
+  onMotionBlur,
 }: {
   lens: Lens
+  motionBlur: boolean
   /** The camera faces the screen here: depth of field has nothing to blur. */
   shotIsFlat: boolean
   onChange: (lens: Lens, control: string) => void
+  onMotionBlur: (motionBlur: boolean) => void
 }) {
   const dof = lens.depthOfField
   const edge = lens.progressiveBlur
@@ -50,7 +54,7 @@ export function LensPanel({
     <div className="flex flex-col gap-6">
       <PanelHeading
         title="Lens"
-        description="Real camera effects. Depth of field blurs what's nearer or farther than the focus point; progressive blur softens the edges."
+        description="Real camera effects. Depth of field blurs what's nearer or farther than the focus point; progressive blur softens the edges. To keep one area sharp, add a Focus area (Graphics)."
       />
 
       <div className="grid grid-cols-2 gap-2">
@@ -73,6 +77,21 @@ export function LensPanel({
           )
         })}
       </div>
+
+      <Field orientation="horizontal">
+        <Switch
+          id="motion-blur"
+          aria-describedby="motion-blur-hint"
+          checked={motionBlur}
+          onCheckedChange={onMotionBlur}
+        />
+        <FieldContent>
+          <FieldLabel htmlFor="motion-blur">Motion blur</FieldLabel>
+          <FieldDescription id="motion-blur-hint">
+            A touch of blur on fast camera moves, like a real camera shutter.
+          </FieldDescription>
+        </FieldContent>
+      </Field>
 
       <section className="flex flex-col gap-4" aria-labelledby="dof-heading">
         <Field orientation="horizontal">

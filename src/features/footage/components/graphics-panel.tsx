@@ -7,6 +7,7 @@ import {
   CrosshairIcon,
   EyeOffIcon,
   FlagIcon,
+  FocusIcon,
   KeyboardIcon,
   MessageSquareIcon,
   MousePointerClickIcon,
@@ -26,11 +27,12 @@ import {
   graphicKinds,
   graphicLimits,
   isScreenGraphic,
+  type FocusShape,
   type GraphicItem,
   type GraphicKind,
 } from "@/shared/motion"
 import { Button } from "@/shared/ui/button"
-import { Field, FieldLabel } from "@/shared/ui/field"
+import { Field, FieldDescription, FieldLabel } from "@/shared/ui/field"
 import { Input } from "@/shared/ui/input"
 import { Spinner } from "@/shared/ui/spinner"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
@@ -41,11 +43,13 @@ import {
   type GraphicTemplateId,
 } from "../lib/graphic-templates"
 import { PanelHeading, SliderField } from "./editor-panels"
+import { draggablePreset, LayerControl } from "./layer-control"
 
 const icons: Record<
   GraphicKind,
   React.ComponentType<{ className?: string }>
 > = {
+  focus: FocusIcon,
   ripple: MousePointerClickIcon,
   spotlight: SunIcon,
   magnifier: SearchIcon,
@@ -170,6 +174,8 @@ export function GraphicsPanel({
                     key={kind}
                     type="button"
                     disabled={full}
+                    title="Click to add at the playhead, or drag onto the timeline"
+                    {...draggablePreset({ type: "graphic", kind })}
                     onClick={() => onAdd(kind)}
                     className="flex items-start gap-2 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:opacity-50"
                   >
@@ -372,6 +378,18 @@ function GraphicInspector({
         </Field>
       )}
 
+      {item.kind === "focus" && (
+        <FocusControls
+          focus={item.focus}
+          onChange={(focus, control) => onUpdate({ focus }, control)}
+        />
+      )}
+
+      <LayerControl
+        track={item.track}
+        onChange={(track) => onUpdate({ track }, "track")}
+      />
+
       <SliderField
         label="On screen for"
         value={item.durationMs}
@@ -398,5 +416,95 @@ function GraphicInspector({
         </Button>
       </div>
     </section>
+  )
+}
+
+function FocusControls({
+  focus,
+  onChange,
+}: {
+  focus: GraphicItem["focus"]
+  onChange: (focus: GraphicItem["focus"], control: string) => void
+}) {
+  const set = (patch: Partial<GraphicItem["focus"]>, control: string) =>
+    onChange({ ...focus, ...patch }, `focus:${control}`)
+  return (
+    <div className="flex flex-col gap-5">
+      <Field>
+        <span className="text-sm font-medium">Shape</span>
+        <ToggleGroup
+          aria-label="Focus shape"
+          variant="outline"
+          className="grid grid-cols-3 gap-1"
+          value={[focus.shape]}
+          onValueChange={(values) => {
+            const shape = values[0] as FocusShape | undefined
+            if (shape) set({ shape }, "shape")
+          }}
+        >
+          <ToggleGroupItem value="circle" className="w-full text-xs">
+            Circle
+          </ToggleGroupItem>
+          <ToggleGroupItem value="rounded" className="w-full text-xs">
+            Rounded box
+          </ToggleGroupItem>
+          <ToggleGroupItem value="rect" className="w-full text-xs">
+            Rectangle
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </Field>
+      <Field>
+        <span className="text-sm font-medium">Blur</span>
+        <ToggleGroup
+          aria-label="Blur which part"
+          variant="outline"
+          className="grid grid-cols-2 gap-2"
+          value={[focus.invert ? "inside" : "outside"]}
+          onValueChange={(values) => {
+            const value = values[0]
+            if (value) set({ invert: value === "inside" }, "invert")
+          }}
+        >
+          <ToggleGroupItem value="outside" className="w-full text-xs">
+            Everything else
+          </ToggleGroupItem>
+          <ToggleGroupItem value="inside" className="w-full text-xs">
+            Inside the shape
+          </ToggleGroupItem>
+        </ToggleGroup>
+        <FieldDescription>
+          {focus.invert
+            ? "The shape is blurred and the rest stays sharp: good for hiding details."
+            : "The shape stays sharp and the rest blurs: points the eye at it."}
+        </FieldDescription>
+      </Field>
+      <SliderField
+        label="Blur strength"
+        value={focus.strength}
+        min={0.1}
+        max={3}
+        step={0.1}
+        format={(value) => `${value.toFixed(1)}%`}
+        onChange={(strength) => set({ strength }, "strength")}
+      />
+      <SliderField
+        label="Soft edge"
+        value={focus.feather}
+        min={0}
+        max={15}
+        step={0.5}
+        format={(value) => (value === 0 ? "Sharp" : `${value.toFixed(1)}%`)}
+        onChange={(feather) => set({ feather }, "feather")}
+      />
+      <SliderField
+        label="Darken the blur"
+        value={focus.dim}
+        min={0}
+        max={0.7}
+        step={0.05}
+        format={(value) => `${Math.round(value * 100)}%`}
+        onChange={(dim) => set({ dim }, "dim")}
+      />
+    </div>
   )
 }

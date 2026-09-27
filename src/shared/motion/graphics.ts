@@ -8,6 +8,7 @@ import { z } from "zod"
  */
 export const graphicKinds = [
   // On the screen
+  "focus",
   "ripple",
   "spotlight",
   "magnifier",
@@ -25,6 +26,7 @@ export const graphicKinds = [
 export type GraphicKind = (typeof graphicKinds)[number]
 
 export const screenGraphics: readonly GraphicKind[] = [
+  "focus",
   "ripple",
   "spotlight",
   "magnifier",
@@ -47,6 +49,13 @@ export const graphicInfo: Record<
     secondary: string
   }
 > = {
+  focus: {
+    label: "Focus area",
+    hint: "Keeps one area sharp and blurs the rest (or the reverse).",
+    durationMs: 3000,
+    text: "",
+    secondary: "",
+  },
   ripple: {
     label: "Click ripple",
     hint: "Rings where something is clicked.",
@@ -138,6 +147,30 @@ export const graphicLimits = { items: 30, text: 80 } as const
 const unit = z.number().min(0).max(1)
 
 export const graphicBoxSchema = z.object({ x: unit, y: unit, w: unit, h: unit })
+
+export const focusShapes = ["circle", "rounded", "rect"] as const
+export type FocusShape = (typeof focusShapes)[number]
+
+/** Focus area settings: what stays sharp, and how the rest blurs. */
+export const focusSchema = z.object({
+  shape: z.enum(focusShapes),
+  /** Blur inside the shape instead of outside it. */
+  invert: z.boolean(),
+  /** Blur, in % of the stage's width. */
+  strength: z.number().min(0.1).max(3),
+  /** Soft edge, in % of the frame's width. */
+  feather: z.number().min(0).max(15),
+  /** Darken the blurred part (0–0.7), to make the sharp part pop. */
+  dim: z.number().min(0).max(0.7),
+})
+export type FocusSettings = z.infer<typeof focusSchema>
+export const defaultFocus: FocusSettings = {
+  shape: "rounded",
+  invert: false,
+  strength: 1,
+  feather: 3,
+  dim: 0.15,
+}
 export type GraphicBox = z.infer<typeof graphicBoxSchema>
 
 export const graphicItemSchema = z.object({
@@ -151,6 +184,12 @@ export const graphicItemSchema = z.object({
   secondary: z.string().max(graphicLimits.text).default(""),
   /** Callouts: which side of the box the label sits on. */
   side: z.enum(["auto", "left", "right", "top", "bottom"]).default("auto"),
+  /** Layer: higher tracks draw over lower ones (0 sits on the video). */
+  track: z.number().int().min(0).max(9).default(0),
+  /** Stage graphics: centre on the stage (0–1); null = the kind's spot. */
+  at: z.object({ x: unit, y: unit }).nullable().default(null),
+  /** Focus areas only. */
+  focus: focusSchema.default(defaultFocus),
 })
 export type GraphicItem = z.output<typeof graphicItemSchema>
 
@@ -185,4 +224,24 @@ export function keycaps(text: string) {
     return [...parts[0]!]
   }
   return parts.slice(0, 5)
+}
+
+/**
+ * The lowest free layer for something new from `startMs` for `lengthMs`
+ * (all in the same time base), like a native editor dropping a clip.
+ */
+export function freeTrack(
+  items: { track: number; startMs: number; endMs: number }[],
+  startMs: number,
+  lengthMs: number
+) {
+  const endMs = startMs + lengthMs
+  for (let track = 0; track < 10; track++) {
+    const busy = items.some(
+      (item) =>
+        item.track === track && item.startMs < endMs && item.endMs > startMs
+    )
+    if (!busy) return track
+  }
+  return 9
 }

@@ -185,8 +185,8 @@ export function EffectsPanel({
   return (
     <div className="flex flex-col gap-6">
       <PanelHeading
-        title="Effects"
-        description="One click styles the whole clip. Undo with ⌘Z if you don’t like it."
+        title="Looks"
+        description="New here? Pick a look to style every key moment in one click, or let the AI plan the whole edit (AI). Undo with ⌘Z if you don’t like it."
       />
       <section className="flex flex-col gap-3" aria-labelledby="looks-heading">
         <h3 id="looks-heading" className="text-sm font-medium">
@@ -707,22 +707,6 @@ export function StylePanel({
             <FieldLabel htmlFor="animated-background">Moving light</FieldLabel>
             <FieldDescription id="animated-background-hint">
               A slow glow drifts across the background, so it never sits still.
-            </FieldDescription>
-          </FieldContent>
-        </Field>
-        <Field orientation="horizontal">
-          <Switch
-            id="motion-blur"
-            aria-describedby="motion-blur-hint"
-            checked={presentation.motionBlur}
-            onCheckedChange={(motionBlur) =>
-              onChange({ ...presentation, motionBlur }, "motion-blur")
-            }
-          />
-          <FieldContent>
-            <FieldLabel htmlFor="motion-blur">Motion blur</FieldLabel>
-            <FieldDescription id="motion-blur-hint">
-              A touch of blur on fast camera moves, like a real camera.
             </FieldDescription>
           </FieldContent>
         </Field>
