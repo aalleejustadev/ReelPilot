@@ -223,4 +223,62 @@ describe.runIf(hasDatabase)("footage actions", () => {
     })
     expect(await db.footageMarker.count({ where: { footageId } })).toBe(0)
   })
+
+  it("queues the smart analysis for a new moment, and on request", async () => {
+    const footageId = await uploaded()
+    await db.footage.update({
+      where: { id: footageId },
+      data: { status: "READY", durationMs: 10_000, analysisStatus: "READY" },
+    })
+    const analyzeCall = [
+      expect.objectContaining({ name: "footage.analyze" }),
+      { footageId },
+      { singletonKey: footageId },
+    ]
+
+    // A new moment gets described.
+    await actions.addFootageMarker({ footageId, atMs: 1000 })
+    expect(enqueue).toHaveBeenCalledWith(...analyzeCall)
+    expect(
+      (await db.footage.findUniqueOrThrow({ where: { id: footageId } }))
+        .analysisStatus
+    ).toBe("PENDING")
+
+    // "Analyse again" starts over.
+    enqueue.mockClear()
+    await db.footage.update({
+      where: { id: footageId },
+      data: { analysisStatus: "READY" },
+    })
+    expect(await actions.analyzeFootageAgain(footageId)).toEqual({
+      ok: true,
+      data: null,
+    })
+    expect(enqueue).toHaveBeenCalledWith(...analyzeCall)
+
+    // A queue hiccup doesn't fail the edit (the sweep re-queues it).
+    enqueue.mockRejectedValueOnce(new Error("queue down"))
+    expect(
+      await actions.addFootageMarker({ footageId, atMs: 2000 })
+    ).toMatchObject({
+      ok: true,
+    })
+  })
+
+  it("won't analyse a clip that isn't ready, or for viewers", async () => {
+    const footageId = await uploaded()
+    expect(await actions.analyzeFootageAgain(footageId)).toMatchObject({
+      ok: false,
+      error: { code: "NOT_FOUND" },
+    })
+    await db.membership.updateMany({
+      where: { workspaceId },
+      data: { role: "VIEWER" },
+    })
+    expect(await actions.analyzeFootageAgain(footageId)).toMatchObject({
+      ok: false,
+      error: { code: "FORBIDDEN" },
+    })
+    expect(enqueue).not.toHaveBeenCalled()
+  })
 })

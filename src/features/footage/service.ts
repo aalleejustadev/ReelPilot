@@ -6,7 +6,10 @@ import { AppError } from "@/shared/lib/errors"
 
 import { footageFileKey, footageFolder, originalFileName } from "./lib/keys"
 import { assertCanAddFootage, assertFootageSize } from "./lib/limits"
-import type { RequestUploadInput } from "./schema"
+import type { FootageAnalysis } from "./lib/analysis"
+import type { MomentInsight } from "./lib/insight"
+import type { RecordingInfo } from "./lib/recording"
+import { footageLimits, type RequestUploadInput } from "./schema"
 
 const kitNotFound = () =>
   new AppError("NOT_FOUND", "We couldn’t find that brand kit.")
@@ -83,12 +86,13 @@ export async function getUploadingFootage(
 export async function startProcessing(
   workspaceId: string,
   footageId: string,
-  recordedMarksMs: number[]
+  recordedMarksMs: number[],
+  recording?: RecordingInfo
 ) {
   return db.$transaction(async (tx) => {
     const { count } = await tx.footage.updateMany({
       where: { id: footageId, workspaceId, status: "UPLOADING" },
-      data: { status: "PROCESSING" },
+      data: { status: "PROCESSING", ...(recording && { recording }) },
     })
     if (count === 0) {
       const exists = await tx.footage.count({
@@ -163,6 +167,8 @@ export async function saveProcessedFootage(
         height: result.height,
         errorMessage: null,
         processedAt: new Date(),
+        // The analysis job runs next (§7.4b).
+        analysisStatus: "PENDING",
       },
     })
     await tx.footageMarker.deleteMany({
@@ -323,15 +329,140 @@ export async function moveMarker(
 ) {
   const marker = await db.footageMarker.findFirst({
     where: markerInWorkspace(markerId, workspaceId),
-    select: { footage: { select: { durationMs: true } } },
+    select: {
+      atMs: true,
+      footageId: true,
+      footage: { select: { durationMs: true } },
+    },
   })
   if (!marker?.footage) throw new AppError("NOT_FOUND", "That marker is gone.")
   const end = marker.footage.durationMs
   if (end !== null && atMs > end) {
     throw new AppError("VALIDATION", "That moment is past the end of the clip.")
   }
+  // A second away the screen shows something else: describe it again.
+  const stale = Math.abs(atMs - marker.atMs) > 1000
   await db.footageMarker.update({
     where: { id: markerId },
-    data: { atMs, source: "MANUAL" },
+    data: {
+      atMs,
+      source: "MANUAL",
+      ...(stale && { insight: Prisma.DbNull }),
+    },
   })
+  return { footageId: marker.footageId, needsInsight: stale }
+}
+
+// ── Smart analysis (§7.4b) ──────────────────────────────────────────────────
+
+/**
+ * Asks for a fresh analysis: clears the old one (and, with `redescribe`,
+ * every moment's AI description) and marks it PENDING. Returns false if
+ * the clip isn't READY.
+ */
+export async function requestAnalysis(
+  workspaceId: string,
+  footageId: string,
+  options: { redescribe: boolean }
+) {
+  return db.$transaction(async (tx) => {
+    const { count } = await tx.footage.updateMany({
+      where: { id: footageId, workspaceId, status: "READY" },
+      data: {
+        analysisStatus: "PENDING",
+        ...(options.redescribe && { analysis: Prisma.DbNull }),
+      },
+    })
+    if (count === 0) return false
+    if (options.redescribe) {
+      // Labels the AI filled in (still unedited) are refilled, not kept.
+      await tx.$executeRaw`
+        UPDATE footage_markers SET label = NULL
+        WHERE "footageId" = ${footageId}
+          AND label = left(insight->>'description', ${footageLimits.label})`
+      await tx.footageMarker.updateMany({
+        where: { footageId },
+        data: { insight: Prisma.DbNull },
+      })
+    }
+    return true
+  })
+}
+
+/** Worker side: the clip, its kit's name and its markers, for analysis. */
+export async function getFootageForAnalysis(footageId: string) {
+  return db.footage.findUnique({
+    where: { id: footageId },
+    select: {
+      id: true,
+      workspaceId: true,
+      status: true,
+      videoKey: true,
+      durationMs: true,
+      width: true,
+      height: true,
+      analysis: true,
+      brandKit: { select: { name: true } },
+      markers: {
+        orderBy: { atMs: "asc" },
+        select: { id: true, atMs: true, insight: true },
+      },
+    },
+  })
+}
+
+export async function setAnalysisStatus(
+  footageId: string,
+  status: "RUNNING" | "READY" | "FAILED"
+) {
+  await db.footage.updateMany({
+    where: { id: footageId, status: "READY" },
+    data: { analysisStatus: status },
+  })
+}
+
+export async function saveFootageAnalysis(
+  footageId: string,
+  analysis: FootageAnalysis
+) {
+  await db.footage.updateMany({
+    where: { id: footageId },
+    data: { analysis },
+  })
+}
+
+/**
+ * Saves what the AI saw at a moment, unless the moment moved meanwhile
+ * (then it's described again). An empty "What's on screen" is filled in;
+ * one the owner wrote is kept.
+ */
+export async function saveMomentInsight(
+  markerId: string,
+  atMs: number,
+  insight: MomentInsight
+) {
+  await db.$transaction([
+    db.footageMarker.updateMany({
+      where: { id: markerId, atMs },
+      data: { insight },
+    }),
+    db.footageMarker.updateMany({
+      where: { id: markerId, atMs, OR: [{ label: null }, { label: "" }] },
+      data: { label: insight.description.slice(0, footageLimits.label) },
+    }),
+  ])
+}
+
+/** Clips whose analysis was asked for but never started (lost enqueue). */
+export async function stuckAnalyses(olderThan: Date) {
+  const clips = await db.footage.findMany({
+    where: {
+      status: "READY",
+      analysisStatus: "PENDING",
+      updatedAt: { lt: olderThan },
+    },
+    select: { id: true },
+    take: 20,
+  })
+  return clips.map((clip) => clip.id)
 }

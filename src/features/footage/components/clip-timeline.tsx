@@ -31,6 +31,7 @@ export function ClipTimeline({
   stripWidth,
   moments,
   selectedId,
+  idle = [],
   onSeek,
   onScrubbingChange,
   onSelect,
@@ -42,6 +43,8 @@ export function ClipTimeline({
   stripWidth: number
   moments: TimelineMoment[]
   selectedId: string | null
+  /** Stretches where nothing changes on screen (from the analysis). */
+  idle?: { startMs: number; endMs: number }[]
   onSeek: (ms: number) => void
   /** True while the user drags, so playback can pause and resume. */
   onScrubbingChange: (scrubbing: boolean) => void
@@ -246,6 +249,18 @@ export function ClipTimeline({
               style={{ width: `${stripWidth}%` }}
             />
           )}
+          {idle.map((range) => (
+            <span
+              key={range.startMs}
+              aria-hidden
+              data-testid="idle-range"
+              className="pointer-events-none absolute inset-x-0 bottom-0 h-1.5 bg-[repeating-linear-gradient(135deg,var(--foreground)_0_2px,var(--background)_2px_5px)] opacity-80"
+              style={{
+                left: `${clampPercent(range.startMs, durationMs)}%`,
+                width: `${clampPercent(range.endMs - range.startMs, durationMs)}%`,
+              }}
+            />
+          ))}
           {moments.map((moment) => (
             <button
               key={moment.id}

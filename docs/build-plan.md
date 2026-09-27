@@ -319,6 +319,18 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **One source of truth:** camera math in `src/shared/motion` (pure), used by the browser preview now and the Remotion compositions in M5, so renders match the preview.
 - **Acceptance:** shots can be set per marker by preset, sliders or AI; the preview animates between them over the clip's background; settings persist; reduced-motion users get a non-animated preview.
 
+### 7.4b motion studio `[V1, owner-added 2026-09-27]`
+- **Purpose:** Turn the footage editor into a professional motion studio (researched against Screen Studio, Cap, Tella, FocuSee, CapCut, Rotato and Remotion libraries; notes in `docs/decisions.md`). Every option is tuned to look directed, never repetitive or cheap.
+- **A. Smart analysis:** a worker job after processing maps where the screen changes (activity boxes per sample), idle and scrolling stretches, and the footage's palette; AI vision describes each key moment (what's on screen, a headline idea, on-screen words, the key element's box). The recorder also keeps the shared surface and, where the browser reports it (Captured Mouse Events), a cursor track. A web page can't see clicks in other tabs; a Chrome extension for clicks/element bounds is a later, separately approved step.
+- **B. Engine:** the stage moves to a Remotion composition shown in `@remotion/player` (the same code M5 renders); spring camera with Focused / Smooth / Rapid temperaments, zoom time growing with depth, direct pans between nearby targets, velocity motion blur.
+- **C. Camera looks as rules:** opener, a body pool with no repeats within two moments and flipping direction, a hero shot on the starred moment, a closer; "Zoom to action" from the analysis.
+- **D. Cuts, speed and transitions:** split/trim, speed up idle parts; a short list of pro transitions (cut, pan, push/slide, whip, zoom-through, blur dissolve, mask wipe from the click point).
+- **E. Text:** a text track, 8 animations (word rise, mask reveal, blur resolve, marker sweep, keyword swap, typewriter, number ticker, tracking-in), brand-font style presets; one animation style per video by default.
+- **F. Motion graphics:** 12 presets (click ripple, spotlight dim, magnifier, callout with drawn arrow, scribble, key chip, stat card, lower third, logo reveal, end card, privacy blur, animated background) anchored to a moment's action box; "turn a moment into a graphic" by AI or tailored templates.
+- **G. Editor:** multi-track timeline (camera, transitions, text, graphics) with drag/resize/snap, inspector per selection, live preset previews, on-stage placement, J/K/L and frame stepping.
+- **H. AI director v2:** plans the whole edit from the analysis and brand kit, explained and undoable.
+- **Acceptance:** each part ships with tests and axe checks; the preview is the composition M5 renders.
+
 ### 7.5 presenters
 - **Purpose:** Stock presenters: a licensed still portrait paired with a Kokoro stock voice. `TODO(owner)`: source of the portraits (licensed stock photos or generated faces).
 - **`[V1.1]` — everything below in this section.**
@@ -727,6 +739,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
 | M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5) |
 | M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
+| M3c | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **in progress** |
 | M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
 | M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
 | M6 | Billing | billing, plans, ledger, Stripe | Subscribe, get credits, see balance |

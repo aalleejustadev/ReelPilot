@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+import { enqueue } from "@/shared/jobs"
 import { MediaToolError, probeVideo, runFfmpeg } from "@/shared/media"
 import { downloadToFile, uploadFromFile } from "@/shared/storage"
 
@@ -22,6 +23,7 @@ import {
   getFootageForProcessing,
   saveProcessedFootage,
 } from "../service"
+import { analyzeFootageJob } from "./definitions"
 
 /** A problem with the file itself: retrying won't help, tell the user. */
 class UnusableFootage extends Error {}
@@ -114,6 +116,15 @@ export async function processFootage(
       thumbnailIntervalMs: plan.intervalMs,
       autoMarkersMs,
     })
+    // The smart analysis runs as its own job, so its trouble never fails
+    // the clip. A lost enqueue is picked up by the stuck-analysis sweep.
+    await enqueue(
+      analyzeFootageJob,
+      { footageId },
+      { singletonKey: footageId }
+    ).catch((error: unknown) =>
+      console.warn(`[footage] couldn't queue analysis for ${footageId}`, error)
+    )
   } catch (error) {
     if (error instanceof UnusableFootage) {
       await failFootage(footageId, error.message)

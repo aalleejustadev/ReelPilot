@@ -8,6 +8,12 @@ export type JobQueuePolicy = {
   retryDelaySeconds: number
   /** A running job is failed (and retried) after this long. */
   timeoutSeconds: number
+  /**
+   * "stately": at most one queued and one running job per singletonKey
+   * (a request while one runs queues exactly one follow-up). Default
+   * "standard" ignores singletonKey.
+   */
+  queuePolicy?: "standard" | "stately"
 }
 
 export type JobDefinition<T> = {

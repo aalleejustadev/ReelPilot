@@ -1,12 +1,20 @@
 "use client"
 
-import { MoveHorizontalIcon, TrashIcon, VideoIcon } from "lucide-react"
+import {
+  MoveHorizontalIcon,
+  RefreshCwIcon,
+  ScanSearchIcon,
+  SparklesIcon,
+  TrashIcon,
+  VideoIcon,
+} from "lucide-react"
 import { useState, useTransition } from "react"
 
 import { cn } from "@/shared/lib/utils"
 import {
   defaultShot,
   presetOf,
+  shotLabel,
   shotPresetNames,
   shotPresets,
   type Shot,
@@ -26,8 +34,13 @@ import { Spinner } from "@/shared/ui/spinner"
 import { toast } from "@/shared/ui/toast"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
-import { deleteFootageMarker, updateFootageMarker } from "../actions"
+import {
+  analyzeFootageAgain,
+  deleteFootageMarker,
+  updateFootageMarker,
+} from "../actions"
 import { formatTimecode } from "../lib/format"
+import { parseStoredInsight } from "../lib/insight"
 import type { FootageDetail } from "../queries"
 import { footageLimits } from "../schema"
 import { PanelHeading } from "./editor-panels"
@@ -43,6 +56,8 @@ export type ThumbnailStrip = {
 
 /** Every key moment as a card: its frame, time, shot and description. */
 export function MomentsPanel({
+  footageId,
+  analysisStatus,
   markers,
   selectedId,
   readOnly,
@@ -53,6 +68,8 @@ export function MomentsPanel({
   onShotChange,
   onMove,
 }: {
+  footageId: string
+  analysisStatus: FootageDetail["analysisStatus"]
   markers: Marker[]
   selectedId: string | null
   readOnly: boolean
@@ -69,6 +86,15 @@ export function MomentsPanel({
         title="Key moments"
         description="The beats your ad cuts to. The camera moves at each one. Drag them on the timeline to change when they happen."
       />
+      <AnalysisStatus
+        footageId={footageId}
+        status={analysisStatus}
+        described={
+          markers.filter((marker) => parseStoredInsight(marker.insight)).length
+        }
+        total={markers.length}
+        readOnly={readOnly}
+      />
       {markers.length === 0 ? (
         <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
           No key moments yet. Play the clip and press “Add marker” where
@@ -78,7 +104,8 @@ export function MomentsPanel({
         <ul className="flex flex-col gap-3" aria-label="Key moments">
           {markers.map((marker) => (
             <MomentCard
-              key={marker.id}
+              // A label the AI filled in after load shows up in the field.
+              key={`${marker.id}:${marker.label ?? ""}`}
               marker={marker}
               readOnly={readOnly}
               isSelected={marker.id === selectedId}
@@ -92,6 +119,78 @@ export function MomentsPanel({
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+/**
+ * Where the smart analysis is (§7.4b), and a way to run it again (or for
+ * the first time, on clips from before it existed).
+ */
+function AnalysisStatus({
+  footageId,
+  status,
+  described,
+  total,
+  readOnly,
+}: {
+  footageId: string
+  status: FootageDetail["analysisStatus"]
+  described: number
+  total: number
+  readOnly: boolean
+}) {
+  const [isStarting, startAnalysis] = useTransition()
+  const isWorking = status === "PENDING" || status === "RUNNING"
+
+  function analyze() {
+    startAnalysis(async () => {
+      const result = await analyzeFootageAgain(footageId)
+      if (!result.ok) toast.add({ type: "error", title: result.error.message })
+    })
+  }
+
+  const message = isWorking
+    ? "Analysing your footage: finding where the action is and reading each moment…"
+    : status === "READY"
+      ? total > 0 && described > 0
+        ? `Analysed. The AI described ${described} of ${total} ${total === 1 ? "moment" : "moments"}.`
+        : "Analysed: the camera can aim at where things happen."
+      : status === "FAILED"
+        ? "We couldn’t analyse this clip. Try again."
+        : "Not analysed yet. Analysing finds where the action is, the footage’s colours, and what’s on screen at each moment."
+
+  return (
+    <div
+      className="flex items-start gap-3 rounded-lg border bg-muted/40 p-3"
+      role="status"
+    >
+      {isWorking ? (
+        <Spinner className="mt-0.5 shrink-0" />
+      ) : (
+        <ScanSearchIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+      )}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <p className="text-sm">{message}</p>
+        {!readOnly && !isWorking && (
+          <div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isStarting}
+              onClick={analyze}
+            >
+              {isStarting ? (
+                <Spinner data-icon="inline-start" />
+              ) : (
+                <RefreshCwIcon data-icon="inline-start" />
+              )}
+              {status === null ? "Analyse footage" : "Analyse again"}
+            </Button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -143,6 +242,11 @@ function MomentCard({
   const [isDeleting, startDelete] = useTransition()
   const time = formatTimecode(marker.atMs)
   const labelId = `moment-${marker.id}-label`
+  const insight = parseStoredInsight(marker.insight)
+  const labelFromAi =
+    insight !== null &&
+    label !== "" &&
+    label === insight.description.slice(0, footageLimits.label)
 
   function saveLabel() {
     if (label.trim() === (marker.label ?? "")) return
@@ -254,10 +358,21 @@ function MomentCard({
           }}
         />
         <p id={`${labelId}-hint`} className="text-xs text-muted-foreground">
-          The AI uses this to aim the camera and to write lines that match this
-          moment.
+          {labelFromAi
+            ? "Filled in by the AI from the screen. Edit it if it’s off: it aims the camera and shapes the lines written for this moment."
+            : "The AI uses this to aim the camera and to write lines that match this moment."}
         </p>
       </div>
+
+      {insight?.headline && (
+        <div className="flex flex-col gap-1 rounded-md bg-muted/60 px-3 py-2">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <SparklesIcon aria-hidden className="size-3.5" />
+            Headline idea
+          </span>
+          <p className="text-sm">{insight.headline}</p>
+        </div>
+      )}
     </li>
   )
 }
@@ -284,7 +399,9 @@ function ShotSelect({
       value: name,
       label: shotPresets[name].label,
     })),
-    ...(value === customShot ? [{ value: customShot, label: "Custom" }] : []),
+    ...(value === customShot && shot
+      ? [{ value: customShot, label: shotLabel(shot.camera) }]
+      : []),
   ]
   return (
     <Select

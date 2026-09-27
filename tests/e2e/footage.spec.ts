@@ -134,6 +134,19 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   ).toHaveAttribute("aria-pressed", "true")
   await expectNoViolations(page)
 
+  // The smart analysis ran after processing (AI vision is off in tests):
+  // the still colour bars from 2s are marked as a stretch where nothing
+  // changes.
+  await tools.getByRole("tab", { name: "Moments" }).click()
+  await expect(
+    page.getByText("Analysed: the camera can aim at where things happen.")
+  ).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByTestId("idle-range")).toHaveCount(1)
+  await expect(
+    page.getByRole("button", { name: "Analyse again" })
+  ).toBeVisible()
+  await expectNoViolations(page)
+
   // Drag the playhead to 60% of the 5s clip, then nudge it with the keyboard.
   const box = await timeline.boundingBox()
   if (!box) throw new Error("Timeline not visible")

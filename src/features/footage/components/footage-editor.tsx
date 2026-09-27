@@ -42,10 +42,14 @@ import {
   updateFootagePresentation,
   updateMarkerShot,
 } from "../actions"
+import { aimAt } from "../lib/aim"
+import { parseStoredAnalysis } from "../lib/analysis"
 import { formatDuration, formatTimecode } from "../lib/format"
 import { commit, createHistory, redo, undo, type History } from "../lib/history"
 import { applyLook, resetLook } from "../lib/looks"
+import { parseStoredInsight } from "../lib/insight"
 import { parseStoredShot } from "../lib/motion"
+import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
 import { DeleteClipButton } from "./delete-clip-button"
@@ -57,6 +61,7 @@ import {
 } from "./editor-panels"
 import { MomentsPanel } from "./moments-panel"
 import { MotionStage, stageAspects, type StageAspect } from "./motion-stage"
+import { RefreshWhileProcessing } from "./refresh-while-processing"
 
 type Marker = FootageDetail["markers"][number]
 type Motion = { shots: Record<string, Shot | null>; presentation: Presentation }
@@ -102,6 +107,26 @@ function playSafely(video: HTMLVideoElement | null) {
   })
 }
 
+/**
+ * Signed links change on every server render (each refresh re-signs
+ * them), and a new <video> src restarts playback from 0. So the first
+ * links are kept; `renew` switches to the latest ones, for when the kept
+ * ones stop working (they expire after an hour).
+ */
+function useStableLinks<T extends Record<string, string | null>>(links: T) {
+  const [stable, setStable] = useState(links)
+  const latest = useRef(links)
+  useEffect(() => {
+    latest.current = links
+  })
+  const renew = useCallback(() => {
+    if (JSON.stringify(latest.current) === JSON.stringify(stable)) return false
+    setStable(latest.current)
+    return true
+  }, [stable])
+  return [stable, renew] as const
+}
+
 /** Typing in a field keeps the browser's own shortcuts (text undo, space). */
 function isTyping(target: EventTarget | null) {
   const el = target as HTMLElement | null
@@ -139,6 +164,15 @@ export function FootageEditor({
   kitName: string
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [links, renewLinks] = useStableLinks({
+    videoUrl,
+    posterUrl,
+    thumbnailsUrl,
+  })
+  // Where to pick up again after switching to fresh links.
+  const resumeAfterRenew = useRef<{ atS: number; playing: boolean } | null>(
+    null
+  )
   const [currentMs, setCurrentMs] = useState(0)
   const [isPlaying, setPlaying] = useState(false)
   const [isAdding, startAdd] = useTransition()
@@ -242,6 +276,30 @@ export function FootageEditor({
     [markers, shotOf]
   )
   const selected = markers.find((marker) => marker.id === selectedId) ?? null
+
+  // Smart analysis (§7.4b): where the action is, idle stretches, colours.
+  const analysis = useMemo(
+    () => parseStoredAnalysis(clip.analysis),
+    [clip.analysis]
+  )
+  const recording = useMemo(
+    () => parseStoredRecording(clip.recording),
+    [clip.recording]
+  )
+  const selectedAim = selected
+    ? aimAt({
+        analysis,
+        recording,
+        insight: parseStoredInsight(selected.insight),
+        atMs: selected.atMs,
+      })
+    : null
+  const idleMs = (analysis?.idle ?? []).reduce(
+    (total, range) => total + range.endMs - range.startMs,
+    0
+  )
+  const isAnalysing =
+    clip.analysisStatus === "PENDING" || clip.analysisStatus === "RUNNING"
 
   const onTimeChange = useCallback((ms: number) => setCurrentMs(ms), [])
   const onPlayingChange = useCallback(
@@ -381,6 +439,20 @@ export function FootageEditor({
     }
   }
 
+  // After fresh links load, carry on from the same spot.
+  useEffect(() => {
+    const video = videoRef.current
+    const resume = resumeAfterRenew.current
+    if (!video || !resume) return
+    const onLoaded = () => {
+      resumeAfterRenew.current = null
+      video.currentTime = resume.atS
+      if (resume.playing) playSafely(video)
+    }
+    video.addEventListener("loadedmetadata", onLoaded, { once: true })
+    return () => video.removeEventListener("loadedmetadata", onLoaded)
+  }, [links.videoUrl])
+
   // Leaving while a save is in flight would lose it: ask first.
   useEffect(() => {
     if (saveState !== "saving") return
@@ -474,6 +546,7 @@ export function FootageEditor({
 
   return (
     <div className="flex min-h-dvh flex-col bg-background lg:h-dvh">
+      <RefreshWhileProcessing active={isAnalysing} />
       {/* Top bar */}
       <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-3 sm:gap-3 sm:px-4">
         {/* Rendered here, not passed in from the server page: elements
@@ -585,6 +658,7 @@ export function FootageEditor({
                 <EffectsPanel
                   hasMoments={markers.length > 0}
                   brandColors={brandColors}
+                  palette={analysis?.palette ?? null}
                   onApplyLook={applyLookById}
                   onReset={() =>
                     change(resetLook(markers, presentation), "reset")
@@ -601,6 +675,7 @@ export function FootageEditor({
                 <ShotPanel
                   moment={selected}
                   shot={selected ? shotOf(selected) : null}
+                  aim={selectedAim}
                   pickingFocus={pickingFocus}
                   onShotChange={(shot, control) =>
                     selected && changeShotFor(selected, shot, control)
@@ -632,6 +707,7 @@ export function FootageEditor({
                 <StylePanel
                   presentation={presentation}
                   brandColors={brandColors}
+                  palette={analysis?.palette ?? null}
                   onChange={changePresentation}
                 />
               </TabsContent>
@@ -644,12 +720,14 @@ export function FootageEditor({
               </TabsContent>
               <TabsContent value="moments">
                 <MomentsPanel
+                  footageId={clip.id}
+                  analysisStatus={clip.analysisStatus}
                   markers={markers}
                   selectedId={selectedId}
                   readOnly={readOnly}
                   shotOf={shotOf}
                   strip={{
-                    url: thumbnailsUrl,
+                    url: links.thumbnailsUrl,
                     count: clip.thumbnailCount,
                     intervalMs: clip.thumbnailIntervalMs,
                   }}
@@ -676,8 +754,8 @@ export function FootageEditor({
           <div className="h-[50vh] bg-muted/60 p-4 sm:p-6 lg:h-auto lg:min-h-0 lg:flex-1">
             <MotionStage
               videoRef={videoRef}
-              videoUrl={videoUrl}
-              posterUrl={posterUrl}
+              videoUrl={links.videoUrl}
+              posterUrl={links.posterUrl}
               presentation={presentation}
               shots={timedShots}
               durationMs={durationMs}
@@ -700,6 +778,13 @@ export function FootageEditor({
               }}
               onTimeChange={onTimeChange}
               onPlayingChange={onPlayingChange}
+              onVideoError={() => {
+                const video = videoRef.current
+                resumeAfterRenew.current = video
+                  ? { atS: video.currentTime, playing: !video.paused }
+                  : null
+                if (!renewLinks()) resumeAfterRenew.current = null
+              }}
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t bg-card px-3 py-2 sm:gap-3 sm:px-4">
@@ -761,6 +846,15 @@ export function FootageEditor({
             <FilmIcon aria-hidden className="size-4" />
             Timeline
           </span>
+          {idleMs > 0 && (
+            <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+              <span
+                aria-hidden
+                className="size-3 rounded-sm border bg-[repeating-linear-gradient(135deg,var(--muted-foreground)_0_2px,transparent_2px_5px)]"
+              />
+              Nothing changes on screen ({(idleMs / 1000).toFixed(1)} s)
+            </span>
+          )}
           {!readOnly && (
             <Button
               type="button"
@@ -783,7 +877,7 @@ export function FootageEditor({
         <ClipTimeline
           durationMs={durationMs}
           currentMs={currentMs}
-          thumbnailsUrl={thumbnailsUrl}
+          thumbnailsUrl={links.thumbnailsUrl}
           stripWidth={stripWidth}
           moments={markers.map((marker) => {
             const shot = shotOf(marker)
@@ -796,6 +890,7 @@ export function FootageEditor({
             }
           })}
           selectedId={selectedId}
+          idle={analysis?.idle}
           onSeek={seek}
           onScrubbingChange={onScrubbingChange}
           onMoveMoment={

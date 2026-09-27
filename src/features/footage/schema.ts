@@ -2,6 +2,8 @@ import { z } from "zod"
 
 import { presentationSchema, shotSchema } from "@/shared/motion"
 
+import { recordingSchema } from "./lib/recording"
+
 /** Accepted video types → file extension for the stored original. */
 export const footageTypes = {
   "video/mp4": "mp4",
@@ -12,7 +14,7 @@ export type FootageType = keyof typeof footageTypes
 
 export const footageLimits = {
   name: 80,
-  label: 60,
+  label: 120,
   recordedMarks: 100,
 } as const
 
@@ -51,6 +53,8 @@ export const completeUploadSchema = z.object({
     .array(z.number().int().min(0))
     .max(footageLimits.recordedMarks)
     .default([]),
+  /** Surface and cursor track from the in-app recorder. */
+  recording: recordingSchema.optional(),
 })
 
 const labelSchema = z

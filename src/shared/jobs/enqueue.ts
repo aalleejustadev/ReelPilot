@@ -21,7 +21,8 @@ function sender() {
 /**
  * Queues a job for the worker. `data` is validated against the job's
  * schema here, so a bad payload fails at the caller, not in the worker.
- * `singletonKey` drops duplicates while one with the same key is queued.
+ * `singletonKey` drops duplicates only on queues with a "stately" policy
+ * (see JobQueuePolicy); returns null when a duplicate was dropped.
  */
 export async function enqueue<T>(
   job: JobDefinition<T>,

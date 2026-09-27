@@ -31,6 +31,9 @@ const envSchema = z.object({
   AI_TEXT_PROVIDER: z.enum(["anthropic"]),
   AI_TEXT_MODEL: z.string().min(1),
   ANTHROPIC_API_KEY: z.string().startsWith("sk-ant-"),
+  // "off" skips AI vision in the worker (describing key moments). Tests and
+  // CI turn it off; unit tests cover it with a mock model.
+  AI_VISION: z.enum(["on", "off"]).default("on"),
 
   // Neon Object Storage for the linked branch. Written by `neon env pull`.
   AWS_ACCESS_KEY_ID: z.string().min(1),

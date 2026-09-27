@@ -37,6 +37,8 @@ export default defineConfig({
     {
       // The job worker, so uploaded footage gets processed during tests.
       command: "npm run worker",
+      // No real AI vision calls from test runs (unit tests mock it).
+      env: { AI_VISION: "off" },
       wait: { stdout: /\[worker\] running/ },
       timeout: 120_000,
     },

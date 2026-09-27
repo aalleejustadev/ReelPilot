@@ -35,6 +35,8 @@ export async function generateStructured<T>(input: {
   schema: z.ZodType<T>
   system: string
   prompt: string
+  /** Pictures sent with the prompt (e.g. a video frame), for vision. */
+  images?: { data: Uint8Array; mediaType: "image/jpeg" | "image/png" }[]
   /** For tests: overrides the configured model. */
   model?: LanguageModel
 }): Promise<T> {
@@ -43,7 +45,24 @@ export async function generateStructured<T>(input: {
       model: input.model ?? textModel(),
       output: Output.object({ schema: input.schema }),
       system: input.system,
-      prompt: input.prompt,
+      ...(input.images?.length
+        ? {
+            messages: [
+              {
+                role: "user" as const,
+                content: [
+                  { type: "text" as const, text: input.prompt },
+                  // "file" parts (AI SDK 7 deprecated "image" parts).
+                  ...input.images.map((image) => ({
+                    type: "file" as const,
+                    data: image.data,
+                    mediaType: image.mediaType,
+                  })),
+                ],
+              },
+            ],
+          }
+        : { prompt: input.prompt }),
       maxRetries: 2,
     })
     return output

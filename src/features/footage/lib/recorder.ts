@@ -1,5 +1,7 @@
 /** Browser helpers for in-app screen recording. */
 
+import { recordingLimits, type RecordingInfo } from "./recording"
+
 /** Best recording format this browser supports (MP4 first: no conversion
  *  surprises in Safari; Chrome/Edge 126+ support it too), or "" for default. */
 export function pickRecordingType(
@@ -73,4 +75,62 @@ export function copyStylesInto(target: Document) {
   }
   target.documentElement.className = document.documentElement.className
   target.body.className = "bg-background text-foreground"
+}
+
+/** A CaptureController for getDisplayMedia, where the browser has one. */
+export function newCaptureController(): EventTarget | undefined {
+  const Controller = (
+    window as Window & { CaptureController?: new () => EventTarget }
+  ).CaptureController
+  return Controller ? new Controller() : undefined
+}
+
+type CapturedMouseEvent = Event & { surfaceX: number; surfaceY: number }
+
+/** What was shared: a tab, a window or a screen. */
+export function sharedSurface(
+  track: MediaStreamTrack | undefined
+): RecordingInfo["surface"] {
+  const surface = (
+    track?.getSettings() as { displaySurface?: string } | undefined
+  )?.displaySurface
+  return surface === "browser" || surface === "window" || surface === "monitor"
+    ? surface
+    : "unknown"
+}
+
+/**
+ * Records the cursor over the shared surface in browsers that report it
+ * (Captured Mouse Events, a Chrome proposal; feature-detected, so other
+ * browsers just record nothing). `elapsedMs` is time since recording
+ * started; samples before the start (the countdown) are skipped.
+ */
+export function trackCursor(
+  controller: EventTarget | undefined,
+  track: MediaStreamTrack | undefined,
+  elapsedMs: () => number
+) {
+  const samples: RecordingInfo["cursor"] = []
+  let last = -Infinity
+  const onMove = (event: Event) => {
+    const { surfaceX, surfaceY } = event as CapturedMouseEvent
+    // -1 means the cursor left the shared surface.
+    if (!(surfaceX >= 0 && surfaceY >= 0)) return
+    const t = Math.round(elapsedMs())
+    if (t < 0 || t - last < recordingLimits.cursorEveryMs) return
+    if (samples.length >= recordingLimits.cursorSamples) return
+    const { width, height } = track?.getSettings() ?? {}
+    if (!width || !height) return
+    // Surface coordinates are CSS pixels; the track is in device pixels.
+    const scale = window.devicePixelRatio || 1
+    const x = Math.min(1, (surfaceX * scale) / width)
+    const y = Math.min(1, (surfaceY * scale) / height)
+    samples.push([t, Math.round(x * 1000) / 1000, Math.round(y * 1000) / 1000])
+    last = t
+  }
+  controller?.addEventListener("capturedmousechange", onMove)
+  return {
+    samples: () => samples,
+    stop: () => controller?.removeEventListener("capturedmousechange", onMove),
+  }
 }

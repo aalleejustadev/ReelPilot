@@ -5,6 +5,7 @@ import {
   deleteFootage,
   requestFootageUpload,
 } from "../actions"
+import type { RecordingInfo } from "./recording"
 import { uploadToStorage } from "./upload-to-storage"
 
 /**
@@ -20,6 +21,8 @@ export async function sendFootage(input: {
   name: string
   source: "UPLOAD" | "RECORDING"
   recordedMarksMs?: number[]
+  /** What the recorder saw besides the video (recordings only). */
+  recording?: RecordingInfo
   onProgress: (fraction: number) => void
   signal?: AbortSignal
 }): Promise<string | null> {
@@ -49,6 +52,7 @@ export async function sendFootage(input: {
   const completed = await completeFootageUpload({
     footageId,
     recordedMarksMs: input.recordedMarksMs ?? [],
+    recording: input.recording,
   })
   return completed.ok ? null : completed.error.message
 }

@@ -8,6 +8,8 @@ import {
   type ShotPresetName,
 } from "@/shared/motion"
 
+import type { Palette } from "./analysis"
+
 /**
  * One-click looks: each gives every key moment a shot (cycling through a
  * sequence), and sets the intro and frame. Deterministic, no AI.
@@ -139,8 +141,58 @@ export function resetLook(moments: Moment[], presentation: Presentation) {
   }
 }
 
-/** Ready-made backgrounds; "Brand" uses the kit's colours when it has them. */
-export function backgroundPresets(brand: string[]) {
+/** Mixes a hex colour toward white (+) or black (−) by `amount` (0–1). */
+export function shade(hex: string, amount: number) {
+  const target = amount >= 0 ? 255 : 0
+  const channels = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+  return `#${channels
+    .map((c) =>
+      Math.round(c + (target - c) * Math.abs(amount))
+        .toString(16)
+        .padStart(2, "0")
+    )
+    .join("")}`
+}
+
+/**
+ * Backgrounds matched to the footage's own colours (§7.4b): its accent
+ * (buttons, charts) as a gradient, and a tone just off its main colour.
+ */
+export function footageBackgrounds(palette: Palette | null) {
+  const presets: { name: string; background: Presentation["background"] }[] = []
+  const [accent, second] = palette?.accents ?? []
+  if (accent) {
+    presets.push({
+      name: "Footage accent",
+      background: {
+        kind: "gradient",
+        from: accent,
+        to: second ?? shade(accent, -0.45),
+      },
+    })
+  }
+  const main = palette?.colors[0]?.hex
+  if (main) {
+    presets.push({
+      name: "Footage tone",
+      background: {
+        kind: "gradient",
+        from: shade(main, palette.isDark ? 0.14 : -0.06),
+        to: shade(main, palette.isDark ? -0.25 : -0.16),
+      },
+    })
+  }
+  return presets
+}
+
+/**
+ * Ready-made backgrounds: "Brand" uses the kit's colours when it has them,
+ * then the ones matched to the footage, then fixed presets.
+ */
+export function backgroundPresets(
+  brand: string[],
+  palette: Palette | null = null
+) {
   const presets: { name: string; background: Presentation["background"] }[] = [
     {
       name: "Midnight",
@@ -171,6 +223,7 @@ export function backgroundPresets(brand: string[]) {
       background: { kind: "solid", from: "#15171c", to: "#15171c" },
     },
   ]
+  presets.unshift(...footageBackgrounds(palette))
   const [first, second] = brand
   if (first) {
     presets.unshift({

@@ -220,6 +220,15 @@ enum FootageStatus {
   FAILED
 }
 
+// Smart analysis of a READY clip (§7.4b): where the action is, idle and
+// scrolling stretches, colours, and an AI description of each key moment.
+enum FootageAnalysisStatus {
+  PENDING
+  RUNNING
+  READY
+  FAILED
+}
+
 enum FootageSource {
   UPLOAD
   RECORDING
@@ -233,12 +242,12 @@ enum MarkerSource {
 }
 
 model Footage {
-  id                  String        @id @default(cuid())
+  id                  String                 @id @default(cuid())
   workspaceId         String
   brandKitId          String
   name                String
   source              FootageSource
-  status              FootageStatus @default(UPLOADING)
+  status              FootageStatus          @default(UPLOADING)
   // The file as uploaded, and what the worker makes from it.
   originalKey         String
   contentType         String
@@ -258,9 +267,15 @@ model Footage {
   // Presentation (background, frame, intro) for the 3D motion (§7.4a),
   // validated by shared/motion. Null = defaults from the brand kit.
   presentation        Json?
+  // What the recorder saw besides the video (surface, cursor track when
+  // the browser shares it), validated by lib/recording. Null for uploads.
+  recording           Json?
+  // Smart analysis (§7.4b), validated by lib/analysis. Null = not analysed.
+  analysis            Json?
+  analysisStatus      FootageAnalysisStatus?
   processedAt         DateTime?
-  createdAt           DateTime      @default(now())
-  updatedAt           DateTime      @updatedAt
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
 
   workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   brandKit  BrandKit        @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
@@ -281,6 +296,9 @@ model FootageMarker {
   // Camera shot the view moves into at this moment (§7.4a), validated by
   // shared/motion. Null = the camera keeps its previous shot.
   shot      Json?
+  // What the AI saw on screen here (§7.4b), validated by lib/insight.
+  // Null = not described yet (or the moment moved since).
+  insight   Json?
   createdAt DateTime     @default(now())
 
   footage Footage @relation(fields: [footageId], references: [id], onDelete: Cascade)

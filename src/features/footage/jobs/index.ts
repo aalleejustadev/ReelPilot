@@ -4,11 +4,17 @@ import "server-only"
 
 import { handle, type MaintenanceTask } from "@/shared/jobs/worker"
 
-import { failStaleUploads } from "../service"
-import { processFootageJob } from "./definitions"
+import { enqueue } from "@/shared/jobs"
+
+import { failStaleUploads, stuckAnalyses } from "../service"
+import { analyzeFootage } from "./analyze-footage"
+import { analyzeFootageJob, processFootageJob } from "./definitions"
 import { processFootage } from "./process-footage"
 
-export const footageJobs = [handle(processFootageJob, processFootage)]
+export const footageJobs = [
+  handle(processFootageJob, processFootage),
+  handle(analyzeFootageJob, analyzeFootage),
+]
 
 export const footageMaintenance: MaintenanceTask[] = [
   {
@@ -21,6 +27,22 @@ export const footageMaintenance: MaintenanceTask[] = [
       )
       if (count > 0)
         console.info(`[maintenance] failed ${count} stale upload(s)`)
+    },
+  },
+  {
+    // An analysis asked for but never queued (the enqueue after processing
+    // failed): queue it again. Stately queues drop it if it's queued.
+    name: "footage.requeue-stuck-analyses",
+    everyMs: 10 * 60 * 1000,
+    run: async () => {
+      const ids = await stuckAnalyses(new Date(Date.now() - 10 * 60 * 1000))
+      for (const footageId of ids) {
+        await enqueue(
+          analyzeFootageJob,
+          { footageId },
+          { singletonKey: footageId }
+        )
+      }
     },
   },
 ]

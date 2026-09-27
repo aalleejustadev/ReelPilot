@@ -29,7 +29,14 @@ export async function getFootage(workspaceId: string, footageId: string) {
     include: {
       markers: {
         orderBy: { atMs: "asc" },
-        select: { id: true, atMs: true, label: true, source: true, shot: true },
+        select: {
+          id: true,
+          atMs: true,
+          label: true,
+          source: true,
+          shot: true,
+          insight: true,
+        },
       },
     },
   })

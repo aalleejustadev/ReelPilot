@@ -38,6 +38,7 @@ export function MotionStage({
   onPickFocus,
   onTimeChange,
   onPlayingChange,
+  onVideoError,
 }: {
   videoRef: React.RefObject<HTMLVideoElement | null>
   videoUrl: string
@@ -53,6 +54,8 @@ export function MotionStage({
   onPickFocus: (point: { x: number; y: number }) => void
   onTimeChange: (ms: number) => void
   onPlayingChange: (playing: boolean) => void
+  /** The video stopped loading (e.g. its signed link expired). */
+  onVideoError?: () => void
 }) {
   const frameRef = useRef<HTMLDivElement>(null)
 
@@ -172,6 +175,7 @@ export function MotionStage({
               playsInline
               preload="metadata"
               className="block w-full"
+              onError={onVideoError}
             >
               Your browser can’t play this video.
             </video>

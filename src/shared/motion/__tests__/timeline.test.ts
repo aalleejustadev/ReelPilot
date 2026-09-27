@@ -187,3 +187,20 @@ describe("presets", () => {
     expect([...grouped].sort()).toEqual([...shotPresetNames].sort())
   })
 })
+
+describe("shotLabel", () => {
+  it("names presets, aimed zooms and hand-tuned shots", async () => {
+    const { shotLabel } = await import("../index")
+    const flat = shotPresets.flat.camera
+    expect(shotLabel(shotPresets["tilt-left"].camera)).toBe("Tilt left")
+    // Aimed closer (e.g. "Aim at the action"): named for what it is.
+    expect(shotLabel({ ...flat, zoom: 1.8, focusX: 0.8 })).toBe("Zoom 1.8×")
+    expect(shotLabel({ ...flat, focusX: 0.8 })).toBe("Flat")
+    expect(
+      shotLabel({ ...shotPresets["tilt-left"].camera, zoom: 2.2, focusY: 0.1 })
+    ).toBe("Tilt left · 2.2×")
+    expect(shotLabel({ ...shotPresets["tilt-left"].camera, turn: 5 })).toBe(
+      "Custom"
+    )
+  })
+})

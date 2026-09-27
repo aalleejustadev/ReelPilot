@@ -170,8 +170,28 @@ export function presetOf(camera: CameraSettings): ShotPresetName | undefined {
   })
 }
 
-/** "Tilt left", or "Custom" for hand-tuned cameras. */
+const angles = ["tilt", "turn", "roll"] as const
+
+/**
+ * A shot's name: "Tilt left"; a preset aimed closer, "Tilt left · 1.8×";
+ * a flat zoom, "Zoom 1.8×"; anything else hand-tuned, "Custom". Focus
+ * points don't change the name.
+ */
 export function shotLabel(camera: CameraSettings) {
   const preset = presetOf(camera)
-  return preset ? shotPresets[preset].label : "Custom"
+  if (preset) return shotPresets[preset].label
+  const zoom = `${camera.zoom.toFixed(1)}×`
+  if (angles.every((key) => Math.abs(camera[key]) < 0.001)) {
+    return camera.zoom > 1.001 ? `Zoom ${zoom}` : shotPresets.flat.label
+  }
+  const similar = shotPresetNames.find((name) =>
+    angles.every(
+      (key) => Math.abs(shotPresets[name].camera[key] - camera[key]) < 0.001
+    )
+  )
+  if (!similar) return "Custom"
+  const { label, camera: base } = shotPresets[similar]
+  return Math.abs(base.zoom - camera.zoom) < 0.001
+    ? label
+    : `${label} · ${zoom}`
 }

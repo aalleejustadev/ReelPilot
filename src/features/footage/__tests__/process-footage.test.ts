@@ -2,7 +2,19 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest"
+
+// The analysis job it queues is tested in analyze-footage.test.ts.
+const enqueue = vi.hoisted(() => vi.fn().mockResolvedValue("job-1"))
+vi.mock("@/shared/jobs", () => ({ enqueue }))
 
 // Real database, real ffmpeg and real storage: runs where a bucket exists
 // (NEON_BRANCH locally; STORAGE_TESTS in CI with MinIO).
@@ -127,6 +139,14 @@ describe.runIf(hasStorage)("processFootage job", () => {
     })
     expect(await storage.fileSize(clip.posterKey ?? "")).toBeGreaterThan(0)
     expect(await storage.fileSize(clip.thumbnailsKey ?? "")).toBeGreaterThan(0)
+
+    // The smart analysis is next.
+    expect(clip.analysisStatus).toBe("PENDING")
+    expect(enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "footage.analyze" }),
+      { footageId },
+      { singletonKey: footageId }
+    )
   })
 
   it("handles a browser recording that has no duration in its header", async () => {

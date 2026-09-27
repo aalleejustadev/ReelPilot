@@ -119,4 +119,6 @@ export const aiLimits = {
   brandKitDraftsPerDay: 20,
   /** "Direct with AI" requests for footage motion per workspace per day. */
   motionDirectionsPerDay: 40,
+  /** Key moments the AI describes from a frame, per workspace per day. */
+  momentDescriptionsPerDay: 300,
 } as const

@@ -25,9 +25,13 @@ import {
   canRecordScreen,
   copyStylesInto,
   documentPictureInPicture,
+  newCaptureController,
+  sharedSurface,
+  trackCursor,
   pickRecordingType,
   recordingName,
 } from "../lib/recorder"
+import type { RecordingInfo } from "../lib/recording"
 import { sendFootage } from "../lib/send-footage"
 import { footageLimits } from "../schema"
 
@@ -73,6 +77,9 @@ export function ScreenRecorder({
   const startedAt = useRef(0)
   const bytes = useRef(0)
   const pipRef = useRef<Window | null>(null)
+  // Surface and cursor track, sent with the upload (see lib/recording).
+  const cursor = useRef<ReturnType<typeof trackCursor> | null>(null)
+  const recording = useRef<RecordingInfo | null>(null)
 
   // Tick the timer; stop at the plan's length.
   useEffect(() => {
@@ -100,6 +107,7 @@ export function ScreenRecorder({
   )
 
   function cleanUp() {
+    cursor.current?.stop()
     stream.current?.getTracks().forEach((track) => track.stop())
     stream.current = null
     pipRef.current?.close()
@@ -109,18 +117,33 @@ export function ScreenRecorder({
 
   async function chooseScreen() {
     let media: MediaStream
+    const controller = newCaptureController()
     try {
       media = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: 30 },
         audio: false,
-      })
+        ...(controller && { controller }),
+      } as DisplayMediaStreamOptions)
     } catch {
       // The user closed the picker, or the browser refused.
       return
     }
     stream.current = media
+    const track = media.getVideoTracks()[0]
     // "Stop sharing" in the browser's own bar ends the recording too.
-    media.getVideoTracks()[0]?.addEventListener("ended", stopRecording)
+    track?.addEventListener("ended", stopRecording)
+    // Timed from the start of the recording, not of the countdown.
+    startedAt.current = Number.POSITIVE_INFINITY
+    cursor.current = trackCursor(
+      controller,
+      track,
+      () => Date.now() - startedAt.current
+    )
+    recording.current = {
+      version: 1,
+      surface: sharedSurface(track),
+      cursor: [],
+    }
     await openMiniWindow()
     for (const seconds of [3, 2, 1]) {
       setStage({ name: "countdown", seconds })
@@ -159,6 +182,9 @@ export function ScreenRecorder({
       if (bytes.current > maxBytes * 0.95) stopRecording()
     }
     rec.onstop = () => {
+      if (recording.current && cursor.current) {
+        recording.current.cursor = [...cursor.current.samples()]
+      }
       cleanUp()
       const blob = new Blob(chunks, {
         type: rec.mimeType || type || "video/webm",
@@ -211,6 +237,7 @@ export function ScreenRecorder({
       name: name || recordingName(),
       source: "RECORDING",
       recordedMarksMs: marks,
+      recording: recording.current ?? undefined,
       onProgress: (progress) => setStage({ name: "uploading", progress }),
     })
     URL.revokeObjectURL(url)

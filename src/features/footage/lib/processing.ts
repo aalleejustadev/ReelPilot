@@ -152,3 +152,44 @@ export function sceneDetectArgs(input: string) {
     "-",
   ]
 }
+
+// ── Analysis (§7.4b) ───────────────────────────────────────────────────────
+
+/** Raw frames for analysis: `fps` a second, `size`, gray or RGB bytes. */
+export function analysisFramesArgs(
+  input: string,
+  output: string,
+  options: {
+    fps: string
+    size: { w: number; h: number }
+    pixels: "gray" | "rgb24"
+  }
+) {
+  return [
+    "-i",
+    input,
+    "-an",
+    "-vf",
+    `fps=${options.fps},scale=${options.size.w}:${options.size.h}:flags=area,format=${options.pixels}`,
+    "-f",
+    "rawvideo",
+    output,
+  ]
+}
+
+/** One frame at `atMs` as a JPEG for the vision model (≤1280px wide). */
+export function momentFrameArgs(input: string, output: string, atMs: number) {
+  return [
+    "-ss",
+    (atMs / 1000).toFixed(3),
+    "-i",
+    input,
+    "-frames:v",
+    "1",
+    "-vf",
+    "scale='min(1280,iw)':-2",
+    "-q:v",
+    "3",
+    output,
+  ]
+}

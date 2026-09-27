@@ -14,7 +14,7 @@ import type { Presentation, Shot } from "@/shared/motion"
 import { consumeRateLimit } from "@/shared/rate-limit"
 import { deleteFolder, fileSize, signedFileUpload } from "@/shared/storage"
 
-import { processFootageJob } from "./jobs/definitions"
+import { analyzeFootageJob, processFootageJob } from "./jobs/definitions"
 import { directMotion } from "./lib/direct-motion"
 import { presentationFor } from "./lib/motion"
 import { getFootage } from "./queries"
@@ -99,7 +99,7 @@ export async function completeFootageUpload(
   try {
     const parsed = completeUploadSchema.safeParse(input)
     if (!parsed.success) throw invalid(parsed.error, "Check the upload.")
-    const { footageId, recordedMarksMs } = parsed.data
+    const { footageId, recordedMarksMs, recording } = parsed.data
 
     const { workspace } = await requireWorkspaceAccess("content:create")
     const clip = await service.getUploadingFootage(workspace.id, footageId)
@@ -115,7 +115,8 @@ export async function completeFootageUpload(
     const started = await service.startProcessing(
       workspace.id,
       footageId,
-      recordedMarksMs
+      recordedMarksMs,
+      recording
     )
     if (started) {
       await enqueue(
@@ -162,6 +163,7 @@ export async function addFootageMarker(
 
     const { workspace } = await requireWorkspaceAccess("content:edit")
     const { id } = await service.addMarker(workspace.id, parsed.data)
+    await queueAnalysis(workspace.id, parsed.data.footageId)
 
     refreshFootage()
     return ok({ markerId: id })
@@ -310,11 +312,57 @@ export async function moveFootageMarker(input: unknown): Promise<Result<null>> {
     if (!parsed.success) throw invalid(parsed.error, "Check the new time.")
 
     const { workspace } = await requireWorkspaceAccess("content:edit")
-    await service.moveMarker(
+    const moved = await service.moveMarker(
       workspace.id,
       parsed.data.markerId,
       parsed.data.atMs
     )
+    if (moved.needsInsight) await queueAnalysis(workspace.id, moved.footageId)
+
+    refreshFootage()
+    return ok(null)
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+/**
+ * Queues the smart analysis (§7.4b), which also describes moments that
+ * have no description yet. A failed enqueue is logged, not shown: the
+ * stuck-analysis sweep queues it again.
+ */
+async function queueAnalysis(
+  workspaceId: string,
+  footageId: string,
+  options = { redescribe: false }
+) {
+  if (!(await service.requestAnalysis(workspaceId, footageId, options))) {
+    return false
+  }
+  await enqueue(
+    analyzeFootageJob,
+    { footageId },
+    { singletonKey: footageId }
+  ).catch((error: unknown) =>
+    console.warn(`[footage] couldn't queue analysis for ${footageId}`, error)
+  )
+  return true
+}
+
+/** "Analyse again": fresh activity map, colours and moment descriptions. */
+export async function analyzeFootageAgain(
+  footageId: unknown
+): Promise<Result<null>> {
+  try {
+    const parsed = footageIdSchema.safeParse(footageId)
+    if (!parsed.success) throw new AppError("NOT_FOUND", "That clip is gone.")
+
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    const queued = await queueAnalysis(workspace.id, parsed.data, {
+      redescribe: true,
+    })
+    if (!queued) throw new AppError("NOT_FOUND", "That clip isn’t ready yet.")
 
     refreshFootage()
     return ok(null)

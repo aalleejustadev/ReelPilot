@@ -38,6 +38,7 @@ export async function ensureQueue(boss: PgBoss, job: JobDefinition<unknown>) {
         retryDelay: job.policy.retryDelaySeconds,
         retryBackoff: true,
         expireInSeconds: job.policy.timeoutSeconds,
+        policy: job.policy.queuePolicy ?? "standard",
       })
       .catch(async (error: unknown) => {
         // Another process created it first.

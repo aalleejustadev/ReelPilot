@@ -4,6 +4,7 @@ import {
   CopyIcon,
   CrosshairIcon,
   RotateCcwIcon,
+  ScanSearchIcon,
   SparklesIcon,
   TrashIcon,
 } from "lucide-react"
@@ -48,6 +49,8 @@ import { Switch } from "@/shared/ui/switch"
 import { Textarea } from "@/shared/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 
+import type { Aim } from "../lib/aim"
+import type { Palette } from "../lib/analysis"
 import { formatTimecode } from "../lib/format"
 import { backgroundPresets, looks } from "../lib/looks"
 import { motionPrompts } from "../lib/motion-prompts"
@@ -133,12 +136,14 @@ function ShotThumb({ camera }: { camera: CameraSettings }) {
 export function EffectsPanel({
   hasMoments,
   brandColors,
+  palette,
   onApplyLook,
   onReset,
   onBackground,
 }: {
   hasMoments: boolean
   brandColors: string[]
+  palette: Palette | null
   onApplyLook: (lookId: string) => void
   onReset: () => void
   onBackground: (background: Presentation["background"]) => void
@@ -193,7 +198,11 @@ export function EffectsPanel({
         <h3 id="backgrounds-heading" className="text-sm font-medium">
           Backgrounds
         </h3>
-        <BackgroundPresets brandColors={brandColors} onPick={onBackground} />
+        <BackgroundPresets
+          brandColors={brandColors}
+          palette={palette}
+          onPick={onBackground}
+        />
       </section>
     </div>
   )
@@ -201,16 +210,18 @@ export function EffectsPanel({
 
 function BackgroundPresets({
   brandColors,
+  palette,
   current,
   onPick,
 }: {
   brandColors: string[]
+  palette: Palette | null
   current?: Presentation["background"]
   onPick: (background: Presentation["background"]) => void
 }) {
   return (
     <div className="grid grid-cols-4 gap-2">
-      {backgroundPresets(brandColors).map(({ name, background }) => {
+      {backgroundPresets(brandColors, palette).map(({ name, background }) => {
         const isCurrent =
           current?.kind === background.kind &&
           current.from === background.from &&
@@ -247,9 +258,16 @@ const easingLabels: Record<EasingName, string> = {
   linear: "Linear",
 }
 
+const aimSources: Record<Aim["source"], string> = {
+  activity: "what changes on screen here",
+  ai: "the part the AI picked out",
+  cursor: "where your cursor was",
+}
+
 export function ShotPanel({
   moment,
   shot,
+  aim,
   pickingFocus,
   onShotChange,
   onTogglePick,
@@ -257,6 +275,8 @@ export function ShotPanel({
 }: {
   moment: { atMs: number; label: string | null } | null
   shot: Shot | null
+  /** Where the action is at this moment, from the analysis. */
+  aim: Aim | null
   pickingFocus: boolean
   onShotChange: (shot: Shot | null, control: string) => void
   onTogglePick: () => void
@@ -277,6 +297,12 @@ export function ShotPanel({
       control
     )
   const preset = shot ? presetOf(shot.camera) : undefined
+  const isAimed =
+    aim !== null &&
+    shot !== null &&
+    Math.abs(shot.camera.focusX - aim.focusX) < 0.01 &&
+    Math.abs(shot.camera.focusY - aim.focusY) < 0.01 &&
+    Math.abs(shot.camera.zoom - aim.zoom) < 0.01
 
   return (
     <div className="flex flex-col gap-6">
@@ -288,6 +314,41 @@ export function ShotPanel({
             : "No shot yet: the camera keeps the previous one. Pick one below."
         }
       />
+
+      {aim && (
+        <button
+          type="button"
+          aria-pressed={isAimed}
+          onClick={() =>
+            onShotChange(
+              {
+                ...current,
+                camera: {
+                  ...current.camera,
+                  focusX: aim.focusX,
+                  focusY: aim.focusY,
+                  zoom: aim.zoom,
+                },
+              },
+              "aim"
+            )
+          }
+          className={cn(
+            "flex items-start gap-3 rounded-lg border bg-background p-3 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50",
+            isAimed && "border-ring ring-2 ring-ring/40"
+          )}
+        >
+          <ScanSearchIcon aria-hidden className="mt-0.5 size-4 shrink-0" />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium">
+              {isAimed ? "Aimed at the action" : "Aim at the action"}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Zooms {aim.zoom.toFixed(1)}× toward {aimSources[aim.source]}.
+            </span>
+          </span>
+        </button>
+      )}
 
       {shotPresetGroups.map((group) => (
         <section
@@ -484,10 +545,12 @@ function ColorPicker({
 export function StylePanel({
   presentation,
   brandColors,
+  palette,
   onChange,
 }: {
   presentation: Presentation
   brandColors: string[]
+  palette: Palette | null
   onChange: (presentation: Presentation, control: string) => void
 }) {
   const { background, frame, intro } = presentation
@@ -505,6 +568,7 @@ export function StylePanel({
       />
       <BackgroundPresets
         brandColors={brandColors}
+        palette={palette}
         current={background}
         onPick={(next) => set("background", next, "background-preset")}
       />
