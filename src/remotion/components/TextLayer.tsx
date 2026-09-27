@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef, useState } from "react"
 import {
   AbsoluteFill,
   Sequence,
@@ -450,54 +451,14 @@ export function AnimatedText({
         return (
           <AnimatedText {...{ item, frame, colors }} animation="word-rise" />
         )
-      // Each word holds for an equal share of the time on screen.
-      const hold = 36
-      const index = Math.floor(Math.max(0, frame - 12) / hold)
-      const current = Math.min(swap.words.length - 1, index)
-      const swapT = easeOutCubic(((frame - 12) % hold) / 12)
-      const first = easeOutCubic(frame / 12)
       return (
-        <span style={{ opacity: first }}>
-          {swap.before}
-          <span
-            style={{
-              display: "inline-grid",
-              verticalAlign: "bottom",
-              overflow: "hidden",
-              color: emphasisColor,
-            }}
-          >
-            {swap.words.map((word, i) => {
-              const isCurrent = i === current
-              const isPrevious = i === current - 1 && swapT < 1 && index > 0
-              const y = isCurrent
-                ? index === 0
-                  ? (1 - first) * 0.8
-                  : (1 - swapT) * 0.8
-                : isPrevious
-                  ? -swapT * 0.8
-                  : 1
-              return (
-                <span
-                  key={word}
-                  style={{
-                    gridArea: "1 / 1",
-                    transform: `translateY(${y.toFixed(3)}em)`,
-                    opacity:
-                      isCurrent || isPrevious
-                        ? isPrevious
-                          ? 1 - swapT
-                          : 1
-                        : 0,
-                  }}
-                >
-                  {word}
-                </span>
-              )
-            })}
-          </span>
-          {swap.after}
-        </span>
+        <KeywordSwap
+          before={swap.before}
+          words={swap.words}
+          after={swap.after}
+          frame={frame}
+          color={emphasisColor}
+        />
       )
     }
     case "typewriter": {
@@ -555,4 +516,127 @@ export function AnimatedText({
       )
     }
   }
+}
+
+/**
+ * "Ship {faster|safer}": the words roll through one slot. The slot is as
+ * wide as the word showing, easing between widths as they swap, so the
+ * words around it sit close at every moment (a slot sized to the longest
+ * word left gaps). Widths are measured once, in em, so they hold at any
+ * text size and stage scale.
+ */
+function KeywordSwap({
+  before,
+  words,
+  after,
+  frame,
+  color,
+}: {
+  before: string
+  words: string[]
+  after: string
+  frame: number
+  color: string | undefined
+}) {
+  const measureRef = useRef<HTMLSpanElement>(null)
+  const [widths, setWidths] = useState<number[] | null>(null)
+  const key = words.join("|")
+  useLayoutEffect(() => {
+    const box = measureRef.current
+    if (!box) return
+    const measure = () => {
+      const size = parseFloat(getComputedStyle(box).fontSize) || 1
+      setWidths(
+        [...box.children].map(
+          (child) => (child as HTMLElement).offsetWidth / size
+        )
+      )
+    }
+    measure()
+    // Web fonts arriving later change the widths.
+    let live = true
+    document.fonts?.ready.then(() => live && measure())
+    return () => {
+      live = false
+    }
+  }, [key])
+
+  // Each word holds for an equal share of the time on screen.
+  const hold = 36
+  const index = Math.floor(Math.max(0, frame - 12) / hold)
+  const current = Math.min(words.length - 1, index)
+  const swapT = easeOutCubic(((frame - 12) % hold) / 12)
+  const first = easeOutCubic(frame / 12)
+  const swapping = index > 0 && index < words.length && swapT < 1
+  const width = widths
+    ? swapping
+      ? widths[current - 1]! + (widths[current]! - widths[current - 1]!) * swapT
+      : widths[current]!
+    : null
+
+  return (
+    <span style={{ opacity: first }}>
+      {before}
+      <span
+        style={{
+          display: "inline-block",
+          position: "relative",
+          verticalAlign: "bottom",
+          overflow: "hidden",
+          whiteSpace: "nowrap",
+          width: width === null ? undefined : `${width.toFixed(4)}em`,
+          color,
+        }}
+      >
+        {/* Holds the line's height (and, before measuring, a width). */}
+        <span style={{ visibility: "hidden" }}>
+          {width === null
+            ? words.reduce((a, b) => (b.length > a.length ? b : a))
+            : "\u00a0"}
+        </span>
+        {words.map((word, i) => {
+          const isCurrent = i === current
+          const isPrevious = i === current - 1 && swapping
+          const y = isCurrent
+            ? index === 0
+              ? (1 - first) * 0.8
+              : (1 - swapT) * 0.8
+            : isPrevious
+              ? -swapT * 0.8
+              : 1
+          return (
+            <span
+              key={word}
+              style={{
+                position: "absolute",
+                left: 0,
+                top: 0,
+                transform: `translateY(${y.toFixed(3)}em)`,
+                opacity: isCurrent ? 1 : isPrevious ? 1 - swapT : 0,
+              }}
+            >
+              {word}
+            </span>
+          )
+        })}
+      </span>
+      {after}
+      {/* Off-stage copies of the words, for their widths. */}
+      <span
+        ref={measureRef}
+        aria-hidden
+        style={{
+          position: "absolute",
+          visibility: "hidden",
+          whiteSpace: "nowrap",
+          left: 0,
+          top: 0,
+        }}
+      >
+        {words.map((word) => (
+          <span key={word}>{word}</span>
+        ))}
+      </span>
+    </span>
+  )
 }

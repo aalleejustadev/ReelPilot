@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react"
+import { useCallback, useEffect, useId, useRef, useState } from "react"
 
 import type { Transition } from "@/shared/motion"
 
@@ -78,6 +78,20 @@ function useSyncedVideo(
   })
 }
 
+/** A slot's video, as its events last reported it. */
+type VideoState = {
+  /** Not seeking, with a frame to show. */
+  settled: boolean
+  /** Its time, in footage seconds. */
+  at: number
+}
+
+/** How early (ad ms) a part coming in with a transition is staged. */
+const stageMs = 150
+
+/** How far (s) a video may be from its moment and still count as there. */
+const onTime = 0.5
+
 export function PlayerFootage({
   videoUrl,
   posterUrl,
@@ -97,56 +111,203 @@ export function PlayerFootage({
   styleFor: (part: PlayerPart, localMs: number) => Look
   onVideoError?: () => void
 }) {
+  const [states, setStates] = useState<[VideoState, VideoState]>([
+    { settled: false, at: -1 },
+    { settled: false, at: -1 },
+  ])
+  const report = useCallback((slot: number, state: VideoState) => {
+    setStates((current) => {
+      const before = current[slot]!
+      if (before.settled === state.settled && before.at === state.at)
+        return current
+      const next = [...current] as [VideoState, VideoState]
+      next[slot] = state
+      return next
+    })
+  }, [])
+
+  // Parts each video has been seen at its moment in (by start), so it
+  // stays in front for the rest of the part: its time is reported only a
+  // few times a second, and at 4× it runs well ahead of the last report.
+  const [shown, setShown] = useState<[number | null, number | null]>([
+    null,
+    null,
+  ])
+
+  const slots = [0, 1].map((slot) => {
+    const own = parts.filter((_, i) => i % 2 === slot)
+    const active = own.find((p) => adMs >= p.outStartMs && adMs < p.outEndMs)
+    const at = active
+      ? Math.min(
+          active.startMs + (adMs - active.outStartMs) * active.speed,
+          active.endMs
+        ) / 1000
+      : null
+    const state = states[slot]!
+    // Showing (about) the right moment: safe to put in front.
+    const seenOnTime =
+      at !== null && state.settled && Math.abs(state.at - at) < onTime
+    return {
+      own,
+      active,
+      at,
+      seenOnTime,
+      onTime:
+        seenOnTime ||
+        (active !== undefined && shown[slot] === active.outStartMs),
+      settled: state.settled,
+    }
+  })
+  const latch0 = slots[0]!.seenOnTime ? slots[0]!.active!.outStartMs : null
+  const latch1 = slots[1]!.seenOnTime ? slots[1]!.active!.outStartMs : null
+  // Remember it (React's "adjust state while rendering" pattern).
+  if (
+    (latch0 !== null && latch0 !== shown[0]) ||
+    (latch1 !== null && latch1 !== shown[1])
+  ) {
+    setShown([latch0 ?? shown[0], latch1 ?? shown[1]])
+  }
+
+  /*
+   * Both videos stay visible, stacked, instead of hiding the idle one:
+   * Chrome paints a video's new frames apart from the page's styles, so a
+   * video hidden (or shown) and seeked in the same instant could flash a
+   * frame from elsewhere in the ad. The video showing its part's moment is
+   * in front; the other waits behind it, so whatever it paints while it
+   * seeks to its next part is never seen. If the part that just started
+   * isn't at its moment yet, the one before holds its last frame in front
+   * until it is (a held frame reads as nothing; a wrong one as a flash).
+   * During a transition both are in their part, in document order as
+   * before.
+   */
+  const front = (() => {
+    const [a, b] = slots
+    // In a transition the incoming part (the later one) is on top.
+    if (a!.active && b!.active)
+      return a!.active.outStartMs > b!.active.outStartMs ? 0 : 1
+    const k = a!.active ? 0 : b!.active ? 1 : null
+    if (k === null) return null
+    const other = slots[1 - k]!
+    // A part about to come in with a transition is staged on top while
+    // still invisible, so the transition only changes its opacity:
+    // re-stacking a video in the same frame its opacity changes could
+    // draw it at full strength for a frame.
+    const upNext = other.own.find((p) => p.outStartMs > adMs)
+    if (
+      upNext?.enter &&
+      upNext.enter.kind !== "cut" &&
+      upNext.outStartMs - adMs <= stageMs &&
+      slots[k]!.onTime
+    )
+      return 1 - k
+    return slots[k]!.onTime || !other.settled ? k : 1 - k
+  })()
+  // Staged: on top, not yet showing.
+  const staged = (i: number) => front === i && !slots[i]!.active
+
   return (
-    <>
-      {[0, 1].map((slot) => (
-        <Slot
-          key={slot}
-          videoUrl={videoUrl}
-          // Only the first slot shows before loading (a poster on the
-          // hidden one is a wasted, warned-about preload).
-          posterUrl={slot === 0 ? posterUrl : null}
-          parts={parts.filter((_, i) => i % 2 === slot)}
-          adMs={adMs}
-          playing={playing}
-          styleFor={styleFor}
-          onVideoError={onVideoError}
-        />
-      ))}
-    </>
+    // Their own stacking context: the slots' order is between themselves,
+    // under the frame's blurs and graphics (which sample them). A z-index
+    // makes no backdrop root, so those blurs still see the video.
+    <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+      {slots.map((slot, i) => {
+        const inFront = front === null || front === i
+        const next = slot.own.find((p) => p.outStartMs > adMs)
+        return (
+          <Slot
+            key={i}
+            slot={i}
+            videoUrl={videoUrl}
+            // Only the first slot shows before loading (a poster on the
+            // other is a wasted, warned-about preload).
+            posterUrl={i === 0 ? posterUrl : null}
+            active={slot.active ?? null}
+            at={slot.at}
+            // Waiting behind: seek ahead only while the other is in front.
+            ready={
+              !slot.active && next && front !== null && front !== i
+                ? next.startMs / 1000
+                : null
+            }
+            z={front === null ? undefined : inFront ? 2 : 1}
+            staged={staged(i)}
+            adMs={adMs}
+            playing={playing}
+            styleFor={styleFor}
+            onState={report}
+            onVideoError={onVideoError}
+          />
+        )
+      })}
+    </div>
   )
 }
 
 function Slot({
+  slot,
   videoUrl,
   posterUrl,
-  parts,
+  active,
+  at,
+  ready,
+  z,
+  staged,
   adMs,
   playing,
   styleFor,
+  onState,
   onVideoError,
 }: {
+  slot: number
   videoUrl: string
   posterUrl?: string | null
-  parts: PlayerPart[]
+  /** Its part showing now, if any. */
+  active: PlayerPart | null
+  /** Where its video should be now (footage s), when active. */
+  at: number | null
+  /** When idle: where to wait for its next part (null = stay put). */
+  ready: number | null
+  z: number | undefined
+  /** On top ahead of its transition, invisible until it starts. */
+  staged: boolean
   adMs: number
   playing: boolean
   styleFor: (part: PlayerPart, localMs: number) => Look
+  onState: (slot: number, state: VideoState) => void
   onVideoError?: () => void
 }) {
   const ref = useRef<HTMLVideoElement>(null)
   const filterId = useId().replace(/:/g, "")
-  const active = parts.find((p) => adMs >= p.outStartMs && adMs < p.outEndMs)
-  const next = parts.find((p) => p.outStartMs > adMs)
-  const at = active
-    ? (active.startMs + (adMs - active.outStartMs) * active.speed) / 1000
-    : null
   useSyncedVideo(ref, {
-    at: at === null ? null : Math.min(at, active!.endMs / 1000),
-    ready: next ? next.startMs / 1000 : null,
+    at,
+    ready,
     speed: active?.speed ?? 1,
     playing,
   })
+  // Report where the video really is, from its own events.
+  useEffect(() => {
+    const video = ref.current
+    if (!video) return
+    const update = () =>
+      onState(slot, {
+        settled: !video.seeking && video.readyState >= 2,
+        at: video.currentTime,
+      })
+    const events = [
+      "seeking",
+      "seeked",
+      "loadeddata",
+      "canplay",
+      "playing",
+      "waiting",
+      "timeupdate",
+    ]
+    for (const name of events) video.addEventListener(name, update)
+    update()
+    return () => {
+      for (const name of events) video.removeEventListener(name, update)
+    }
+  }, [slot, onState])
   const look = active ? styleFor(active, adMs - active.outStartMs) : {}
   const whip = look.whipBlur ?? 0
   return (
@@ -154,10 +315,9 @@ function Slot({
       style={{
         position: "absolute",
         inset: 0,
-        // Waiting slots stay loaded but out of sight.
-        visibility: active ? "visible" : "hidden",
+        zIndex: z,
         transform: look.transform,
-        opacity: look.opacity,
+        opacity: staged ? 0 : look.opacity,
         clipPath: look.clipPath,
         filter:
           whip > 0.1

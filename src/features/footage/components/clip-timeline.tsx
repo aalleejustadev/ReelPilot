@@ -212,7 +212,8 @@ export function ClipTimeline({
           style={{ left: `${playhead}%` }}
         />
       </div>
-      <div className={row}>
+      {/* Stays in view when the rows scroll (a short timeline). */}
+      <div className={cn(row, "sticky top-0 z-50 bg-card")}>
         <span />
         {/* Ruler: second marks and the playhead's handle (press or drag it,
           or anywhere on the ruler, to move the playhead). */}

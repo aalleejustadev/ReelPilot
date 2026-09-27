@@ -94,7 +94,7 @@ describe("depth of field layers", () => {
 
   it("stacks to the exact blur at each band (Gaussians add in quadrature)", () => {
     const layers = depthOfFieldLayers(input)
-    expect(layers).toHaveLength(6)
+    expect(layers).toHaveLength(3)
     const edge = depthBlurAt({ ...input, dx: 900, dy: 0 })
     const total = Math.sqrt(layers.reduce((sum, l) => sum + l.blurPx ** 2, 0))
     expect(total).toBeCloseTo(edge, 2) // the far edge, under the cap
@@ -134,9 +134,9 @@ describe("progressive blur", () => {
     })
     const total = Math.sqrt(layers.reduce((sum, l) => sum + l.blurPx ** 2, 0))
     expect(total).toBeCloseTo(19.2, 2)
-    // The first layer starts 30% in from the bottom edge.
+    // The first of three layers starts 30% in from the bottom edge.
     expect(layers[0]!.mask).toBe(
-      "linear-gradient(180deg, transparent 70.00%, #000 75.00%)"
+      "linear-gradient(180deg, transparent 70.00%, #000 80.00%)"
     )
     expect(layers.at(-1)!.mask).toContain("#000 100.00%")
   })

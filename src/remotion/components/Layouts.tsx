@@ -55,11 +55,15 @@ type LayoutProps = {
 export function TextSlide({
   item,
   frames,
+  holdOut = false,
   colors,
   fonts,
   background,
   animation,
-}: LayoutProps) {
+}: LayoutProps & {
+  /** Hands over to another full-stage card: stay solid to the end. */
+  holdOut?: boolean
+}) {
   const frame = useCurrentFrame()
   const { width, height } = useVideoConfig()
   const su = Math.min(width, height) / 100
@@ -67,10 +71,9 @@ export function TextSlide({
   const ink = item.backgroundColor
     ? readableOn(item.backgroundColor)
     : colors.base
-  const fade = Math.min(
-    easeOutCubic(frame / 9),
-    easeOutCubic((frames - frame) / 9)
-  )
+  const fade = holdOut
+    ? easeOutCubic(frame / 9)
+    : Math.min(easeOutCubic(frame / 9), easeOutCubic((frames - frame) / 9))
   const words = Math.min(1, easeOutCubic((frames - frame) / 7))
   const rule = easeOutCubic((frame - 4) / 14)
   const line = easeOutCubic((frame - 14) / 14)
@@ -125,7 +128,8 @@ export function TextSlide({
             fontSize: (tall ? 4.2 : 3.6) * su * item.secondarySize,
             lineHeight: 1.35,
             color: item.secondaryColor ?? ink,
-            opacity: 0.78 * line * words,
+            // Auto lines sit a step back; a chosen colour shows as picked.
+            opacity: (item.secondaryColor ? 1 : 0.78) * line * words,
             transform: `translateY(${((1 - line) * 1.2 * su).toFixed(2)}px)`,
             maxWidth: "70ch",
             textWrap: "balance",
@@ -225,7 +229,7 @@ export function SplitText({
             fontSize: (stacked ? 3.4 : 2.7) * su * item.secondarySize,
             lineHeight: 1.4,
             color: item.secondaryColor ?? ink,
-            opacity: 0.78 * line,
+            opacity: (item.secondaryColor ? 1 : 0.78) * line,
             transform: `translateY(${((1 - line) * 1.2 * su).toFixed(2)}px)`,
             textWrap: "pretty",
           }}

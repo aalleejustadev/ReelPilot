@@ -566,6 +566,41 @@ export function MagnifierLens({
 
 // ── On the stage ───────────────────────────────────────────────────────────
 
+/** Graphics that cover the whole stage. */
+const fullStage = (item: GraphicItem) =>
+  item.kind === "slide" || item.kind === "end-card"
+
+/** Frames a full-stage card takes to fade in. */
+const cardInFrames = 12
+
+/**
+ * Full-stage cards handing straight over to another (a slide, then the
+ * end card): the first holds solid, and stays until the next has faded
+ * in over it. Fading one out while the next fades in let the video flash
+ * through between them. Returns each such card's extended length.
+ */
+function handOffs(items: Timed[]) {
+  const cards = items.filter(({ item }) => fullStage(item))
+  const extended = new Map<string, number>()
+  for (const card of cards) {
+    const end = card.from + card.frames
+    const next = cards.find(
+      (other) =>
+        other.item.id !== card.item.id &&
+        other.from > card.from &&
+        other.from >= end - cardInFrames &&
+        other.from <= end + 1
+    )
+    if (next) {
+      extended.set(
+        card.item.id,
+        Math.max(card.frames, next.from + cardInFrames - card.from)
+      )
+    }
+  }
+  return extended
+}
+
 /** Stage graphics; the end card goes above text (it closes the ad). */
 export function StageGraphics({
   items,
@@ -587,18 +622,20 @@ export function StageGraphics({
   /** The video's text style, for slides and splits. */
   animation: TextAnimation
 }) {
+  const cards = handOffs(items)
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>
       {items.map(({ item, from, frames }) => (
         <Sequence
           key={item.id}
           from={from}
-          durationInFrames={frames}
+          durationInFrames={cards.get(item.id) ?? frames}
           layout="none"
         >
           <StageGraphicPlaced
             item={item}
             frames={frames}
+            holdOut={cards.has(item.id)}
             colors={colors}
             fonts={fonts}
             logoUrl={logoUrl}
@@ -713,6 +750,7 @@ function StageGraphic({
   siteLabel,
   background,
   animation,
+  holdOut = false,
 }: {
   item: GraphicItem
   frames: number
@@ -724,12 +762,15 @@ function StageGraphic({
   background: string
   animation: TextAnimation
   placed: boolean
+  /** Hands over to another full-stage card: no fade out. */
+  holdOut?: boolean
 }) {
   const frame = useCurrentFrame()
   const { width, height } = useVideoConfig()
   const id = placed ? {} : { "data-item-id": item.id }
   const su = Math.min(width, height) / 100
   // The end card closes the ad: it comes in and holds to the last frame.
+  // (It fades in over `cardInFrames`, as `handOffs` expects.)
   const shown =
     item.kind === "end-card"
       ? easeOutCubic(frame / 10)
@@ -896,7 +937,7 @@ function StageGraphic({
                   color: item.secondaryColor ?? ink,
                   marginTop: 0.4 * su,
                   ...rise(10),
-                  opacity: 0.8 * rise(10).opacity,
+                  opacity: (item.secondaryColor ? 1 : 0.8) * rise(10).opacity,
                 }}
               >
                 {item.secondary}
@@ -944,7 +985,7 @@ function StageGraphic({
           data-item-id={item.id}
           style={{
             background: item.backgroundColor ?? background,
-            opacity: easeOutCubic(frame / 12),
+            opacity: easeOutCubic(frame / cardInFrames),
             alignItems: "center",
             justifyContent: "center",
             flexDirection: "column",
@@ -1018,6 +1059,7 @@ function StageGraphic({
         <TextSlide
           item={item}
           frames={frames}
+          holdOut={holdOut}
           colors={colors}
           fonts={fonts}
           background={background}

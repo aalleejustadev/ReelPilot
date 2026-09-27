@@ -106,6 +106,27 @@ import { TextPanel, type TextPreset } from "./text-panel"
 import { DeleteClipButton } from "./delete-clip-button"
 import { FullscreenControls } from "./fullscreen-controls"
 import {
+  TimelineResizeHandle,
+  timelineMinHeight,
+} from "./timeline-resize-handle"
+
+/** Where the timeline's chosen height is kept (this browser only). */
+const timelineHeightKey = "reelpilot:timeline-height"
+
+function readTimelineHeight() {
+  try {
+    const saved = Number(window.localStorage.getItem(timelineHeightKey))
+    return saved >= timelineMinHeight ? saved : null
+  } catch {
+    return null
+  }
+}
+
+const subscribeToStorage = (onChange: () => void) => {
+  window.addEventListener("storage", onChange)
+  return () => window.removeEventListener("storage", onChange)
+}
+import {
   DirectPanel,
   EffectsPanel,
   ShotPanel,
@@ -1126,6 +1147,39 @@ export function FootageEditor({
     return () => window.removeEventListener("keydown", onKey)
   }, [fullscreen, enterFullscreen, exitFullscreen])
 
+  // The timeline's height: null fits every layer; a drag on its top edge
+  // sets one (kept per browser), and the layers scroll inside.
+  const timelineRef = useRef<HTMLElement>(null)
+  // The saved height, read after hydration (the server has none).
+  const savedTimelineHeight = useSyncExternalStore(
+    subscribeToStorage,
+    readTimelineHeight,
+    () => null
+  )
+  // A drag this session (undefined: none yet, so the saved one applies).
+  const [draggedHeight, setDraggedHeight] = useState<number | null>()
+  const timelineHeight =
+    draggedHeight === undefined ? savedTimelineHeight : draggedHeight
+  const [timelineBoxHeight, setTimelineBoxHeight] = useState(0)
+  useEffect(() => {
+    const box = timelineRef.current
+    if (!box) return
+    const observer = new ResizeObserver(() =>
+      setTimelineBoxHeight(box.getBoundingClientRect().height)
+    )
+    observer.observe(box)
+    return () => observer.disconnect()
+  }, [])
+  const resizeTimeline = useCallback((height: number | null) => {
+    setDraggedHeight(height)
+    try {
+      if (height === null) window.localStorage.removeItem(timelineHeightKey)
+      else window.localStorage.setItem(timelineHeightKey, String(height))
+    } catch {
+      // Private mode: the height just isn't remembered.
+    }
+  }, [])
+
   // Keep the open tool's tab in view in the phone's scrolling row.
   const railRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -1713,92 +1767,110 @@ export function FootageEditor({
         </main>
       </div>
 
-      {/* Timeline, full width */}
-      <footer className="order-2 shrink-0 border-t bg-card px-3 py-3 sm:px-4 lg:order-none">
-        <div className="mb-2 flex items-center gap-3">
-          <span className="flex items-center gap-2 text-sm font-medium">
-            <FilmIcon aria-hidden className="size-4" />
-            Timeline
-          </span>
-          {idleMs > 0 && (
-            <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
-              <span
-                aria-hidden
-                className="size-3 rounded-sm border bg-[repeating-linear-gradient(135deg,var(--muted-foreground)_0_2px,transparent_2px_5px)]"
-              />
-              Nothing changes on screen ({(idleMs / 1000).toFixed(1)} s)
-            </span>
-          )}
-          {!readOnly && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={addAtCurrentTime}
-              disabled={isAdding}
-            >
-              {isAdding ? (
-                <Spinner data-icon="inline-start" />
-              ) : (
-                <FlagIcon data-icon="inline-start" />
-              )}
-              Add marker at{" "}
-              <span className="font-mono">{formatTimecode(sourceMs)}</span>
-            </Button>
-          )}
-        </div>
-        <ClipTimeline
-          durationMs={durationMs}
-          currentMs={sourceMs}
-          thumbnailsUrl={links.thumbnailsUrl}
-          stripWidth={stripWidth}
-          moments={markers.map((marker) => {
-            const shot = shotOf(marker)
-            return {
-              id: marker.id,
-              atMs: marker.atMs,
-              label: marker.label,
-              source: marker.source,
-              shotLabel: shot ? shotLabel(shot.camera) : null,
-            }
-          })}
-          selectedId={selectedId}
-          idle={analysis?.idle}
-          clipParts={clipParts}
-          overlays={overlays}
-          selectedOverlay={
-            tool === "text"
-              ? selectedTextId
-              : tool === "graphics"
-                ? selectedGraphicId
-                : null
-          }
-          onSelectOverlay={selectOverlay}
-          {...(!readOnly && {
-            onMoveOverlay: moveOverlay,
-            onResizeOverlay: resizeOverlay,
-            onDropItem: dropItem,
-          })}
-          selectedPart={tool === "cuts" ? selectedPart : null}
-          onSelectPart={(index) => {
-            setSelectedPart(index)
-            if (!readOnly) setTool("cuts")
-          }}
-          onSeek={seek}
-          onScrubbingChange={onScrubbingChange}
-          onMoveMoment={
-            readOnly
-              ? undefined
-              : (id, atMs, nudge) => moveMoment(id, atMs, { nudge })
-          }
-          onSelect={(id) => {
-            const marker = markers.find((m) => m.id === id)
-            if (!marker) return
-            selectMarker(marker)
-            if (!readOnly) setTool("shot")
-          }}
+      {/* Timeline, full width; its top edge resizes it. */}
+      <footer
+        ref={timelineRef}
+        data-testid="timeline-panel"
+        className="order-2 flex shrink-0 flex-col border-t bg-card lg:order-none"
+        style={{ height: timelineHeight ?? undefined }}
+      >
+        <TimelineResizeHandle
+          height={timelineHeight}
+          current={timelineBoxHeight}
+          onResize={resizeTimeline}
         />
+        <div className="flex min-h-0 flex-1 flex-col px-3 pb-3 sm:px-4">
+          <div className="mb-2 flex shrink-0 items-center gap-3">
+            <span className="flex items-center gap-2 text-sm font-medium">
+              <FilmIcon aria-hidden className="size-4" />
+              Timeline
+            </span>
+            {idleMs > 0 && (
+              <span className="hidden items-center gap-1.5 text-xs text-muted-foreground sm:flex">
+                <span
+                  aria-hidden
+                  className="size-3 rounded-sm border bg-[repeating-linear-gradient(135deg,var(--muted-foreground)_0_2px,transparent_2px_5px)]"
+                />
+                Nothing changes on screen ({(idleMs / 1000).toFixed(1)} s)
+              </span>
+            )}
+            {!readOnly && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="ml-auto"
+                onClick={addAtCurrentTime}
+                disabled={isAdding}
+              >
+                {isAdding ? (
+                  <Spinner data-icon="inline-start" />
+                ) : (
+                  <FlagIcon data-icon="inline-start" />
+                )}
+                Add marker at{" "}
+                <span className="font-mono">{formatTimecode(sourceMs)}</span>
+              </Button>
+            )}
+          </div>
+          {/* Layers beyond the height scroll; the ruler stays on top. */}
+          <div
+            data-testid="timeline-scroll"
+            className="min-h-0 flex-1 overflow-y-auto"
+          >
+            <ClipTimeline
+              durationMs={durationMs}
+              currentMs={sourceMs}
+              thumbnailsUrl={links.thumbnailsUrl}
+              stripWidth={stripWidth}
+              moments={markers.map((marker) => {
+                const shot = shotOf(marker)
+                return {
+                  id: marker.id,
+                  atMs: marker.atMs,
+                  label: marker.label,
+                  source: marker.source,
+                  shotLabel: shot ? shotLabel(shot.camera) : null,
+                }
+              })}
+              selectedId={selectedId}
+              idle={analysis?.idle}
+              clipParts={clipParts}
+              overlays={overlays}
+              selectedOverlay={
+                tool === "text"
+                  ? selectedTextId
+                  : tool === "graphics"
+                    ? selectedGraphicId
+                    : null
+              }
+              onSelectOverlay={selectOverlay}
+              {...(!readOnly && {
+                onMoveOverlay: moveOverlay,
+                onResizeOverlay: resizeOverlay,
+                onDropItem: dropItem,
+              })}
+              selectedPart={tool === "cuts" ? selectedPart : null}
+              onSelectPart={(index) => {
+                setSelectedPart(index)
+                if (!readOnly) setTool("cuts")
+              }}
+              onSeek={seek}
+              onScrubbingChange={onScrubbingChange}
+              onMoveMoment={
+                readOnly
+                  ? undefined
+                  : (id, atMs, nudge) => moveMoment(id, atMs, { nudge })
+              }
+              onSelect={(id) => {
+                const marker = markers.find((m) => m.id === id)
+                if (!marker) return
+                selectMarker(marker)
+                if (!readOnly) setTool("shot")
+              }}
+            />
+          </div>
+        </div>
       </footer>
     </div>
   )

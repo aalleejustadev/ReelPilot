@@ -71,8 +71,14 @@ export const defaultLens: Lens = lensSchema.parse({})
 /** A blur layer: CSS blur radius (px) and the mask where it shows. */
 export type BlurLayer = { blurPx: number; mask: string }
 
-/** Layers per effect: more are smoother, each costs a blur pass. */
-const layerCount = 6
+/**
+ * Layers per effect: more are smoother, each costs a blur pass. Every
+ * layer is a GPU surface the size of the (zoomed, tilted) frame; six per
+ * effect ran Chrome out of GPU memory on tall stages and in full screen
+ * (whole-page flashes). Three, with masks ramping between them, look the
+ * same.
+ */
+const layerCount = 3
 
 /**
  * The aperture's diameter in stage pixels for an f-stop, tuned so f/1.4

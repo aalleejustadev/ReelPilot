@@ -543,7 +543,7 @@ test("lens: depth of field on angled shots, progressive blur on the screen", asy
   await page.getByRole("button", { name: "Orbit left", exact: true }).click()
   await expect(
     stage.getByTestId("depth-of-field").locator("> div")
-  ).toHaveCount(6)
+  ).toHaveCount(3)
   await tools.getByRole("tab", { name: "Lens" }).click()
   await page.getByRole("button", { name: "f/8" }).click()
   await expect(page.getByRole("button", { name: "f/8" })).toHaveAttribute(
@@ -556,7 +556,7 @@ test("lens: depth of field on angled shots, progressive blur on the screen", asy
   await page.getByRole("button", { name: "All edges" }).click()
   await expect(
     stage.getByTestId("progressive-blur").locator("> div")
-  ).toHaveCount(6)
+  ).toHaveCount(3)
   // Saves go out 500ms after the last change: let it start, then finish.
   await page.waitForTimeout(700)
   await expect(page.getByText("Saved", { exact: true })).toBeVisible()
@@ -1087,5 +1087,40 @@ test("colour any text, give it a background, and watch full screen", async ({
   await expect(box).toHaveAttribute("data-fullscreen", "true")
   await controls.getByRole("button", { name: "Exit full screen" }).click()
   await expect(box).not.toHaveAttribute("data-fullscreen", "true")
+
+  // The timeline's top edge resizes it; the layers scroll when it's short.
+  const panel = page.getByTestId("timeline-panel")
+  const handle = page.getByRole("separator", { name: "Resize timeline" })
+  const scroller = page.getByTestId("timeline-scroll")
+  const fitted = (await panel.boundingBox())!.height
+  const grip = (await handle.boundingBox())!
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + grip.height / 2)
+  await page.mouse.down()
+  await page.mouse.move(grip.x + grip.width / 2, grip.y + 400, { steps: 8 })
+  await page.mouse.up()
+  const short = (await panel.boundingBox())!.height
+  expect(short).toBeLessThan(fitted - 60)
+  expect(
+    await scroller.evaluate((el) => el.scrollHeight > el.clientHeight)
+  ).toBe(true)
+  // The ruler stays in view while the rows scroll.
+  await scroller.evaluate((el) => (el.scrollTop = el.scrollHeight))
+  await expect(page.getByRole("slider", { name: "Playhead" })).toBeInViewport()
+  // Keys too, and it's remembered after a reload.
+  await handle.focus()
+  await page.keyboard.press("ArrowUp")
+  await expect
+    .poll(async () => (await panel.boundingBox())!.height)
+    .toBeGreaterThan(short + 10)
+  const chosen = (await panel.boundingBox())!.height
+  await page.reload()
+  await expect
+    .poll(async () => (await panel.boundingBox())!.height)
+    .toBeCloseTo(chosen, -1)
+  // Double-click fits every layer again.
+  await handle.dblclick()
+  await expect
+    .poll(async () => (await panel.boundingBox())!.height)
+    .toBeGreaterThan(chosen + 30)
   expect(consoleProblems).toEqual([])
 })
