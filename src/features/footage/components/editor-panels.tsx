@@ -5,6 +5,7 @@ import {
   CrosshairIcon,
   RotateCcwIcon,
   ScanSearchIcon,
+  ShuffleIcon,
   SparklesIcon,
   TrashIcon,
 } from "lucide-react"
@@ -53,7 +54,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import type { Aim } from "../lib/aim"
 import type { Palette } from "../lib/analysis"
 import { formatTimecode } from "../lib/format"
-import { backgroundPresets, looks } from "../lib/looks"
+import { backgroundPresets, looks, type Look } from "../lib/looks"
 import { motionPrompts } from "../lib/motion-prompts"
 
 /** Every panel opens with a title and a short line on what it does. */
@@ -115,19 +116,47 @@ function SliderField({
 const degrees = (value: number) => `${Math.round(value)}°`
 
 /** A tiny 3D card showing what a shot looks like. */
-function ShotThumb({ camera }: { camera: CameraSettings }) {
+function ShotThumb({
+  camera,
+  size = "md",
+}: {
+  camera: CameraSettings
+  size?: "sm" | "md"
+}) {
   // Zoom is shown gently: a thumbnail can't show a 2× close-up.
   const pose = { ...camera, zoom: 1 + (camera.zoom - 1) * 0.35, x: 0, y: 0 }
   return (
     <span
       aria-hidden
-      className="flex h-14 w-full items-center justify-center overflow-hidden rounded-md bg-muted"
-      style={{ perspective: "260px" }}
+      className={cn(
+        "flex w-full items-center justify-center overflow-hidden rounded-md bg-muted",
+        size === "md" ? "h-14" : "h-9"
+      )}
+      style={{ perspective: size === "md" ? "260px" : "160px" }}
     >
       <span
-        className="block h-7 w-11 rounded-[3px] bg-foreground/80 shadow-md ring-1 ring-background/40"
+        className={cn(
+          "block bg-foreground/80 shadow-md ring-1 ring-background/40",
+          size === "md" ? "h-7 w-11 rounded-[3px]" : "h-3.5 w-6 rounded-[2px]"
+        )}
         style={cameraStyle(pose)}
       />
+    </span>
+  )
+}
+
+/** A look's storyboard: its opener, a typical shot and its hero shot. */
+function LookStoryboard({ look }: { look: Look }) {
+  const beats = [look.opener, look.pool[0] ?? look.rest, look.hero]
+  return (
+    <span className="grid grid-cols-3 gap-1">
+      {beats.map((beat, index) => (
+        <ShotThumb
+          key={index}
+          size="sm"
+          camera={{ ...shotPresets[beat.preset].camera, ...beat.tweak }}
+        />
+      ))}
     </span>
   )
 }
@@ -138,6 +167,7 @@ export function EffectsPanel({
   hasMoments,
   brandColors,
   palette,
+  activeLook,
   onApplyLook,
   onReset,
   onBackground,
@@ -145,7 +175,9 @@ export function EffectsPanel({
   hasMoments: boolean
   brandColors: string[]
   palette: Palette | null
-  onApplyLook: (lookId: string) => void
+  /** The look applied last, and which take of it. */
+  activeLook: { id: string; take: number } | null
+  onApplyLook: (lookId: string, take: number) => void
   onReset: () => void
   onBackground: (background: Presentation["background"]) => void
 }) {
@@ -170,12 +202,14 @@ export function EffectsPanel({
               key={look.id}
               type="button"
               disabled={!hasMoments}
-              onClick={() => onApplyLook(look.id)}
-              className="flex flex-col gap-2 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50"
+              aria-pressed={activeLook?.id === look.id}
+              onClick={() => onApplyLook(look.id, 0)}
+              className={cn(
+                "flex flex-col gap-2 rounded-lg border bg-background p-2 text-left outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:opacity-50",
+                activeLook?.id === look.id && "border-ring ring-2 ring-ring/40"
+              )}
             >
-              <ShotThumb
-                camera={shotPresets[look.sequence[0] ?? "flat"].camera}
-              />
+              <LookStoryboard look={look} />
               <span className="flex flex-col gap-0.5">
                 <span className="text-sm font-medium">{look.title}</span>
                 <span className="text-xs text-muted-foreground">
@@ -185,12 +219,29 @@ export function EffectsPanel({
             </button>
           ))}
         </div>
-        <div>
+        <div className="flex flex-wrap gap-2">
+          {activeLook && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onApplyLook(activeLook.id, activeLook.take + 1)}
+            >
+              <ShuffleIcon data-icon="inline-start" />
+              New take
+            </Button>
+          )}
           <Button type="button" variant="ghost" onClick={onReset}>
             <RotateCcwIcon data-icon="inline-start" />
             Reset to flat
           </Button>
         </div>
+        {activeLook && (
+          <p className="text-xs text-muted-foreground" aria-live="polite">
+            {looks.find((look) => look.id === activeLook.id)?.title}, take{" "}
+            {activeLook.take + 1}. A new take keeps the style and redraws the
+            shots.
+          </p>
+        )}
       </section>
       <section
         className="flex flex-col gap-3"

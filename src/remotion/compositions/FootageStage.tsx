@@ -48,8 +48,8 @@ export type FootageStageProps = {
 
 const flatPose = { ...flatCamera, x: 0, y: 0 }
 
-/** Strongest blur, in % of the stage width (about 5px at 1080p). */
-const maxBlur = 0.28
+/** Strongest blur, in % of the stage width (about 4px at 1080p). */
+const maxBlur = 0.22
 
 /**
  * The screen recording on its stage: background, frame, and the camera

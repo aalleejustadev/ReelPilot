@@ -187,11 +187,19 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   await page.getByRole("button", { name: /^Redo/ }).click()
   await expect(shotSelect).toContainText("Tilt left")
 
-  // One click on a look styles every moment; the Undo button reverts it.
+  // One click on a look styles every moment; "New take" redraws it (here
+  // mirrored); the Undo button steps back through both.
   await tools.getByRole("tab", { name: "Effects" }).click()
-  await page.getByRole("button", { name: /^Showcase/ }).click()
+  await page.getByRole("button", { name: /^Isometric/ }).click()
+  await expect(
+    page.getByRole("button", { name: /^Isometric/ })
+  ).toHaveAttribute("aria-pressed", "true")
+  await page.getByRole("button", { name: "New take" }).click()
+  await expect(page.getByText("Isometric, take 2.")).toBeVisible()
   await tools.getByRole("tab", { name: "Moments" }).click()
-  await expect(shotSelect).toContainText("Orbit left")
+  await expect(shotSelect).toContainText("Isometric right")
+  await page.getByRole("button", { name: /^Undo/ }).click()
+  await expect(shotSelect).toContainText("Isometric")
   await page.getByRole("button", { name: /^Undo/ }).click()
   await expect(shotSelect).toContainText("Tilt left")
   await expect(saved).toBeVisible()
@@ -256,7 +264,7 @@ test("playback keeps going through saves and refreshes to the very end", async (
   const position = page.getByLabel("Playback position")
 
   // A look saves every moment; wait out the saves while paused.
-  await page.getByRole("button", { name: /^Showcase/ }).click()
+  await page.getByRole("button", { name: /^Product launch/ }).click()
   await page.getByRole("button", { name: "Pause", exact: true }).click()
   await page
     .getByRole("group", { name: "Timeline" })

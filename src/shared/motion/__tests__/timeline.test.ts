@@ -236,10 +236,10 @@ describe("drift", () => {
 })
 
 describe("presets", () => {
-  it("offers 18 shots, each in exactly one group", async () => {
+  it("offers 21 shots, each in exactly one group", async () => {
     const { shotPresetGroups, shotPresetNames } = await import("../index")
     const grouped = shotPresetGroups.flatMap((group) => group.presets)
-    expect(shotPresetNames).toHaveLength(18)
+    expect(shotPresetNames).toHaveLength(21)
     expect([...grouped].sort()).toEqual([...shotPresetNames].sort())
   })
 })
@@ -257,6 +257,45 @@ describe("shotLabel", () => {
     ).toBe("Tilt left · 2.2×")
     expect(shotLabel({ ...shotPresets["tilt-left"].camera, turn: 5 })).toBe(
       "Custom"
+    )
+  })
+
+  it("names a mirrored shot after the one it mirrors", async () => {
+    const { mirrorCamera, shotLabel } = await import("../index")
+    expect(shotLabel(mirrorCamera(shotPresets.dramatic.camera))).toBe(
+      "Dramatic · mirrored"
+    )
+    // Mirror pairs are each other's presets.
+    expect(shotLabel(mirrorCamera(shotPresets["side-sweep-left"].camera))).toBe(
+      "Side sweep right"
+    )
+  })
+})
+
+describe("moveDurationMs", () => {
+  it("takes longer for deeper zooms, bigger turns and longer pans", async () => {
+    const { moveDurationMs } = await import("../timeline")
+    const flat = shotPresets.flat.camera
+    const small = moveDurationMs(flat, { ...flat, zoom: 1.25 })
+    const deep = moveDurationMs(flat, { ...flat, zoom: 2.5 })
+    expect(small).toBe(700) // 0.6s + 0.55s·ln(1.25)
+    expect(deep).toBeGreaterThan(small)
+    expect(moveDurationMs(flat, shotPresets.dramatic.camera)).toBeGreaterThan(
+      small
+    )
+    expect(
+      moveDurationMs(flat, { ...flat, focusX: 0.9, focusY: 0.9 })
+    ).toBeGreaterThan(700)
+  })
+
+  it("follows the pace and stays within 0.3–2.6s", async () => {
+    const { moveDurationMs } = await import("../timeline")
+    const flat = shotPresets.flat.camera
+    const far = { ...flat, zoom: 3, turn: 60, focusX: 1 }
+    expect(moveDurationMs(flat, far, "calm")).toBe(2600)
+    expect(moveDurationMs(flat, flat, "brisk")).toBe(350)
+    expect(moveDurationMs(flat, flat, "calm")).toBeGreaterThan(
+      moveDurationMs(flat, flat)
     )
   })
 })

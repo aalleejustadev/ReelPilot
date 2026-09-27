@@ -1,5 +1,5 @@
 import { flatCamera, introPoses, type CameraPose } from "./presets"
-import type { EasingName, Presentation, Shot } from "./schema"
+import type { CameraSettings, EasingName, Presentation, Shot } from "./schema"
 
 const flatPose: CameraPose = { ...flatCamera, x: 0, y: 0 }
 const clamp01 = (t: number) => Math.min(1, Math.max(0, t))
@@ -268,4 +268,28 @@ export function backgroundStyle(background: Presentation["background"]) {
  */
 export function frameRadiusCss(radius: number) {
   return `${Number(radius.toFixed(2))}cqw`
+}
+
+export type Pace = "calm" | "normal" | "brisk"
+const paceFactor: Record<Pace, number> = { calm: 1.35, normal: 1, brisk: 0.6 }
+
+/**
+ * How long a move should take for how far it goes: deeper zooms, bigger
+ * turns and longer pans take longer (Screen Studio-style tools grow zoom
+ * time with depth, ≈0.6s + 0.55s·ln(zoom)). Rounded to 50ms, 300–2600ms.
+ */
+export function moveDurationMs(
+  from: CameraSettings,
+  to: CameraSettings,
+  pace: Pace = "normal"
+) {
+  const zoom = Math.abs(Math.log(to.zoom / from.zoom))
+  const angle = Math.max(
+    Math.abs(to.tilt - from.tilt),
+    Math.abs(to.turn - from.turn),
+    Math.abs(to.roll - from.roll)
+  )
+  const pan = Math.hypot(to.focusX - from.focusX, to.focusY - from.focusY)
+  const ms = (600 + 550 * zoom + 9 * angle + 500 * pan) * paceFactor[pace]
+  return Math.round(Math.min(2600, Math.max(300, ms)) / 50) * 50
 }

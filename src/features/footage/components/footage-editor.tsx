@@ -505,8 +505,29 @@ export function FootageEditor({
     })
   }
 
-  function applyLookById(lookId: string) {
-    change(applyLook(lookId, markers, history.present), "look")
+  // The look applied last and which take, for "New take".
+  const [activeLook, setActiveLook] = useState<{
+    id: string
+    take: number
+  } | null>(null)
+
+  function applyLookById(lookId: string, take: number) {
+    const moments = markers.map((marker) => ({
+      id: marker.id,
+      atMs: marker.atMs,
+      aim: aimAt({
+        analysis,
+        recording,
+        insight: parseStoredInsight(marker.insight),
+        atMs: marker.atMs,
+      }),
+    }))
+    // Each look or take is its own undo step (never merged).
+    change(
+      applyLook(lookId, moments, history.present, { take }),
+      `look:${lookId}:${take}`
+    )
+    setActiveLook({ id: lookId, take })
     stop()
     play()
   }
@@ -662,10 +683,12 @@ export function FootageEditor({
                   hasMoments={markers.length > 0}
                   brandColors={brandColors}
                   palette={analysis?.palette ?? null}
+                  activeLook={activeLook}
                   onApplyLook={applyLookById}
-                  onReset={() =>
+                  onReset={() => {
                     change(resetLook(markers, presentation), "reset")
-                  }
+                    setActiveLook(null)
+                  }}
                   onBackground={(background) =>
                     changePresentation(
                       { ...presentation, background },

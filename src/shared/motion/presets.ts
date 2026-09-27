@@ -15,6 +15,8 @@ export const shotPresetNames = [
   "push-in",
   "spotlight",
   "float",
+  "sway-left",
+  "sway-right",
   // Angles
   "tilt-left",
   "tilt-right",
@@ -28,6 +30,7 @@ export const shotPresetNames = [
   "top-down",
   "birds-eye",
   "isometric",
+  "isometric-right",
   // Stylised
   "tilted-card",
   "dutch",
@@ -37,7 +40,17 @@ export type ShotPresetName = (typeof shotPresetNames)[number]
 
 export const shotPresetGroups: { label: string; presets: ShotPresetName[] }[] =
   [
-    { label: "Classic", presets: ["flat", "push-in", "spotlight", "float"] },
+    {
+      label: "Classic",
+      presets: [
+        "flat",
+        "push-in",
+        "spotlight",
+        "float",
+        "sway-left",
+        "sway-right",
+      ],
+    },
     {
       label: "Angles",
       presets: [
@@ -51,7 +64,14 @@ export const shotPresetGroups: { label: string; presets: ShotPresetName[] }[] =
     },
     {
       label: "Perspective",
-      presets: ["low-angle", "hero-rise", "top-down", "birds-eye", "isometric"],
+      presets: [
+        "low-angle",
+        "hero-rise",
+        "top-down",
+        "birds-eye",
+        "isometric",
+        "isometric-right",
+      ],
     },
     { label: "Stylised", presets: ["tilted-card", "dutch", "dramatic"] },
   ]
@@ -69,6 +89,15 @@ export const shotPresets: Record<
   float: {
     label: "Float",
     camera: { ...flatCamera, tilt: 10, turn: -12, roll: 3, zoom: 1.02 },
+  },
+  // A gentle lean for slow, cinematic pushes.
+  "sway-left": {
+    label: "Sway left",
+    camera: { ...flatCamera, turn: 6, tilt: 4 },
+  },
+  "sway-right": {
+    label: "Sway right",
+    camera: { ...flatCamera, turn: -6, tilt: 4 },
   },
   "tilt-left": {
     label: "Tilt left",
@@ -113,6 +142,10 @@ export const shotPresets: Record<
   isometric: {
     label: "Isometric",
     camera: { ...flatCamera, tilt: 40, turn: -28, roll: 14, zoom: 1.1 },
+  },
+  "isometric-right": {
+    label: "Isometric right",
+    camera: { ...flatCamera, tilt: 40, turn: 28, roll: -14, zoom: 1.1 },
   },
   "tilted-card": {
     label: "Tilted card",
@@ -173,6 +206,16 @@ export function presetOf(camera: CameraSettings): ShotPresetName | undefined {
 
 const angles = ["tilt", "turn", "roll"] as const
 
+/** The same shot seen from the other side (turns and rolls reversed). */
+export function mirrorCamera(camera: CameraSettings): CameraSettings {
+  return {
+    ...camera,
+    turn: camera.turn === 0 ? 0 : -camera.turn,
+    roll: camera.roll === 0 ? 0 : -camera.roll,
+    focusX: Math.round((1 - camera.focusX) * 1000) / 1000,
+  }
+}
+
 /**
  * A shot's name: "Tilt left"; a preset aimed closer, "Tilt left · 1.8×";
  * a flat zoom, "Zoom 1.8×"; anything else hand-tuned, "Custom". Focus
@@ -190,7 +233,10 @@ export function shotLabel(camera: CameraSettings) {
       (key) => Math.abs(shotPresets[name].camera[key] - camera[key]) < 0.001
     )
   )
-  if (!similar) return "Custom"
+  if (!similar) {
+    const mirrored = presetOf(mirrorCamera(camera))
+    return mirrored ? `${shotPresets[mirrored].label} · mirrored` : "Custom"
+  }
   const { label, camera: base } = shotPresets[similar]
   return Math.abs(base.zoom - camera.zoom) < 0.001
     ? label
