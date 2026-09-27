@@ -169,7 +169,7 @@ export function ClipTimeline({
       {/* Ruler: second marks and the playhead's handle (press or drag it,
           or anywhere on the ruler, to move the playhead). */}
       <div
-        className="relative h-6 cursor-ew-resize touch-none select-none"
+        className="relative mx-3 h-6 cursor-ew-resize touch-none select-none"
         onPointerDown={startDrag}
         onPointerMove={drag}
         onPointerUp={endDrag}
@@ -212,8 +212,7 @@ export function ClipTimeline({
           aria-valuenow={currentMs}
           aria-valuetext={formatTimecode(currentMs)}
           className="group absolute inset-y-0 z-20 -ml-3 flex w-6 cursor-ew-resize items-end justify-center outline-none"
-          // Kept just inside the ends so the handle is never cut off.
-          style={{ left: `clamp(0.75rem, ${playhead}%, calc(100% - 0.75rem))` }}
+          style={{ left: `${playhead}%` }}
           onKeyDown={onKeyDown}
         >
           <span
@@ -224,7 +223,6 @@ export function ClipTimeline({
       </div>
 
       <div
-        ref={trackRef}
         className="relative h-16 cursor-ew-resize touch-none overflow-hidden rounded-md border bg-muted select-none"
         role="group"
         aria-label="Timeline"
@@ -233,84 +231,91 @@ export function ClipTimeline({
         onPointerUp={endDrag}
         onPointerCancel={endDrag}
       >
-        {thumbnailsUrl && (
-          // Signed, short-lived storage URL (see brand-kits LogoField).
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thumbnailsUrl}
-            alt=""
-            draggable={false}
-            className="pointer-events-none absolute inset-y-0 left-0 h-full max-w-none"
-            style={{ width: `${stripWidth}%` }}
-          />
-        )}
-        {moments.map((moment) => (
-          <button
-            key={moment.id}
-            type="button"
-            data-moment
-            className={cn(
-              "group absolute inset-y-0 z-10 -ml-3 flex w-6 justify-center outline-none",
-              onMoveMoment
-                ? "cursor-grab active:cursor-grabbing"
-                : "cursor-pointer"
-            )}
-            // Kept just inside the ends so a moment at 0:00 stays visible.
-            style={{
-              left: `clamp(0.75rem, ${clampPercent(dragPreview?.id === moment.id ? dragPreview.atMs : moment.atMs, durationMs)}%, calc(100% - 0.75rem))`,
-            }}
-            aria-label={`Select the moment at ${formatTimecode(moment.atMs)}${moment.label ? `, ${moment.label}` : ""}${moment.shotLabel ? ", camera set" : ""}`}
-            aria-pressed={moment.id === selectedId}
-            aria-keyshortcuts={
-              onMoveMoment ? "ArrowLeft ArrowRight" : undefined
-            }
-            title={onMoveMoment ? "Drag to move · arrow keys nudge" : undefined}
-            onPointerDown={(event) => startMomentDrag(event, moment.id)}
-            onPointerMove={dragMoment}
-            onPointerUp={endMomentDrag}
-            onPointerCancel={endMomentDrag}
-            onKeyDown={(event) => nudgeMoment(event, moment)}
-            onClick={() => {
-              if (justDragged.current) {
-                justDragged.current = false
-                return
-              }
-              onSelect(moment.id)
-            }}
-          >
-            <span
-              aria-hidden
-              // A light outline keeps the bar visible over any footage.
-              className={cn(
-                "h-full w-1 rounded-full bg-chroma-strong ring-2 ring-background group-hover:w-1.5 group-focus-visible:w-1.5",
-                moment.source === "MANUAL" && "bg-tally-strong",
-                moment.id === selectedId && "w-1.5 ring-foreground"
-              )}
+        {/* The time area: 0:00 is exactly its left edge and the clip's end
+            its right edge. The 12px on each side leaves room for handles at
+            the ends instead of nudging them inward (which shifted 0:00). */}
+        <div ref={trackRef} className="absolute inset-x-3 inset-y-0">
+          {thumbnailsUrl && (
+            // Signed, short-lived storage URL (see brand-kits LogoField).
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={thumbnailsUrl}
+              alt=""
+              draggable={false}
+              className="pointer-events-none absolute inset-y-0 left-0 h-full max-w-none"
+              style={{ width: `${stripWidth}%` }}
             />
-            {moment.shotLabel && (
+          )}
+          {moments.map((moment) => (
+            <button
+              key={moment.id}
+              type="button"
+              data-moment
+              className={cn(
+                "group absolute inset-y-0 z-10 -ml-3 flex w-6 justify-center outline-none",
+                onMoveMoment
+                  ? "cursor-grab active:cursor-grabbing"
+                  : "cursor-pointer"
+              )}
+              style={{
+                left: `${clampPercent(dragPreview?.id === moment.id ? dragPreview.atMs : moment.atMs, durationMs)}%`,
+              }}
+              aria-label={`Select the moment at ${formatTimecode(moment.atMs)}${moment.label ? `, ${moment.label}` : ""}${moment.shotLabel ? ", camera set" : ""}`}
+              aria-pressed={moment.id === selectedId}
+              aria-keyshortcuts={
+                onMoveMoment ? "ArrowLeft ArrowRight" : undefined
+              }
+              title={
+                onMoveMoment ? "Drag to move · arrow keys nudge" : undefined
+              }
+              onPointerDown={(event) => startMomentDrag(event, moment.id)}
+              onPointerMove={dragMoment}
+              onPointerUp={endMomentDrag}
+              onPointerCancel={endMomentDrag}
+              onKeyDown={(event) => nudgeMoment(event, moment)}
+              onClick={() => {
+                if (justDragged.current) {
+                  justDragged.current = false
+                  return
+                }
+                onSelect(moment.id)
+              }}
+            >
               <span
                 aria-hidden
-                className="absolute bottom-1 size-2.5 rounded-full bg-background ring-2 ring-foreground"
+                // A light outline keeps the bar visible over any footage.
+                className={cn(
+                  "h-full w-1 rounded-full bg-chroma-strong ring-2 ring-background group-hover:w-1.5 group-focus-visible:w-1.5",
+                  moment.source === "MANUAL" && "bg-tally-strong",
+                  moment.id === selectedId && "w-1.5 ring-foreground"
+                )}
               />
-            )}
-            {dragPreview?.id === moment.id && (
-              <span
-                aria-hidden
-                className="absolute top-1 rounded bg-foreground px-1.5 py-0.5 font-mono text-[11px] text-background"
-              >
-                {formatTimecode(dragPreview.atMs)}
-              </span>
-            )}
-          </button>
-        ))}
+              {moment.shotLabel && (
+                <span
+                  aria-hidden
+                  className="absolute bottom-1 size-2.5 rounded-full bg-background ring-2 ring-foreground"
+                />
+              )}
+              {dragPreview?.id === moment.id && (
+                <span
+                  aria-hidden
+                  className="absolute top-1 rounded bg-foreground px-1.5 py-0.5 font-mono text-[11px] text-background"
+                >
+                  {formatTimecode(dragPreview.atMs)}
+                </span>
+              )}
+            </button>
+          ))}
 
-        {/* The playhead's line; its handle lives in the ruler above, so
+          {/* The playhead's line; its handle lives in the ruler above, so
             it never covers a moment. */}
-        <span
-          aria-hidden
-          className="pointer-events-none absolute inset-y-0 z-20 -ml-px w-0.5 bg-foreground ring-1 ring-background"
-          style={{ left: `clamp(0.75rem, ${playhead}%, calc(100% - 0.75rem))` }}
-        />
+          <span
+            aria-hidden
+            data-testid="playhead-line"
+            className="pointer-events-none absolute inset-y-0 z-20 -ml-px w-0.5 bg-foreground ring-1 ring-background"
+            style={{ left: `${playhead}%` }}
+          />
+        </div>
       </div>
 
       {/* Which shot each part of the clip uses. */}
@@ -323,24 +328,26 @@ export function ClipTimeline({
             Flat all the way. Pick a shot for a key moment to add camera motion.
           </span>
         ) : (
-          parts.map(({ moment, endMs }) => (
-            <button
-              key={moment.id}
-              type="button"
-              tabIndex={-1}
-              className={cn(
-                "absolute inset-y-0 truncate border-l-2 border-foreground/60 bg-secondary px-1.5 text-left text-xs",
-                moment.id === selectedId && "bg-chroma-soft font-medium"
-              )}
-              style={{
-                left: `${clampPercent(moment.atMs, durationMs)}%`,
-                width: `${clampPercent(endMs - moment.atMs, durationMs)}%`,
-              }}
-              onClick={() => onSelect(moment.id)}
-            >
-              {moment.shotLabel}
-            </button>
-          ))
+          <div className="absolute inset-x-3 inset-y-0">
+            {parts.map(({ moment, endMs }) => (
+              <button
+                key={moment.id}
+                type="button"
+                tabIndex={-1}
+                className={cn(
+                  "absolute inset-y-0 truncate border-l-2 border-foreground/60 bg-secondary px-1.5 text-left text-xs",
+                  moment.id === selectedId && "bg-chroma-soft font-medium"
+                )}
+                style={{
+                  left: `${clampPercent(moment.atMs, durationMs)}%`,
+                  width: `${clampPercent(endMs - moment.atMs, durationMs)}%`,
+                }}
+                onClick={() => onSelect(moment.id)}
+              >
+                {moment.shotLabel}
+              </button>
+            ))}
+          </div>
         )}
       </div>
     </div>

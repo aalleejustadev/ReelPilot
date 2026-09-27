@@ -1,3 +1,5 @@
+import type { Locator } from "@playwright/test"
+
 import { expect, hasDatabase, test } from "./fixtures"
 import { expectNoViolations } from "./helpers/axe"
 import { createKitByHand } from "./helpers/brand-kits"
@@ -330,6 +332,24 @@ test("key moments can be dragged, nudged and moved to the playhead", async ({
   await expect(
     timeline.getByRole("button", { name: /^Select the moment at 0:00\.0/ })
   ).toBeVisible()
+
+  // 0:00 is the real start: the playhead and a moment at 0:00 sit exactly
+  // on the strip's left edge (within a pixel), not nudged inward.
+  const stripLeft = (await timeline.locator("img").boundingBox())?.x ?? NaN
+  const centre = async (locator: Locator) => {
+    const box = await locator.boundingBox()
+    return box ? box.x + box.width / 2 : NaN
+  }
+  expect(
+    Math.abs((await centre(page.getByTestId("playhead-line"))) - stripLeft)
+  ).toBeLessThanOrEqual(1)
+  expect(
+    Math.abs(
+      (await centre(
+        timeline.getByRole("button", { name: /^Select the moment at 0:00\.0/ })
+      )) - stripLeft
+    )
+  ).toBeLessThanOrEqual(1)
   await expectNoViolations(page)
   expect(consoleProblems).toEqual([])
 })
