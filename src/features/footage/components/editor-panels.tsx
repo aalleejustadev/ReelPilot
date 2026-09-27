@@ -692,6 +692,25 @@ export function StylePanel({
         </Field>
         <Field orientation="horizontal">
           <Switch
+            id="animated-background"
+            aria-describedby="animated-background-hint"
+            checked={presentation.animatedBackground}
+            onCheckedChange={(animatedBackground) =>
+              onChange(
+                { ...presentation, animatedBackground },
+                "animated-background"
+              )
+            }
+          />
+          <FieldContent>
+            <FieldLabel htmlFor="animated-background">Moving light</FieldLabel>
+            <FieldDescription id="animated-background-hint">
+              A slow glow drifts across the background, so it never sits still.
+            </FieldDescription>
+          </FieldContent>
+        </Field>
+        <Field orientation="horizontal">
+          <Switch
             id="motion-blur"
             aria-describedby="motion-blur-hint"
             checked={presentation.motionBlur}

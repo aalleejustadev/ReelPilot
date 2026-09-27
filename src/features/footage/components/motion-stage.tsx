@@ -45,6 +45,9 @@ export function MotionStage({
   onVideoError,
   fonts,
   accents,
+  logoUrl,
+  brandName,
+  siteLabel,
 }: {
   playerRef: React.RefObject<PlayerRef | null>
   videoUrl: string
@@ -67,6 +70,9 @@ export function MotionStage({
   onVideoError?: () => void
   fonts: StageFonts
   accents: string[]
+  logoUrl: string | null
+  brandName: string
+  siteLabel: string
 }) {
   const size = stageSizes[aspect]
   // Where playback was, so switching shape (a new Player) keeps the spot.
@@ -86,6 +92,9 @@ export function MotionStage({
       onVideoError,
       fonts,
       accents,
+      logoUrl,
+      brandName,
+      siteLabel,
     }),
     [
       videoUrl,
@@ -101,6 +110,9 @@ export function MotionStage({
       onVideoError,
       fonts,
       accents,
+      logoUrl,
+      brandName,
+      siteLabel,
     ]
   )
 

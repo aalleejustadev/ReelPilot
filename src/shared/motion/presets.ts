@@ -188,6 +188,7 @@ export const introLabels: Record<IntroKind, string> = {
 
 export const defaultPresentation: Presentation = {
   background: { kind: "gradient", from: "#15171c", to: "#5b6170" },
+  animatedBackground: false,
   // Owner-chosen defaults (2026-09-27): 2% corners, 2% space, shadow.
   frame: { radius: 2, shadow: true, padding: 0.02 },
   intro: { kind: "none", durationMs: 1200 },
@@ -195,6 +196,7 @@ export const defaultPresentation: Presentation = {
   edit: { parts: [] },
   textStyle: { animation: "word-rise" },
   texts: [],
+  graphics: [],
   lens: {
     depthOfField: { enabled: false, fStop: 2.8, maxBlur: 1.2 },
     progressiveBlur: {

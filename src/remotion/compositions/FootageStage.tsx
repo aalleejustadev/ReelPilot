@@ -18,14 +18,24 @@ import {
   outputLayout,
   progressiveBlurLayers,
   toOutput,
+  isScreenGraphic,
+  type GraphicItem,
   type Presentation,
   type TimedShot,
   type Transition,
 } from "@/shared/motion"
 
 import {
+  BackgroundLight,
+  MagnifierLens,
+  ScreenGraphics,
+  StageGraphics,
+  timedGraphics,
+} from "../components/Graphics"
+import {
   defaultStageFonts,
   TextLayer,
+  textColors,
   type StageFonts,
 } from "../components/TextLayer"
 
@@ -65,6 +75,11 @@ export type FootageStageProps = {
   /** The brand kit's fonts for text, and accent colours (best first). */
   fonts?: StageFonts
   accents?: string[]
+  /** For logo reveals and end cards. */
+  logoUrl?: string | null
+  brandName?: string
+  /** The site to show on an end card, e.g. "acme.app". */
+  siteLabel?: string
 }
 
 /** The ad's length for these props (cuts, speed and transitions). */
@@ -104,6 +119,9 @@ export function FootageStage({
   onVideoError,
   fonts = defaultStageFonts,
   accents = [],
+  logoUrl = null,
+  brandName = "",
+  siteLabel = "",
 }: FootageStageProps) {
   const frameNumber = useCurrentFrame()
   const { fps, width, height } = useVideoConfig()
@@ -181,6 +199,25 @@ export function FootageStage({
       })
     : []
 
+  const colors = textColors(presentation.background, accents)
+  const timed = timedGraphics(presentation.graphics, edit, durationMs, fps)
+  const screenItems = timed.filter(
+    ({ item }) => isScreenGraphic(item.kind) && item.kind !== "magnifier"
+  )
+  const magnifiers = flat
+    ? []
+    : timed.filter(({ item }) => item.kind === "magnifier")
+  const stageItems = timed.filter(({ item }) => !isScreenGraphic(item.kind))
+  const adFrames = framesFor(outputDuration(edit, durationMs))
+  const stageBrand = {
+    colors,
+    fonts,
+    logoUrl,
+    brandName,
+    siteLabel,
+    background: backgroundStyle(presentation.background),
+  }
+
   return (
     <AbsoluteFill
       style={{
@@ -188,6 +225,9 @@ export function FootageStage({
         overflow: "hidden",
       }}
     >
+      {presentation.animatedBackground && (
+        <BackgroundLight totalFrames={adFrames} />
+      )}
       <AbsoluteFill
         style={{
           alignItems: "center",
@@ -253,24 +293,45 @@ export function FootageStage({
                   irisAt={{ x: pose.focusX, y: pose.focusY }}
                   unit={unit}
                   onVideoError={onVideoError}
+                  partFrom={from}
+                  magnifiers={magnifiers}
+                  frameWidth={frameWidth}
+                  frameHeight={frameHeight}
                 />
               </Sequence>
             )
           })}
           <BlurLayers layers={depthLayers} testId="depth-of-field" />
           <BlurLayers layers={edgeLayers} testId="progressive-blur" />
+          {!flat && (
+            <ScreenGraphics
+              items={screenItems}
+              width={frameWidth}
+              height={frameHeight}
+              colors={colors}
+              fonts={fonts}
+            />
+          )}
         </div>
       </AbsoluteFill>
       {!flat && (
-        <TextLayer
-          items={presentation.texts}
-          animation={presentation.textStyle.animation}
-          edit={edit}
-          durationMs={durationMs}
-          fonts={fonts}
-          background={presentation.background}
-          accents={accents}
-        />
+        <>
+          <StageGraphics
+            items={stageItems}
+            layer="under-text"
+            {...stageBrand}
+          />
+          <TextLayer
+            items={presentation.texts}
+            animation={presentation.textStyle.animation}
+            edit={edit}
+            durationMs={durationMs}
+            fonts={fonts}
+            background={presentation.background}
+            accents={accents}
+          />
+          <StageGraphics items={stageItems} layer="over-text" {...stageBrand} />
+        </>
       )}
     </AbsoluteFill>
   )
@@ -325,6 +386,10 @@ function PartLayer({
   irisAt,
   unit,
   onVideoError,
+  partFrom,
+  magnifiers,
+  frameWidth,
+  frameHeight,
 }: {
   videoUrl: string
   posterUrl?: string | null
@@ -336,9 +401,16 @@ function PartLayer({
   irisAt: { x: number; y: number }
   unit: number
   onVideoError?: () => void
+  /** Where this part starts in the ad, and magnifiers in ad frames. */
+  partFrom: number
+  magnifiers: { item: GraphicItem; from: number; frames: number }[]
+  frameWidth: number
+  frameHeight: number
 }) {
   const filterId = useId().replace(/:/g, "")
-  const localMs = (useCurrentFrame() / stageFps) * 1000
+  const localFrame = useCurrentFrame()
+  const localMs = (localFrame / stageFps) * 1000
+  const adFrame = partFrom + localFrame
   const inT =
     enter && enter.durationMs > 0 ? clamp01(localMs / enter.durationMs) : 1
   const outT =
@@ -390,6 +462,38 @@ function PartLayer({
           objectFit: "cover",
         }}
       />
+      {magnifiers
+        // Mounted a second early, so its copy of the footage is ready.
+        .filter(
+          ({ from, frames }) =>
+            adFrame >= from - stageFps && adFrame < from + frames
+        )
+        .map(({ item, from, frames }) => (
+          <div key={item.id} style={{ opacity: adFrame >= from ? 1 : 0 }}>
+            <MagnifierLens
+              box={item.box}
+              frames={frames}
+              frame={Math.max(0, adFrame - from)}
+              width={frameWidth}
+              height={frameHeight}
+              video={
+                <Html5Video
+                  src={videoUrl}
+                  muted
+                  pauseWhenBuffering
+                  trimBefore={trimBefore}
+                  playbackRate={speed}
+                  style={{
+                    display: "block",
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                  }}
+                />
+              }
+            />
+          </div>
+        ))}
     </div>
   )
 }

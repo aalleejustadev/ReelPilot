@@ -16,6 +16,8 @@ import { deleteFolder, fileSize, signedFileUpload } from "@/shared/storage"
 
 import { analyzeFootageJob, processFootageJob } from "./jobs/definitions"
 import { directMotion } from "./lib/direct-motion"
+import { parseStoredInsight } from "./lib/insight"
+import { suggestGraphic, type GraphicSuggestion } from "./lib/suggest-graphic"
 import { presentationFor } from "./lib/motion"
 import { getFootage } from "./queries"
 import {
@@ -25,6 +27,7 @@ import {
   footageIdSchema,
   moveMarkerSchema,
   requestUploadSchema,
+  suggestGraphicSchema,
   updateMarkerSchema,
   updatePresentationSchema,
   updateShotSchema,
@@ -366,6 +369,39 @@ export async function analyzeFootageAgain(
 
     refreshFootage()
     return ok(null)
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+/** "Let AI choose": the graphic that suits a moment, and its label. */
+export async function suggestMomentGraphic(
+  input: unknown
+): Promise<Result<GraphicSuggestion>> {
+  try {
+    const parsed = suggestGraphicSchema.safeParse(input)
+    if (!parsed.success) throw new AppError("NOT_FOUND", "That moment is gone.")
+
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    const clip = await getFootage(workspace.id, parsed.data.footageId)
+    const marker = clip?.markers.find((m) => m.id === parsed.data.markerId)
+    if (!clip || !marker)
+      throw new AppError("NOT_FOUND", "That moment is gone.")
+    await consumeRateLimit({
+      key: `graphic-suggestion:${workspace.id}`,
+      limit: aiLimits.graphicSuggestionsPerDay,
+      windowSeconds: 24 * 60 * 60,
+      message: `You’ve asked the AI for ${aiLimits.graphicSuggestionsPerDay} graphics today. Pick one of the suggestions, or try again tomorrow.`,
+    })
+    const kit = await getBrandKit(workspace.id, clip.brandKitId)
+    return ok(
+      await suggestGraphic({
+        insight: parseStoredInsight(marker.insight),
+        label: marker.label,
+        brandName: kit?.name ?? "the product",
+      })
+    )
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

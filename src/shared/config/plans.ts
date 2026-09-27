@@ -121,4 +121,6 @@ export const aiLimits = {
   motionDirectionsPerDay: 40,
   /** Key moments the AI describes from a frame, per workspace per day. */
   momentDescriptionsPerDay: 300,
+  /** "Let AI choose" a graphic for a moment, per workspace per day. */
+  graphicSuggestionsPerDay: 100,
 } as const

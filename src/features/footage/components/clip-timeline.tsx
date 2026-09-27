@@ -39,6 +39,9 @@ export function ClipTimeline({
   texts = [],
   selectedText = null,
   onSelectText,
+  graphics = [],
+  selectedGraphic = null,
+  onSelectGraphic,
   onSeek,
   onScrubbingChange,
   onSelect,
@@ -57,9 +60,13 @@ export function ClipTimeline({
   selectedPart?: number | null
   onSelectPart?: (index: number) => void
   /** Text items, in footage time. */
-  texts?: { id: string; startMs: number; endMs: number; label: string }[]
+  texts?: OverlayBlock[]
   selectedText?: string | null
   onSelectText?: (id: string) => void
+  /** Graphics, in footage time. */
+  graphics?: OverlayBlock[]
+  selectedGraphic?: string | null
+  onSelectGraphic?: (id: string) => void
   onSeek: (ms: number) => void
   /** True while the user drags, so playback can pause and resume. */
   onScrubbingChange: (scrubbing: boolean) => void
@@ -408,31 +415,21 @@ export function ClipTimeline({
         </div>
       )}
 
-      {/* Text on the ad. */}
-      {texts.length > 0 && (
-        <div className="relative h-6" aria-hidden>
-          <div className="absolute inset-x-3 inset-y-0">
-            {texts.map((text) => (
-              <button
-                key={text.id}
-                type="button"
-                tabIndex={-1}
-                className={cn(
-                  "absolute inset-y-0 truncate rounded-sm border border-border bg-card px-1.5 text-left text-xs font-medium",
-                  text.id === selectedText && "ring-2 ring-ring"
-                )}
-                style={{
-                  left: `${clampPercent(text.startMs, durationMs)}%`,
-                  width: `${Math.max(1, clampPercent(text.endMs - text.startMs, durationMs))}%`,
-                }}
-                onClick={() => onSelectText?.(text.id)}
-              >
-                {text.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Text and graphics on the ad. */}
+      <OverlayRow
+        items={texts}
+        selectedId={selectedText}
+        durationMs={durationMs}
+        className="bg-card font-medium"
+        onSelect={onSelectText}
+      />
+      <OverlayRow
+        items={graphics}
+        selectedId={selectedGraphic}
+        durationMs={durationMs}
+        className="bg-chroma-soft"
+        onSelect={onSelectGraphic}
+      />
 
       {/* Which shot each part of the clip uses. */}
       <div
@@ -465,6 +462,55 @@ export function ClipTimeline({
             ))}
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+type OverlayBlock = {
+  id: string
+  startMs: number
+  endMs: number
+  label: string
+}
+
+/** A row of blocks for items on the ad (text, graphics). */
+function OverlayRow({
+  items,
+  selectedId,
+  durationMs,
+  className,
+  onSelect,
+}: {
+  items: OverlayBlock[]
+  selectedId: string | null
+  durationMs: number
+  className: string
+  onSelect?: (id: string) => void
+}) {
+  if (items.length === 0) return null
+  return (
+    <div className="relative h-6" aria-hidden>
+      <div className="absolute inset-x-3 inset-y-0">
+        {items.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            tabIndex={-1}
+            className={cn(
+              "absolute inset-y-0 truncate rounded-sm border border-border px-1.5 text-left text-xs",
+              className,
+              item.id === selectedId && "ring-2 ring-ring"
+            )}
+            style={{
+              left: `${clampPercent(item.startMs, durationMs)}%`,
+              width: `${Math.max(1, clampPercent(item.endMs - item.startMs, durationMs))}%`,
+            }}
+            onClick={() => onSelect?.(item.id)}
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
     </div>
   )

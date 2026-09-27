@@ -2,7 +2,7 @@ import { ArrowLeftIcon, FilmIcon } from "lucide-react"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
 
-import { getBrandKit } from "@/features/brand-kits"
+import { getBrandKit, logoUrlFor } from "@/features/brand-kits"
 import {
   clipMediaUrls,
   DeleteClipButton,
@@ -18,6 +18,15 @@ import { LinkButton } from "@/shared/ui/link-button"
 import { Spinner } from "@/shared/ui/spinner"
 
 export const metadata: Metadata = { title: "Footage editor" }
+
+/** "https://www.acme.app/pricing" → "acme.app" (for end cards). */
+function siteLabelFor(url: string) {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "")
+  } catch {
+    return ""
+  }
+}
 
 export default async function FootageEditorPage({
   params,
@@ -81,6 +90,8 @@ export default async function FootageEditorPage({
           kitId={kitId}
           kitName={kit.name}
           kitFonts={kit.fonts}
+          kitLogoUrl={await logoUrlFor(kit.logoKey)}
+          kitSite={siteLabelFor(kit.url)}
         />
       )
     }

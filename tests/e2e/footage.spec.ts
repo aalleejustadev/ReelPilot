@@ -576,3 +576,55 @@ test("lens: depth of field on angled shots, progressive blur on the screen", asy
   )
   expect(consoleProblems).toEqual([])
 })
+
+test("turn a moment into graphics, place them, and close on an end card", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const stage = page.getByTestId("motion-stage")
+  const list = page.getByRole("list", { name: "Graphics on the ad" })
+
+  // The moment at 2s becomes a spotlight with a label.
+  await page
+    .getByRole("group", { name: "Timeline" })
+    .getByRole("button", { name: /^Select the moment/ })
+    .first()
+    .click()
+  await tools.getByRole("tab", { name: "Graphics" }).click()
+  await page.getByRole("button", { name: /^Spotlight \+ label/ }).click()
+  await expect(list.getByRole("listitem")).toHaveCount(2)
+  await page.getByRole("textbox", { name: "Label" }).fill("Colour bars")
+  await expect(stage.getByText("Colour bars")).toBeVisible()
+
+  // Place it: click the middle of the (flat) video.
+  await page.getByRole("button", { name: "Place on video" }).click()
+  await page.getByTestId("camera-frame").click()
+  await expect(page.getByText(/^50% × 50%$/)).toBeVisible()
+
+  // An end card closes the ad.
+  await page.getByRole("button", { name: /^End card/ }).click()
+  await page.getByRole("textbox", { name: "Headline" }).fill("Try Acme free")
+  await expect(stage.getByText("Try Acme free")).toBeVisible()
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+  await expectNoViolations(page)
+
+  await page.reload()
+  await page
+    .getByRole("tablist", { name: "Editor tools" })
+    .getByRole("tab", { name: "Graphics" })
+    .click()
+  await expect(list.getByRole("listitem")).toHaveCount(3)
+  await expect(list.getByText("Callout · Colour bars")).toBeVisible()
+  expect(consoleProblems).toEqual([])
+})

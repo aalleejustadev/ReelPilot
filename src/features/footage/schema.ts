@@ -102,3 +102,8 @@ export const moveMarkerSchema = z.object({
   markerId: idSchema,
   atMs: z.number().int().min(0),
 })
+
+export const suggestGraphicSchema = z.object({
+  footageId: idSchema,
+  markerId: idSchema,
+})

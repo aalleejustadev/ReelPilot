@@ -11,6 +11,7 @@ import {
   PlayIcon,
   Redo2Icon,
   ScissorsIcon,
+  ShapesIcon,
   SparklesIcon,
   SquareIcon,
   TypeIcon,
@@ -45,6 +46,10 @@ import {
   type Presentation,
   type Shot,
   type TextItem,
+  boxAround,
+  graphicInfo,
+  isScreenGraphic,
+  type GraphicItem,
 } from "@/shared/motion"
 import type { StageFonts } from "@/remotion/components/TextLayer"
 import { adFonts, toAdFont } from "@/shared/config/ad-fonts"
@@ -61,12 +66,22 @@ import {
   addFootageMarker,
   directFootageMotion,
   moveFootageMarker,
+  suggestMomentGraphic,
   updateFootagePresentation,
   updateMarkerShot,
 } from "../actions"
 import { aimAt } from "../lib/aim"
 import { parseStoredAnalysis } from "../lib/analysis"
 import { formatDuration, formatTimecode } from "../lib/format"
+import {
+  boxFor,
+  buildTemplate,
+  graphicTemplates,
+  newGraphic,
+  newItemId,
+  templatesFor,
+  type GraphicTemplateId,
+} from "../lib/graphic-templates"
 import { commit, createHistory, redo, undo, type History } from "../lib/history"
 import { applyLook, resetLook } from "../lib/looks"
 import { parseStoredInsight } from "../lib/insight"
@@ -75,6 +90,7 @@ import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
 import { CutsPanel } from "./cuts-panel"
+import { GraphicsPanel } from "./graphics-panel"
 import { LensPanel } from "./lens-panel"
 import { TextPanel, type TextPreset } from "./text-panel"
 import { DeleteClipButton } from "./delete-clip-button"
@@ -103,12 +119,21 @@ function historyReducer(history: History<Motion>, action: HistoryAction) {
 }
 
 type Tool =
-  "effects" | "shot" | "cuts" | "text" | "lens" | "style" | "ai" | "moments"
+  | "effects"
+  | "shot"
+  | "cuts"
+  | "text"
+  | "graphics"
+  | "lens"
+  | "style"
+  | "ai"
+  | "moments"
 const tools: { id: Tool; label: string; icon: React.ComponentType }[] = [
   { id: "effects", label: "Effects", icon: WandSparklesIcon },
   { id: "shot", label: "Shot", icon: VideoIcon },
   { id: "cuts", label: "Cuts", icon: ScissorsIcon },
   { id: "text", label: "Text", icon: TypeIcon },
+  { id: "graphics", label: "Graphics", icon: ShapesIcon },
   { id: "lens", label: "Lens", icon: ApertureIcon },
   { id: "style", label: "Style", icon: PaletteIcon },
   { id: "ai", label: "AI", icon: SparklesIcon },
@@ -175,6 +200,8 @@ export function FootageEditor({
   kitId,
   kitName,
   kitFonts,
+  kitLogoUrl,
+  kitSite,
 }: {
   clip: FootageDetail
   videoUrl: string
@@ -187,6 +214,9 @@ export function FootageEditor({
   kitName: string
   /** The brand kit's fonts (names from the ad font list). */
   kitFonts: { heading?: string; body?: string }
+  kitLogoUrl: string | null
+  /** The kit's site, e.g. "acme.app". */
+  kitSite: string
 }) {
   const playerRef = useRef<PlayerRef>(null)
   const [links, renewLinks] = useStableLinks({
@@ -494,7 +524,7 @@ export function FootageEditor({
 
   function newText(patch: Partial<TextItem>): TextItem {
     return {
-      id: `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`,
+      id: newItemId("t"),
       atMs: Math.round(sourceMs),
       durationMs: 2500,
       text: "Your headline here",
@@ -535,6 +565,63 @@ export function FootageEditor({
     seek(sourceMs + 600)
   }
 
+  // ── Graphics ──
+  const [selectedGraphicId, setSelectedGraphicId] = useState<string | null>(
+    null
+  )
+  const [pickingGraphic, setPickingGraphic] = useState<string | null>(null)
+  const selectedInsight = selected ? parseStoredInsight(selected.insight) : null
+
+  function setGraphics(graphics: GraphicItem[], control: string) {
+    changePresentation({ ...presentation, graphics }, `graphic:${control}`)
+  }
+  function updateGraphic(
+    id: string,
+    patch: Partial<GraphicItem>,
+    control: string
+  ) {
+    setGraphics(
+      presentation.graphics.map((g) => (g.id === id ? { ...g, ...patch } : g)),
+      `${id}:${control}`
+    )
+  }
+  function addGraphics(added: GraphicItem[]) {
+    if (added.length === 0) return
+    setGraphics([...presentation.graphics, ...added], `add:${added[0]!.id}`)
+    setSelectedGraphicId(added.at(-1)!.id)
+    playerRef.current?.pause()
+    // Show it a moment into its entrance.
+    seek(added[0]!.atMs + 500)
+  }
+  function applyGraphicTemplate(template: GraphicTemplateId, label?: string) {
+    if (!selected) return
+    addGraphics(
+      buildTemplate(template, {
+        atMs: selected.atMs,
+        box: boxFor(selectedAim, selectedInsight),
+        insight: selectedInsight,
+        label,
+      })
+    )
+  }
+  async function askAiForGraphic() {
+    if (!selected) return
+    const result = await suggestMomentGraphic({
+      footageId: clip.id,
+      markerId: selected.id,
+    })
+    if (!result.ok) {
+      toast.add({ type: "error", title: result.error.message })
+      return
+    }
+    applyGraphicTemplate(result.data.template, result.data.label)
+    toast.add({
+      type: "success",
+      title: `The AI chose ${graphicTemplates[result.data.template].title.toLowerCase()}`,
+      description: `${undoKey} undoes it.`,
+    })
+  }
+
   function treatStillStretches(action: "speed" | "cut") {
     // A little of each still stretch stays at normal speed, so the cut
     // into and out of it doesn't feel abrupt.
@@ -566,6 +653,18 @@ export function FootageEditor({
   )
   useEffect(() => {
     pickFocusRef.current = ({ x, y }) => {
+      if (pickingGraphic) {
+        const item = presentation.graphics.find((g) => g.id === pickingGraphic)
+        if (item) {
+          updateGraphic(
+            item.id,
+            { box: boxAround(x, y, item.box.w, item.box.h) },
+            "place"
+          )
+        }
+        setPickingGraphic(null)
+        return
+      }
       const shot = selected ? shotOf(selected) : null
       if (selected && shot) {
         changeShotFor(
@@ -941,6 +1040,58 @@ export function FootageEditor({
                   }}
                 />
               </TabsContent>
+              <TabsContent value="graphics">
+                <GraphicsPanel
+                  items={presentation.graphics}
+                  selectedId={selectedGraphicId}
+                  playheadMs={sourceMs}
+                  moment={
+                    selected
+                      ? {
+                          atMs: selected.atMs,
+                          hasInsight: selectedInsight !== null,
+                        }
+                      : null
+                  }
+                  templates={templatesFor(selectedInsight)}
+                  isPicking={pickingGraphic !== null}
+                  onApplyTemplate={(template) => applyGraphicTemplate(template)}
+                  onAskAi={askAiForGraphic}
+                  onAdd={(kind) =>
+                    addGraphics([
+                      newGraphic(kind, {
+                        atMs: Math.round(sourceMs),
+                        ...(isScreenGraphic(kind) && {
+                          box: boxFor(selectedAim, selectedInsight),
+                        }),
+                        text: kind === "keys" ? "⌘ K" : "",
+                      }),
+                    ])
+                  }
+                  onSelect={(id) => {
+                    setSelectedGraphicId(id)
+                    const item = presentation.graphics.find((g) => g.id === id)
+                    if (item) {
+                      playerRef.current?.pause()
+                      seek(item.atMs + 500)
+                    }
+                  }}
+                  onUpdate={updateGraphic}
+                  onRemove={(id) => {
+                    setGraphics(
+                      presentation.graphics.filter((g) => g.id !== id),
+                      `remove:${id}`
+                    )
+                    setSelectedGraphicId(null)
+                  }}
+                  onTogglePick={() => {
+                    playerRef.current?.pause()
+                    setPickingGraphic((current) =>
+                      current ? null : selectedGraphicId
+                    )
+                  }}
+                />
+              </TabsContent>
               <TabsContent value="lens">
                 <LensPanel
                   lens={presentation.lens}
@@ -1053,8 +1204,11 @@ export function FootageEditor({
               videoHeight={clip.height ?? 1080}
               aspect={aspect}
               reduceMotion={reduceMotion}
-              pickingFocus={pickingFocus}
+              pickingFocus={pickingFocus || pickingGraphic !== null}
               onPickFocus={onPickFocus}
+              logoUrl={kitLogoUrl}
+              brandName={kitName}
+              siteLabel={kitSite}
               onTimeChange={onTimeChange}
               onPlayingChange={onPlayingChange}
               // The Player keeps its frame; the fresh link loads there.
@@ -1176,6 +1330,20 @@ export function FootageEditor({
             }
           })}
           selectedText={tool === "text" ? selectedTextId : null}
+          graphics={presentation.graphics.map((item) => {
+            const startAd = toOutputNearest(edit, durationMs, item.atMs)
+            return {
+              id: item.id,
+              startMs: item.atMs,
+              endMs: toSource(edit, durationMs, startAd + item.durationMs),
+              label: graphicInfo[item.kind].label,
+            }
+          })}
+          selectedGraphic={tool === "graphics" ? selectedGraphicId : null}
+          onSelectGraphic={(id) => {
+            setSelectedGraphicId(id)
+            if (!readOnly) setTool("graphics")
+          }}
           onSelectText={(id) => {
             setSelectedTextId(id)
             if (!readOnly) setTool("text")

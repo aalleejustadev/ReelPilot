@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { clipEditSchema } from "./edit"
+import { graphicItemSchema, graphicLimits } from "./graphics"
 import { lensSchema } from "./lens"
 import { textItemSchema, textLimits, textStyleSchema } from "./text"
 
@@ -64,6 +65,8 @@ export const presentationSchema = z.object({
     from: hexColor,
     to: hexColor,
   }),
+  /** A slow drift of light across the background (constant, linear). */
+  animatedBackground: z.boolean().default(false),
   frame: z.object({
     /** Corner radius, as a % of the frame's width. */
     radius: z.number().min(0).max(8),
@@ -85,6 +88,7 @@ export const presentationSchema = z.object({
   /** The video's text style, and its text items. */
   textStyle: textStyleSchema.default({ animation: "word-rise" }),
   texts: z.array(textItemSchema).max(textLimits.items).default([]),
+  graphics: z.array(graphicItemSchema).max(graphicLimits.items).default([]),
   /** Depth of field and progressive blur. */
   lens: lensSchema.default({
     depthOfField: { enabled: false, fStop: 2.8, maxBlur: 1.2 },
