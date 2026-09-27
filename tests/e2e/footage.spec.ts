@@ -138,6 +138,45 @@ test("upload a clip, let the worker process it, then edit its markers", async ({
   ).toHaveAttribute("aria-pressed", "true")
   await expectNoViolations(page)
 
+  // Drag the playhead to 60% of the 5s clip, then nudge it with the keyboard.
+  const timeline = page.getByRole("group", { name: "Timeline" })
+  const box = await timeline.boundingBox()
+  if (!box) throw new Error("Timeline not visible")
+  const middleY = box.y + box.height / 2
+  await page.mouse.move(box.x + 4, middleY)
+  await page.mouse.down()
+  await page.mouse.move(box.x + box.width * 0.6, middleY, { steps: 6 })
+  await page.mouse.up()
+  const playhead = page.getByRole("slider", { name: "Playhead" })
+  await expect(playhead).toHaveAttribute("aria-valuetext", /^0:0(2\.9|3\.\d)$/)
+  const before = Number(await playhead.getAttribute("aria-valuenow"))
+  await playhead.press("ArrowRight")
+  await expect(playhead).toHaveAttribute("aria-valuenow", String(before + 100))
+
+  // Play from there; Stop returns to the start.
+  await page.getByRole("button", { name: "Play", exact: true }).click()
+  await expect(
+    page.getByRole("button", { name: "Pause", exact: true })
+  ).toBeVisible()
+  await page.getByRole("button", { name: "Stop" }).click()
+  await expect(playhead).toHaveAttribute("aria-valuetext", "0:00.0")
+
+  // Each key moment can take its own shot right in the list.
+  const shotSelect = page.getByRole("combobox", {
+    name: /^Camera shot at 0:02/,
+  })
+  await shotSelect.click()
+  await page.getByRole("option", { name: "Tilt left" }).click()
+  await expect(shotSelect).toContainText("Tilt left")
+  await expect(inspector.getByText("Saved")).toBeVisible()
+
+  // Ready-made AI prompts fill the instruction.
+  await inspector.getByRole("tab", { name: "AI" }).click()
+  await inspector.getByRole("button", { name: "Feature tour" }).click()
+  await expect(
+    inspector.getByRole("textbox", { name: "Describe the motion" })
+  ).toHaveValue(/^Zoom into each key moment/)
+
   // Add a marker at the start, label it, then remove it.
   await page
     .getByRole("group", { name: "Timeline" })

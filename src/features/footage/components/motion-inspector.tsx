@@ -10,6 +10,7 @@ import {
   easingNames,
   introKinds,
   introLabels,
+  presetOf,
   shotPresetNames,
   shotPresets,
   type CameraSettings,
@@ -42,6 +43,7 @@ import { Textarea } from "@/shared/ui/textarea"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 
 import { formatTimecode } from "../lib/format"
+import { motionPrompts } from "../lib/motion-prompts"
 
 export type InspectorTab = "shot" | "style" | "ai"
 
@@ -49,16 +51,6 @@ const easingLabels: Record<EasingName, string> = {
   smooth: "Smooth",
   snappy: "Snappy",
   linear: "Linear",
-}
-
-/** The preset a camera matches exactly, if any. */
-function presetOf(camera: CameraSettings): ShotPresetName | undefined {
-  return shotPresetNames.find((name) => {
-    const preset = shotPresets[name].camera
-    return (Object.keys(preset) as (keyof CameraSettings)[]).every(
-      (key) => Math.abs(preset[key] - camera[key]) < 0.001
-    )
-  })
 }
 
 function SliderField({
@@ -461,6 +453,29 @@ function DirectPanel({
         if (instruction.trim()) onDirect(instruction)
       }}
     >
+      <Field>
+        <FieldLabel id="motion-prompts-label">Start from a prompt</FieldLabel>
+        <div
+          role="group"
+          aria-labelledby="motion-prompts-label"
+          className="flex flex-wrap gap-2"
+        >
+          {motionPrompts.map((prompt) => (
+            <Button
+              key={prompt.title}
+              type="button"
+              size="sm"
+              variant={instruction === prompt.text ? "secondary" : "outline"}
+              aria-pressed={instruction === prompt.text}
+              disabled={isDirecting}
+              title={prompt.text}
+              onClick={() => setInstruction(prompt.text)}
+            >
+              {prompt.title}
+            </Button>
+          ))}
+        </div>
+      </Field>
       <Field>
         <FieldLabel htmlFor="motion-instruction">
           Describe the motion

@@ -4,6 +4,7 @@ import {
   FlagIcon,
   PauseIcon,
   PlayIcon,
+  SquareIcon,
   TrashIcon,
   VideoIcon,
 } from "lucide-react"
@@ -16,8 +17,16 @@ import {
   useTransition,
 } from "react"
 
-import { cn } from "@/shared/lib/utils"
-import type { Presentation, Shot } from "@/shared/motion"
+import {
+  defaultShot,
+  presetOf,
+  shotLabel,
+  shotPresetNames,
+  shotPresets,
+  type Presentation,
+  type Shot,
+  type ShotPresetName,
+} from "@/shared/motion"
 import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import {
@@ -29,6 +38,14 @@ import {
 } from "@/shared/ui/card"
 import { Input } from "@/shared/ui/input"
 import { Spinner } from "@/shared/ui/spinner"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/shared/ui/select"
 import { toast } from "@/shared/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 
@@ -44,6 +61,7 @@ import { formatTimecode } from "../lib/format"
 import { parseStoredShot } from "../lib/motion"
 import type { FootageDetail } from "../queries"
 import { footageLimits } from "../schema"
+import { ClipTimeline } from "./clip-timeline"
 import { MotionInspector, type InspectorTab } from "./motion-inspector"
 import { MotionStage, stageAspects, type StageAspect } from "./motion-stage"
 
@@ -163,12 +181,15 @@ export function ClipEditor({
     seek(Math.min(durationMs, marker.atMs + (shot?.transitionMs ?? 0)))
   }
 
-  function changeShot(shot: Shot | null) {
-    if (!selected) return
-    const markerId = selected.id
+  function changeShotFor(marker: Marker, shot: Shot | null) {
+    const markerId = marker.id
     setShotEdits((edits) => ({ ...edits, [markerId]: shot }))
-    showLanded(selected, shot)
+    showLanded(marker, shot)
     saveSoon(`shot:${markerId}`, () => updateMarkerShot({ markerId, shot }))
+  }
+
+  function changeShot(shot: Shot | null) {
+    if (selected) changeShotFor(selected, shot)
   }
 
   function changePresentation(next: Presentation) {
@@ -195,8 +216,28 @@ export function ClipEditor({
   function togglePlay() {
     const video = videoRef.current
     if (!video) return
+    // At the end, Play starts again from the beginning.
+    if (video.ended || video.currentTime * 1000 >= durationMs - 50) seek(0)
     if (video.paused) void video.play()
     else video.pause()
+  }
+
+  function stop() {
+    videoRef.current?.pause()
+    seek(0)
+  }
+
+  // Dragging the playhead pauses playback, then resumes it if it was on.
+  const resumeAfterScrub = useRef(false)
+  function onScrubbingChange(scrubbing: boolean) {
+    const video = videoRef.current
+    if (!video) return
+    if (scrubbing) {
+      resumeAfterScrub.current = !video.paused
+      video.pause()
+    } else if (resumeAfterScrub.current) {
+      void video.play()
+    }
   }
 
   function addAtCurrentTime() {
@@ -279,6 +320,15 @@ export function ClipEditor({
           >
             {isPlaying ? <PauseIcon /> : <PlayIcon />}
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Stop"
+            onClick={stop}
+          >
+            <SquareIcon />
+          </Button>
           <span className="font-mono text-sm" aria-label="Playback position">
             {formatTimecode(currentMs)} / {formatTimecode(durationMs)}
           </span>
@@ -307,69 +357,29 @@ export function ClipEditor({
           </p>
         )}
 
-        <div
-          className="relative h-16 cursor-pointer overflow-hidden rounded-md border bg-muted"
-          role="group"
-          aria-label="Timeline"
-          onClick={(event) => {
-            const box = event.currentTarget.getBoundingClientRect()
-            seek(
-              Math.round(((event.clientX - box.left) / box.width) * durationMs)
-            )
-          }}
-        >
-          {thumbnailsUrl && (
-            // Signed, short-lived storage URL (see brand-kits LogoField).
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={thumbnailsUrl}
-              alt=""
-              className="absolute inset-y-0 left-0 h-full max-w-none"
-              style={{ width: `${stripWidth}%` }}
-            />
-          )}
-          {clip.markers.map((marker) => {
-            const hasShot = Boolean(shotOf(marker))
-            return (
-              <button
-                key={marker.id}
-                type="button"
-                className="group absolute inset-y-0 -ml-2.5 flex w-5 justify-center outline-none"
-                // Kept just inside the ends so a marker at 0:00 stays visible.
-                style={{
-                  left: `clamp(0.375rem, ${(marker.atMs / durationMs) * 100}%, calc(100% - 0.375rem))`,
-                }}
-                aria-label={`Select the moment at ${formatTimecode(marker.atMs)}${marker.label ? `, ${marker.label}` : ""}${hasShot ? ", camera set" : ""}`}
-                aria-pressed={marker.id === selectedId}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  selectMarker(marker)
-                }}
-              >
-                <span
-                  aria-hidden
-                  // A light outline keeps the bar visible over any footage.
-                  className={cn(
-                    "h-full w-1 rounded-full bg-chroma-strong ring-2 ring-background group-hover:w-1.5 group-focus-visible:w-1.5",
-                    marker.source === "MANUAL" && "bg-tally-strong",
-                    marker.id === selectedId && "w-1.5 ring-foreground"
-                  )}
-                />
-                {hasShot && (
-                  <span
-                    aria-hidden
-                    className="absolute top-1 size-2.5 rounded-full bg-background ring-2 ring-foreground"
-                  />
-                )}
-              </button>
-            )
+        <ClipTimeline
+          durationMs={durationMs}
+          currentMs={currentMs}
+          thumbnailsUrl={thumbnailsUrl}
+          stripWidth={stripWidth}
+          moments={clip.markers.map((marker) => {
+            const shot = shotOf(marker)
+            return {
+              id: marker.id,
+              atMs: marker.atMs,
+              label: marker.label,
+              source: marker.source,
+              shotLabel: shot ? shotLabel(shot.camera) : null,
+            }
           })}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 w-0.5 bg-foreground ring-1 ring-background"
-            style={{ left: `${(currentMs / durationMs) * 100}%` }}
-          />
-        </div>
+          selectedId={selectedId}
+          onSeek={seek}
+          onScrubbingChange={onScrubbingChange}
+          onSelect={(id) => {
+            const marker = clip.markers.find((m) => m.id === id)
+            if (marker) selectMarker(marker)
+          }}
+        />
         {!readOnly && (
           <div>
             <Button
@@ -412,8 +422,9 @@ export function ClipEditor({
                     marker={marker}
                     readOnly={readOnly}
                     isSelected={marker.id === selectedId}
-                    hasShot={Boolean(shotOf(marker))}
+                    shot={shotOf(marker)}
                     onSelect={() => selectMarker(marker)}
+                    onShotChange={(shot) => changeShotFor(marker, shot)}
                   />
                 ))}
               </ul>
@@ -451,14 +462,16 @@ function MarkerRow({
   marker,
   readOnly,
   isSelected,
-  hasShot,
+  shot,
   onSelect,
+  onShotChange,
 }: {
   marker: Marker
   readOnly: boolean
   isSelected: boolean
-  hasShot: boolean
+  shot: Shot | null
   onSelect: () => void
+  onShotChange: (shot: Shot | null) => void
 }) {
   const [label, setLabel] = useState(marker.label ?? "")
   const [isSaving, startSave] = useTransition()
@@ -511,12 +524,12 @@ function MarkerRow({
         className="order-last w-full sm:order-none sm:w-auto sm:flex-1"
       />
       <div className="ml-auto flex items-center gap-2 sm:ml-0">
-        {hasShot && (
-          <Badge variant="outline">
-            <VideoIcon data-icon="inline-start" />
-            Camera
-          </Badge>
-        )}
+        <ShotSelect
+          time={time}
+          shot={shot}
+          disabled={readOnly}
+          onChange={onShotChange}
+        />
         <Badge variant={marker.source === "AUTO" ? "secondary" : "outline"}>
           {marker.source === "AUTO" ? "Auto" : "Manual"}
         </Badge>
@@ -534,5 +547,62 @@ function MarkerRow({
         )}
       </div>
     </li>
+  )
+}
+
+const keepPrevious = "keep"
+const customShot = "custom"
+
+/** A moment's shot, right in its row: keep the previous one or pick one. */
+function ShotSelect({
+  time,
+  shot,
+  disabled,
+  onChange,
+}: {
+  time: string
+  shot: Shot | null
+  disabled: boolean
+  onChange: (shot: Shot | null) => void
+}) {
+  const value = shot ? (presetOf(shot.camera) ?? customShot) : keepPrevious
+  const items = [
+    { value: keepPrevious, label: "Keep previous shot" },
+    ...shotPresetNames.map((name) => ({
+      value: name,
+      label: shotPresets[name].label,
+    })),
+    ...(value === customShot ? [{ value: customShot, label: "Custom" }] : []),
+  ]
+  return (
+    <Select
+      items={items}
+      value={value}
+      disabled={disabled}
+      onValueChange={(next) => {
+        if (!next || next === customShot) return
+        if (next === keepPrevious) return onChange(null)
+        const preset = shotPresets[next as ShotPresetName]
+        onChange({ ...(shot ?? defaultShot), camera: preset.camera })
+      }}
+    >
+      <SelectTrigger
+        size="sm"
+        aria-label={`Camera shot at ${time}`}
+        className="w-40"
+      >
+        <VideoIcon data-icon="inline-start" />
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectGroup>
+          {items.map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
+      </SelectContent>
+    </Select>
   )
 }

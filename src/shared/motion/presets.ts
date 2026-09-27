@@ -77,3 +77,19 @@ export const defaultPresentation: Presentation = {
   frame: { radius: 2, shadow: true, padding: 0.1 },
   intro: { kind: "none", durationMs: 1200 },
 }
+
+/** The preset a camera matches exactly, if any. */
+export function presetOf(camera: CameraSettings): ShotPresetName | undefined {
+  return shotPresetNames.find((name) => {
+    const preset = shotPresets[name].camera
+    return (Object.keys(preset) as (keyof CameraSettings)[]).every(
+      (key) => Math.abs(preset[key] - camera[key]) < 0.001
+    )
+  })
+}
+
+/** "Tilt left", or "Custom" for hand-tuned cameras. */
+export function shotLabel(camera: CameraSettings) {
+  const preset = presetOf(camera)
+  return preset ? shotPresets[preset].label : "Custom"
+}
