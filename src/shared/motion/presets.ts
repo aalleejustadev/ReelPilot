@@ -195,6 +195,15 @@ export const defaultPresentation: Presentation = {
   edit: { parts: [] },
   textStyle: { animation: "word-rise" },
   texts: [],
+  lens: {
+    depthOfField: { enabled: false, fStop: 2.8, maxBlur: 1.2 },
+    progressiveBlur: {
+      enabled: false,
+      from: "bottom",
+      strength: 0.8,
+      reach: 0.3,
+    },
+  },
 }
 
 /** The preset a camera matches exactly, if any. */

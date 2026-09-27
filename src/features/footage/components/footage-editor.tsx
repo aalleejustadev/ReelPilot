@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  ApertureIcon,
   ArrowLeftIcon,
   FlagIcon,
   FilmIcon,
@@ -74,6 +75,7 @@ import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
 import { CutsPanel } from "./cuts-panel"
+import { LensPanel } from "./lens-panel"
 import { TextPanel, type TextPreset } from "./text-panel"
 import { DeleteClipButton } from "./delete-clip-button"
 import {
@@ -100,12 +102,14 @@ function historyReducer(history: History<Motion>, action: HistoryAction) {
   return commit(history, action.next, { coalesceKey: action.coalesceKey })
 }
 
-type Tool = "effects" | "shot" | "cuts" | "text" | "style" | "ai" | "moments"
+type Tool =
+  "effects" | "shot" | "cuts" | "text" | "lens" | "style" | "ai" | "moments"
 const tools: { id: Tool; label: string; icon: React.ComponentType }[] = [
   { id: "effects", label: "Effects", icon: WandSparklesIcon },
   { id: "shot", label: "Shot", icon: VideoIcon },
   { id: "cuts", label: "Cuts", icon: ScissorsIcon },
   { id: "text", label: "Text", icon: TypeIcon },
+  { id: "lens", label: "Lens", icon: ApertureIcon },
   { id: "style", label: "Style", icon: PaletteIcon },
   { id: "ai", label: "AI", icon: SparklesIcon },
   { id: "moments", label: "Moments", icon: ListIcon },
@@ -935,6 +939,24 @@ export function FootageEditor({
                     )
                     setSelectedTextId(null)
                   }}
+                />
+              </TabsContent>
+              <TabsContent value="lens">
+                <LensPanel
+                  lens={presentation.lens}
+                  shotIsFlat={(() => {
+                    const camera = selected ? shotOf(selected)?.camera : null
+                    return (
+                      !camera ||
+                      (Math.abs(camera.tilt) < 1 && Math.abs(camera.turn) < 1)
+                    )
+                  })()}
+                  onChange={(lens, control) =>
+                    changePresentation(
+                      { ...presentation, lens },
+                      `lens:${control}`
+                    )
+                  }
                 />
               </TabsContent>
               <TabsContent value="shot">

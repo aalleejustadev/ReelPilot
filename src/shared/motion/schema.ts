@@ -1,6 +1,7 @@
 import { z } from "zod"
 
 import { clipEditSchema } from "./edit"
+import { lensSchema } from "./lens"
 import { textItemSchema, textLimits, textStyleSchema } from "./text"
 
 /**
@@ -84,5 +85,15 @@ export const presentationSchema = z.object({
   /** The video's text style, and its text items. */
   textStyle: textStyleSchema.default({ animation: "word-rise" }),
   texts: z.array(textItemSchema).max(textLimits.items).default([]),
+  /** Depth of field and progressive blur. */
+  lens: lensSchema.default({
+    depthOfField: { enabled: false, fStop: 2.8, maxBlur: 1.2 },
+    progressiveBlur: {
+      enabled: false,
+      from: "bottom",
+      strength: 0.8,
+      reach: 0.3,
+    },
+  }),
 })
 export type Presentation = z.output<typeof presentationSchema>

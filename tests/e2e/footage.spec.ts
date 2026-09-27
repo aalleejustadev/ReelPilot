@@ -510,3 +510,69 @@ test("add text in brand style, animated in, kept after a reload", async ({
   await expect(stage.getByText("Chase invoices automatically")).toBeHidden()
   expect(consoleProblems).toEqual([])
 })
+
+test("lens: depth of field on angled shots, progressive blur on the screen", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const stage = page.getByTestId("motion-stage")
+
+  // Flat: nothing to blur, and the panel says why.
+  await tools.getByRole("tab", { name: "Lens" }).click()
+  await page.getByRole("button", { name: /^Shallow focus/ }).click()
+  await expect(page.getByText(/The camera faces the screen here/)).toBeVisible()
+  await expect(stage.getByTestId("depth-of-field")).toHaveCount(0)
+
+  // An angled shot: the lens blurs what leans away.
+  await page
+    .getByRole("group", { name: "Timeline" })
+    .getByRole("button", { name: /^Select the moment/ })
+    .first()
+    .click()
+  await page.getByRole("button", { name: "Orbit left", exact: true }).click()
+  await expect(
+    stage.getByTestId("depth-of-field").locator("> div")
+  ).toHaveCount(6)
+  await tools.getByRole("tab", { name: "Lens" }).click()
+  await page.getByRole("button", { name: "f/8" }).click()
+  await expect(page.getByRole("button", { name: "f/8" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  )
+
+  // Progressive blur from all edges of the screen.
+  await page.getByRole("switch", { name: "Progressive blur" }).click()
+  await page.getByRole("button", { name: "All edges" }).click()
+  await expect(
+    stage.getByTestId("progressive-blur").locator("> div")
+  ).toHaveCount(6)
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+  await expectNoViolations(page)
+
+  // Kept after a reload.
+  await page.reload()
+  await page
+    .getByRole("tablist", { name: "Editor tools" })
+    .getByRole("tab", { name: "Lens" })
+    .click()
+  await expect(page.getByRole("button", { name: "f/8" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  )
+  await expect(page.getByRole("button", { name: "All edges" })).toHaveAttribute(
+    "aria-pressed",
+    "true"
+  )
+  expect(consoleProblems).toEqual([])
+})

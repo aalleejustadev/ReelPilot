@@ -12,9 +12,11 @@ import {
   cameraSpeed,
   cameraStyle,
   cameraTimeline,
+  depthOfFieldLayers,
   flatCamera,
   outputDuration,
   outputLayout,
+  progressiveBlurLayers,
   toOutput,
   type Presentation,
   type TimedShot,
@@ -104,7 +106,7 @@ export function FootageStage({
   accents = [],
 }: FootageStageProps) {
   const frameNumber = useCurrentFrame()
-  const { fps, width } = useVideoConfig()
+  const { fps, width, height } = useVideoConfig()
   const { edit } = presentation
   const layout = useMemo(
     () => outputLayout(edit, durationMs),
@@ -142,17 +144,55 @@ export function FootageStage({
       : cameraSpeed(poseAt(timeMs - 1000 / fps), pose, 1000 / fps)
   // Blur only fast moves (a slow drift stays sharp), capped.
   const blur = Math.min(maxBlur, Math.max(0, speed - 0.35) * 0.18) * unit
-  const { frame } = presentation
+  const { frame, lens } = presentation
+  // The frame fits inside the padded stage by width and height (CSS
+  // padding is a % of the width on all sides).
+  const pad = frame.padding * width
+  const frameWidth = Math.max(
+    1,
+    Math.min(
+      width - 2 * pad,
+      ((height - 2 * pad) * videoWidth) / Math.max(1, videoHeight)
+    )
+  )
+  const frameHeight = (frameWidth * videoHeight) / Math.max(1, videoWidth)
+  const perspectivePx = 140 * unit
+  const depthLayers =
+    lens.depthOfField.enabled && !flat
+      ? depthOfFieldLayers({
+          pose,
+          frameWidth,
+          frameHeight,
+          stageWidth: width,
+          perspectivePx,
+          fStop: lens.depthOfField.fStop,
+          maxBlur: lens.depthOfField.maxBlur,
+        })
+      : []
+  const edgeBlur = lens.progressiveBlur
+  const edgeLayers = edgeBlur.enabled
+    ? progressiveBlurLayers({
+        from: edgeBlur.from,
+        strength: edgeBlur.strength,
+        reach: edgeBlur.reach,
+        stageWidth: width,
+        width: frameWidth,
+        height: frameHeight,
+      })
+    : []
 
   return (
     <AbsoluteFill
-      style={{ background: backgroundStyle(presentation.background) }}
+      style={{
+        background: backgroundStyle(presentation.background),
+        overflow: "hidden",
+      }}
     >
       <AbsoluteFill
         style={{
           alignItems: "center",
           justifyContent: "center",
-          perspective: `${140 * unit}px`,
+          perspective: `${perspectivePx}px`,
           padding: `${frame.padding * 100}%`,
         }}
       >
@@ -161,8 +201,9 @@ export function FootageStage({
           className="will-change-transform"
           style={{
             position: "relative",
-            width: "100%",
-            aspectRatio: `${videoWidth} / ${videoHeight}`,
+            width: `${frameWidth}px`,
+            height: `${frameHeight}px`,
+            flexShrink: 0,
             overflow: "hidden",
             transform: style.transform,
             transformOrigin: style.transformOrigin,
@@ -216,6 +257,8 @@ export function FootageStage({
               </Sequence>
             )
           })}
+          <BlurLayers layers={depthLayers} testId="depth-of-field" />
+          <BlurLayers layers={edgeLayers} testId="progressive-blur" />
         </div>
       </AbsoluteFill>
       {!flat && (
@@ -230,6 +273,40 @@ export function FootageStage({
         />
       )}
     </AbsoluteFill>
+  )
+}
+
+/**
+ * Stacked blur layers, each blurring what's beneath it where its mask
+ * shows (backdrop-filter), so blur can vary smoothly across an area.
+ */
+function BlurLayers({
+  layers,
+  testId,
+}: {
+  layers: { blurPx: number; mask: string }[]
+  testId: string
+}) {
+  if (layers.length === 0) return null
+  return (
+    <div
+      data-testid={testId}
+      style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
+    >
+      {layers.map((layer, i) => (
+        <div
+          key={i}
+          style={{
+            position: "absolute",
+            inset: 0,
+            backdropFilter: `blur(${layer.blurPx}px)`,
+            WebkitBackdropFilter: `blur(${layer.blurPx}px)`,
+            maskImage: layer.mask,
+            WebkitMaskImage: layer.mask,
+          }}
+        />
+      ))}
+    </div>
   )
 }
 
