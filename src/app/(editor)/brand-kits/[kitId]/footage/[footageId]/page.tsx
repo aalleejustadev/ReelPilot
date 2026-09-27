@@ -78,7 +78,8 @@ export default async function FootageEditorPage({
           initialPresentation={presentationFor(clip.presentation, colors)}
           brandColors={brandColors}
           readOnly={!canEdit}
-          header={header}
+          kitId={kitId}
+          kitName={kit.name}
         />
       )
     }

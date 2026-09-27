@@ -216,3 +216,52 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   await expect(page.getByText("No footage yet")).toBeVisible()
   expect(consoleProblems).toEqual([])
 })
+
+test("playback keeps going through saves and refreshes to the very end", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  // Regression (2026-09-27): after a save, the server refresh re-rendered
+  // server-built header elements as undefined inside the editor, which
+  // crashed it and froze the page mid-playback.
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const player = page.locator("video")
+  const state = () =>
+    player.evaluate((v: HTMLVideoElement) => ({
+      paused: v.paused,
+      ended: v.ended,
+      t: v.currentTime,
+    }))
+
+  // A look saves every moment; wait out the saves while paused.
+  await page.getByRole("button", { name: /^Showcase/ }).click()
+  await page.getByRole("button", { name: "Pause", exact: true }).click()
+  await page
+    .getByRole("group", { name: "Timeline" })
+    .getByRole("button", { name: /^Select the moment/ })
+    .first()
+    .click()
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+  await page.waitForTimeout(2500)
+
+  // Play from the selected moment; add a moment mid-play (that refreshes
+  // the page); it still plays to the end.
+  await page.getByRole("button", { name: "Play", exact: true }).click()
+  await page.waitForTimeout(600)
+  await page.getByRole("button", { name: /^Add marker at/ }).click()
+  await expect(page.getByText(/^Marker added at/)).toBeVisible()
+  await expect
+    .poll(async () => (await state()).ended, { timeout: 10_000 })
+    .toBe(true)
+  expect((await state()).t).toBeGreaterThan(4.9)
+  expect(consoleProblems).toEqual([])
+})

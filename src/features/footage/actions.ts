@@ -223,7 +223,8 @@ export async function updateMarkerShot(input: unknown): Promise<Result<null>> {
       parsed.data.shot
     )
 
-    refreshFootage()
+    // No page refresh: the editor already shows this, and nothing else
+    // renders shots or style (refreshing mid-playback was wasted work).
     return ok(null)
   } catch (error) {
     unstable_rethrow(error)
@@ -245,7 +246,8 @@ export async function updateFootagePresentation(
       parsed.data.presentation
     )
 
-    refreshFootage()
+    // No page refresh: the editor already shows this, and nothing else
+    // renders shots or style (refreshing mid-playback was wasted work).
     return ok(null)
   } catch (error) {
     unstable_rethrow(error)
@@ -292,7 +294,8 @@ export async function directFootageMotion(input: unknown): Promise<
     })
     await service.applyMotionDirection(workspace.id, clip.id, direction)
 
-    refreshFootage()
+    // No page refresh: the editor already shows this, and nothing else
+    // renders shots or style (refreshing mid-playback was wasted work).
     return ok(direction)
   } catch (error) {
     unstable_rethrow(error)

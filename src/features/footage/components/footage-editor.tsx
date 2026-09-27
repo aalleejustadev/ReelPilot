@@ -1,6 +1,7 @@
 "use client"
 
 import {
+  ArrowLeftIcon,
   FlagIcon,
   FilmIcon,
   ListIcon,
@@ -27,6 +28,7 @@ import {
 
 import { shotLabel, type Presentation, type Shot } from "@/shared/motion"
 import { Button } from "@/shared/ui/button"
+import { LinkButton } from "@/shared/ui/link-button"
 import { Spinner } from "@/shared/ui/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
 import { toast } from "@/shared/ui/toast"
@@ -39,12 +41,13 @@ import {
   updateFootagePresentation,
   updateMarkerShot,
 } from "../actions"
-import { formatTimecode } from "../lib/format"
+import { formatDuration, formatTimecode } from "../lib/format"
 import { commit, createHistory, redo, undo, type History } from "../lib/history"
 import { applyLook, resetLook } from "../lib/looks"
 import { parseStoredShot } from "../lib/motion"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline } from "./clip-timeline"
+import { DeleteClipButton } from "./delete-clip-button"
 import {
   DirectPanel,
   EffectsPanel,
@@ -109,7 +112,8 @@ export function FootageEditor({
   initialPresentation,
   brandColors,
   readOnly,
-  header,
+  kitId,
+  kitName,
 }: {
   clip: FootageDetail
   videoUrl: string
@@ -118,8 +122,8 @@ export function FootageEditor({
   initialPresentation: Presentation
   brandColors: string[]
   readOnly: boolean
-  /** Back link, title and delete button, rendered by the page. */
-  header: { start: React.ReactNode; end: React.ReactNode }
+  kitId: string
+  kitName: string
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [currentMs, setCurrentMs] = useState(0)
@@ -407,7 +411,25 @@ export function FootageEditor({
     <div className="flex min-h-dvh flex-col bg-background lg:h-dvh">
       {/* Top bar */}
       <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-3 sm:gap-3 sm:px-4">
-        {header.start}
+        {/* Rendered here, not passed in from the server page: elements
+            built by the server and handed to this client component came
+            back undefined after a server-action refresh, crashing it. */}
+        <LinkButton
+          href={`/brand-kits/${kitId}/footage`}
+          variant="ghost"
+          icon={<ArrowLeftIcon />}
+        >
+          <span className="hidden sm:inline">Footage</span>
+          <span className="sr-only sm:hidden">Back to footage</span>
+        </LinkButton>
+        <div className="flex min-w-0 flex-col leading-tight">
+          <h1 className="truncate text-sm font-semibold">{clip.name}</h1>
+          <p className="truncate font-mono text-xs text-muted-foreground">
+            {kitName}
+            {clip.durationMs !== null &&
+              ` · ${formatDuration(clip.durationMs)}`}
+          </p>
+        </div>
         <div className="ml-auto flex items-center gap-1 sm:gap-2">
           {!readOnly && (
             <>
@@ -457,7 +479,13 @@ export function FootageEditor({
               </span>
             </>
           )}
-          {header.end}
+          {!readOnly && (
+            <DeleteClipButton
+              footageId={clip.id}
+              clipName={clip.name}
+              kitId={kitId}
+            />
+          )}
         </div>
       </header>
 
