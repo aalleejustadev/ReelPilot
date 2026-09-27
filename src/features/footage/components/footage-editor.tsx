@@ -64,13 +64,15 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 import {
   addFootageMarker,
-  directFootageMotion,
+  directFootageEdit,
   moveFootageMarker,
   suggestMomentGraphic,
   updateFootagePresentation,
   updateMarkerShot,
 } from "../actions"
 import { aimAt } from "../lib/aim"
+import { applyPlan, planSummary } from "../lib/apply-plan"
+import type { EditScope } from "../lib/direct-edit"
 import { parseStoredAnalysis } from "../lib/analysis"
 import { formatDuration, formatTimecode } from "../lib/format"
 import {
@@ -881,35 +883,51 @@ export function FootageEditor({
     play()
   }
 
-  function direct(instruction: string) {
+  // The last AI edit's reasoning, shown in the AI panel.
+  const [lastPlan, setLastPlan] = useState<{
+    reasoning: string
+    summary: string
+  } | null>(null)
+
+  function direct(instruction: string, scope: EditScope) {
     startDirect(async () => {
-      const result = await directFootageMotion({
+      const result = await directFootageEdit({
         footageId: clip.id,
         instruction,
+        scope,
       })
       if (!result.ok) {
         toast.add({ type: "error", title: result.error.message })
         return
       }
-      // Saved by the action already: record it for undo, don't save again.
-      dispatch({
-        type: "commit",
-        next: {
-          presentation: result.data.presentation,
-          shots: {
-            ...shots,
-            ...Object.fromEntries(
-              result.data.shots.map(({ markerId, shot }) => [markerId, shot])
-            ),
-          },
-        },
+      const next = applyPlan(result.data, {
+        moments: markers.map((marker) => {
+          const insight = parseStoredInsight(marker.insight)
+          return {
+            id: marker.id,
+            atMs: marker.atMs,
+            insight,
+            aim: aimAt({ analysis, recording, insight, atMs: marker.atMs }),
+          }
+        }),
+        current: history.present,
+        durationMs,
+        idle: analysis?.idle ?? [],
+        scope,
       })
+      // One undoable step; saved like any other change.
+      change(
+        next,
+        `ai:${instruction}:${JSON.stringify(scope)}:${Math.random()}`
+      )
+      const summary = planSummary(result.data, scope)
+      setLastPlan({ reasoning: result.data.reasoning, summary })
       stop()
       play()
       toast.add({
         type: "success",
-        title: `Camera set for ${result.data.shots.length} key ${result.data.shots.length === 1 ? "moment" : "moments"}`,
-        description: `Playing it from the start. ${undoKey} undoes it.`,
+        title: "Edit directed",
+        description: `${summary}. ${undoKey} undoes it.`,
       })
     })
   }
@@ -1237,6 +1255,7 @@ export function FootageEditor({
                 <DirectPanel
                   hasMoments={markers.length > 0}
                   isDirecting={isDirecting}
+                  lastPlan={lastPlan}
                   onDirect={direct}
                 />
               </TabsContent>

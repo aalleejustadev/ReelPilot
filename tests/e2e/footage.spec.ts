@@ -208,8 +208,8 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   await tools.getByRole("tab", { name: "AI", exact: true }).click()
   await page.getByRole("button", { name: "Feature tour" }).click()
   await expect(
-    page.getByRole("textbox", { name: "Describe the motion" })
-  ).toHaveValue(/^Zoom into each key moment/)
+    page.getByRole("textbox", { name: "Describe the ad" })
+  ).toHaveValue(/^A clear, calm feature tour/)
 
   // Add a moment at the start, label it, then remove it.
   await page.getByRole("button", { name: "Stop" }).click()

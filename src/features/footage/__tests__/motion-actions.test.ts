@@ -165,48 +165,57 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
     }
   })
 
-  it("applies an AI direction to the markers and the intro", async () => {
+  const scope = {
+    camera: true,
+    cuts: true,
+    text: true,
+    graphics: true,
+    lens: true,
+  }
+
+  it("returns a cleaned whole-edit plan from the AI", async () => {
     generateStructured.mockResolvedValue({
-      intro: "rise",
-      shots: [
+      look: "tour",
+      take: 1,
+      stillParts: "keep",
+      textStyle: "word-rise",
+      texts: [
         {
           markerId,
-          preset: "push-in",
-          zoom: 2,
-          focusX: 0.7,
-          focusY: 0.2,
-          transitionMs: 700,
-          drift: null,
+          role: "headline",
+          text: "Every invoice, on time",
+          emphasis: "on time",
         },
       ],
+      graphics: [
+        { markerId: "someone-elses", template: "magnify", label: "x" },
+      ],
+      endCard: null,
+      lens: "sharp",
+      reasoning: "Clear and calm.",
     })
 
-    const result = await actions.directFootageMotion({
+    const result = await actions.directFootageEdit({
       footageId,
-      instruction: "Zoom into the dashboard",
+      instruction: "A calm feature tour",
+      scope,
     })
 
-    expect(result).toMatchObject({ ok: true, data: { shots: [{ markerId }] } })
-    const clip = await db.footage.findUniqueOrThrow({
-      where: { id: footageId },
-      include: { markers: true },
+    expect(result).toMatchObject({
+      ok: true,
+      data: { look: "tour", texts: [{ markerId }], graphics: [] },
     })
-    // No saved presentation before: the brand colours are the background.
-    expect(clip.presentation).toMatchObject({
-      intro: { kind: "rise" },
-      background: { from: "#ff5a1f", to: "#2f6bff" },
-    })
-    expect(clip.markers[0]?.shot).toMatchObject({
-      camera: { zoom: 2, focusX: 0.7, focusY: 0.2 },
-      transitionMs: 700,
-    })
+    // The prompt carried the brand kit.
+    expect(generateStructured.mock.calls[0]?.[0].prompt).toContain(
+      "Brand: Acme"
+    )
   })
 
   it("asks for a key moment before directing", async () => {
     await db.footageMarker.deleteMany({ where: { footageId } })
 
     expect(
-      await actions.directFootageMotion({ footageId, instruction: "Go" })
+      await actions.directFootageEdit({ footageId, instruction: "Go", scope })
     ).toMatchObject({
       ok: false,
       error: { code: "VALIDATION", message: /key moment/ },
@@ -214,7 +223,20 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
     expect(generateStructured).not.toHaveBeenCalled()
   })
 
-  it("stops after the daily AI limit", async () => {
+  it("needs something in scope, and stops after the daily AI limit", async () => {
+    expect(
+      await actions.directFootageEdit({
+        footageId,
+        instruction: "Go",
+        scope: {
+          camera: false,
+          cuts: false,
+          text: false,
+          graphics: false,
+          lens: false,
+        },
+      })
+    ).toMatchObject({ ok: false, error: { code: "VALIDATION" } })
     await db.rateLimitBucket.create({
       data: {
         key: `motion-direction:${workspaceId}`,
@@ -222,9 +244,8 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
         windowStart: new Date(),
       },
     })
-
     expect(
-      await actions.directFootageMotion({ footageId, instruction: "Go" })
+      await actions.directFootageEdit({ footageId, instruction: "Go", scope })
     ).toMatchObject({ ok: false, error: { code: "RATE_LIMITED" } })
     expect(generateStructured).not.toHaveBeenCalled()
   })

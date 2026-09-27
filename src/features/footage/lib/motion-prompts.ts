@@ -1,23 +1,23 @@
-/** Ready-made "Direct with AI" instructions (owner request, 2026-09-27). */
+/** Ready-made "Direct with AI" instructions for the whole edit. */
 export const motionPrompts = [
   {
     title: "Product launch",
-    text: "Fly in from the left, then glide between the key moments with gentle tilts. Push in on anything the viewer should click. Premium and calm.",
+    text: "A premium launch video: rise in, glide between the key moments, a short benefit headline up front, spotlight the feature people should click, and end on a clear call to action.",
   },
   {
     title: "Feature tour",
-    text: "Zoom into each key moment so the interface is easy to read, easing back out between them. Clear and steady, no extreme angles.",
+    text: "A clear, calm feature tour: zoom into each key moment so the interface is easy to read, name each feature with a short label, and speed through anything slow.",
   },
   {
     title: "High energy",
-    text: "Punchy and fast: a dramatic opening, snappy moves and bold angles between moments. Keep text readable on the busiest screens.",
+    text: "Punchy and fast for social feeds: a bold opening, snappy moves, cut the dead time, big headlines with the key words highlighted, and a strong call to action.",
   },
   {
     title: "Minimal & clean",
-    text: "Mostly flat and centred, with subtle push-ins on the most important moments. Understated, like a premium product page.",
+    text: "Understated, like a premium product page: mostly flat, sharp lens, one or two short lines of text, no busy graphics, and a quiet end card.",
   },
   {
     title: "Cinematic",
-    text: "Open with a rise from below, then slow, sweeping turns between moments with long, smooth moves. Moody and cinematic.",
+    text: "Cinematic and moody: slow sweeping moves, a shallow-focus lens, a blur-resolve title on the hero moment, and a calm end card.",
   },
 ] as const

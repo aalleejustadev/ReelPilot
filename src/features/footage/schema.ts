@@ -89,13 +89,26 @@ export const updatePresentationSchema = z.object({
   presentation: presentationSchema,
 })
 
-export const directMotionSchema = z.object({
+export const directEditSchema = z.object({
   footageId: idSchema,
   instruction: z
     .string()
     .trim()
-    .min(1, "Describe the motion you want.")
+    .min(1, "Describe the ad you want.")
     .max(500, "Keep the instruction under 500 characters."),
+  /** What the AI may change. */
+  scope: z
+    .object({
+      camera: z.boolean(),
+      cuts: z.boolean(),
+      text: z.boolean(),
+      graphics: z.boolean(),
+      lens: z.boolean(),
+    })
+    .refine(
+      (scope) => Object.values(scope).some(Boolean),
+      "Let the AI change at least one thing."
+    ),
 })
 
 export const moveMarkerSchema = z.object({

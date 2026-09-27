@@ -10,20 +10,21 @@ import { aiLimits } from "@/shared/config/plans"
 import { enqueue } from "@/shared/jobs"
 import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
-import type { Presentation, Shot } from "@/shared/motion"
 import { consumeRateLimit } from "@/shared/rate-limit"
 import { deleteFolder, fileSize, signedFileUpload } from "@/shared/storage"
 
 import { analyzeFootageJob, processFootageJob } from "./jobs/definitions"
-import { directMotion } from "./lib/direct-motion"
+import { aimAt } from "./lib/aim"
+import { parseStoredAnalysis } from "./lib/analysis"
+import { directEdit, type EditPlan } from "./lib/direct-edit"
+import { parseStoredRecording } from "./lib/recording"
 import { parseStoredInsight } from "./lib/insight"
 import { suggestGraphic, type GraphicSuggestion } from "./lib/suggest-graphic"
-import { presentationFor } from "./lib/motion"
 import { getFootage } from "./queries"
 import {
   addMarkerSchema,
   completeUploadSchema,
-  directMotionSchema,
+  directEditSchema,
   footageIdSchema,
   moveMarkerSchema,
   requestUploadSchema,
@@ -261,17 +262,19 @@ export async function updateFootagePresentation(
   }
 }
 
-/** "Direct with AI": turns the owner's words into shots for every marker. */
-export async function directFootageMotion(input: unknown): Promise<
-  Result<{
-    presentation: Presentation
-    shots: { markerId: string; shot: Shot }[]
-  }>
-> {
+/**
+ * "Direct with AI" (v2): plans the whole edit (camera look, cuts, text,
+ * graphics, end card, lens) from the analysis, the brand kit and the
+ * owner's words. Returns the plan; the editor applies it with the
+ * deterministic engines as one undoable change, and saves as usual.
+ */
+export async function directFootageEdit(
+  input: unknown
+): Promise<Result<EditPlan>> {
   try {
-    const parsed = directMotionSchema.safeParse(input)
+    const parsed = directEditSchema.safeParse(input)
     if (!parsed.success)
-      throw invalid(parsed.error, "Describe the motion you want.")
+      throw invalid(parsed.error, "Describe the ad you want.")
 
     const { workspace } = await requireWorkspaceAccess("content:edit")
     const clip = await getFootage(workspace.id, parsed.data.footageId)
@@ -281,28 +284,46 @@ export async function directFootageMotion(input: unknown): Promise<
     if (clip.markers.length === 0) {
       throw new AppError(
         "VALIDATION",
-        "Add a key moment first: the AI directs the camera at each one."
+        "Add a key moment first: the AI builds the edit around them."
       )
     }
     await consumeRateLimit({
       key: `motion-direction:${workspace.id}`,
       limit: aiLimits.motionDirectionsPerDay,
       windowSeconds: 24 * 60 * 60,
-      message: `You’ve used AI direction ${aiLimits.motionDirectionsPerDay} times today. Adjust the shots by hand, or try again tomorrow.`,
+      message: `You’ve used AI direction ${aiLimits.motionDirectionsPerDay} times today. Adjust the edit by hand, or try again tomorrow.`,
     })
 
     const kit = await getBrandKit(workspace.id, clip.brandKitId)
-    const direction = await directMotion({
+    const analysis = parseStoredAnalysis(clip.analysis)
+    const recording = parseStoredRecording(clip.recording)
+    const plan = await directEdit({
       instruction: parsed.data.instruction,
       durationMs: clip.durationMs,
-      markers: clip.markers,
-      current: presentationFor(clip.presentation, kit?.colors ?? {}),
+      moments: clip.markers.map((marker) => {
+        const insight = parseStoredInsight(marker.insight)
+        const aim = aimAt({ analysis, recording, insight, atMs: marker.atMs })
+        return {
+          id: marker.id,
+          atMs: marker.atMs,
+          label: marker.label,
+          insight,
+          aimZoom: aim?.zoom ?? null,
+        }
+      }),
+      stillMs: (analysis?.idle ?? []).reduce(
+        (sum, r) => sum + r.endMs - r.startMs,
+        0
+      ),
+      brand: {
+        name: kit?.name ?? "the product",
+        description: kit?.description ?? "",
+        audience: kit?.audience ?? "",
+        tone: kit?.tone ?? null,
+        bannedWords: kit?.bannedWords ?? [],
+      },
     })
-    await service.applyMotionDirection(workspace.id, clip.id, direction)
-
-    // No page refresh: the editor already shows this, and nothing else
-    // renders shots or style (refreshing mid-playback was wasted work).
-    return ok(direction)
+    return ok(plan)
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

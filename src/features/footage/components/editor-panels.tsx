@@ -53,6 +53,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 
 import type { Aim } from "../lib/aim"
 import type { Palette } from "../lib/analysis"
+import type { EditScope } from "../lib/direct-edit"
 import { formatTimecode } from "../lib/format"
 import { backgroundPresets, looks, type Look } from "../lib/looks"
 import { motionPrompts } from "../lib/motion-prompts"
@@ -772,30 +773,55 @@ export function StylePanel({
 
 // ── AI ─────────────────────────────────────────────────────────────────────
 
+const scopeLabels: Record<keyof EditScope, string> = {
+  camera: "Camera",
+  cuts: "Cuts",
+  text: "Text",
+  graphics: "Graphics",
+  lens: "Lens",
+}
+
+/** "Direct with AI" v2: the AI plans the whole edit, within a scope. */
 export function DirectPanel({
   hasMoments,
   isDirecting,
+  lastPlan,
   onDirect,
 }: {
   hasMoments: boolean
   isDirecting: boolean
-  onDirect: (instruction: string) => void
+  lastPlan: { reasoning: string; summary: string } | null
+  onDirect: (instruction: string, scope: EditScope) => void
 }) {
   const [instruction, setInstruction] = useState("")
+  const [scope, setScope] = useState<(keyof EditScope)[]>([
+    "camera",
+    "cuts",
+    "text",
+    "graphics",
+    "lens",
+  ])
+  const scopeObject = Object.fromEntries(
+    (Object.keys(scopeLabels) as (keyof EditScope)[]).map((key) => [
+      key,
+      scope.includes(key),
+    ])
+  ) as EditScope
   return (
     <form
       className="flex flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault()
-        if (instruction.trim()) onDirect(instruction)
+        if (instruction.trim() && scope.length)
+          onDirect(instruction, scopeObject)
       }}
     >
       <PanelHeading
         title="Direct with AI"
         description={
           hasMoments
-            ? "Say how it should feel. The AI sets a shot for every key moment and an intro; fine-tune after."
-            : "Add a key moment first: the AI directs the camera at each one."
+            ? "Describe the ad you want. The AI plans the camera, cuts, text, graphics and lens from what’s on screen; everything stays editable."
+            : "Add a key moment first: the AI builds the edit around them."
         }
       />
       <Field>
@@ -822,12 +848,10 @@ export function DirectPanel({
         </div>
       </Field>
       <Field>
-        <FieldLabel htmlFor="motion-instruction">
-          Describe the motion
-        </FieldLabel>
+        <FieldLabel htmlFor="motion-instruction">Describe the ad</FieldLabel>
         <Textarea
           id="motion-instruction"
-          placeholder="Fly in from the left, then zoom into each feature. Keep it calm and readable."
+          placeholder="A calm launch video for finance teams. Headline the time saved, spotlight the export button, end on a free trial."
           value={instruction}
           maxLength={500}
           onChange={(event) => setInstruction(event.target.value)}
@@ -835,17 +859,58 @@ export function DirectPanel({
           className="min-h-28"
         />
       </Field>
+      <Field>
+        <span className="text-sm font-medium" id="ai-scope-label">
+          The AI may change
+        </span>
+        <ToggleGroup
+          aria-labelledby="ai-scope-label"
+          variant="outline"
+          multiple
+          className="flex flex-wrap gap-1"
+          value={scope}
+          onValueChange={(values) => setScope(values as (keyof EditScope)[])}
+        >
+          {(Object.keys(scopeLabels) as (keyof EditScope)[]).map((key) => (
+            <ToggleGroupItem key={key} value={key} className="text-xs">
+              {scopeLabels[key]}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+        <FieldDescription>
+          Text and graphics it plans replace the current ones; {"⌘Z"} brings
+          them back.
+        </FieldDescription>
+      </Field>
       <Button
         type="submit"
-        disabled={!hasMoments || isDirecting || !instruction.trim()}
+        disabled={
+          !hasMoments ||
+          isDirecting ||
+          !instruction.trim() ||
+          scope.length === 0
+        }
       >
         {isDirecting ? (
           <Spinner data-icon="inline-start" />
         ) : (
           <SparklesIcon data-icon="inline-start" />
         )}
-        Direct with AI
+        {isDirecting ? "Directing the edit…" : "Direct with AI"}
       </Button>
+      {lastPlan && (
+        <section
+          className="flex flex-col gap-1.5 rounded-lg border bg-muted/40 p-3"
+          aria-labelledby="ai-why-heading"
+          aria-live="polite"
+        >
+          <h3 id="ai-why-heading" className="text-sm font-medium">
+            Why this edit
+          </h3>
+          <p className="text-sm">{lastPlan.reasoning}</p>
+          <p className="text-xs text-muted-foreground">{lastPlan.summary}</p>
+        </section>
+      )}
     </form>
   )
 }
