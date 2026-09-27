@@ -15,6 +15,7 @@ import {
   VideoIcon,
   WandSparklesIcon,
 } from "lucide-react"
+import type { PlayerRef } from "@remotion/player"
 import {
   useCallback,
   useEffect,
@@ -61,6 +62,7 @@ import {
 } from "./editor-panels"
 import { MomentsPanel } from "./moments-panel"
 import { MotionStage, stageAspects, type StageAspect } from "./motion-stage"
+import { stageFps } from "@/remotion/compositions/FootageStage"
 import { RefreshWhileProcessing } from "./refresh-while-processing"
 
 type Marker = FootageDetail["markers"][number]
@@ -95,17 +97,9 @@ const prefersReducedMotion = () =>
 const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform)
 const noSubscribe = () => () => {}
 
-/**
- * Starts playback, ignoring the rejection browsers raise when a pause
- * interrupts a pending play() (e.g. Play then Pause straight away).
- */
-function playSafely(video: HTMLVideoElement | null) {
-  video?.play().catch((error: unknown) => {
-    if (!(error instanceof DOMException && error.name === "AbortError")) {
-      console.error(error)
-    }
-  })
-}
+/** Playback through the Remotion Player (frames at the stage's fps). */
+const playerTime = (player: PlayerRef | null) =>
+  player ? (player.getCurrentFrame() / stageFps) * 1000 : 0
 
 /**
  * Signed links change on every server render (each refresh re-signs
@@ -163,16 +157,12 @@ export function FootageEditor({
   kitId: string
   kitName: string
 }) {
-  const videoRef = useRef<HTMLVideoElement>(null)
+  const playerRef = useRef<PlayerRef>(null)
   const [links, renewLinks] = useStableLinks({
     videoUrl,
     posterUrl,
     thumbnailsUrl,
   })
-  // Where to pick up again after switching to fresh links.
-  const resumeAfterRenew = useRef<{ atS: number; playing: boolean } | null>(
-    null
-  )
   const [currentMs, setCurrentMs] = useState(0)
   const [isPlaying, setPlaying] = useState(false)
   const [isAdding, startAdd] = useTransition()
@@ -379,16 +369,15 @@ export function FootageEditor({
   )
 
   function seek(ms: number) {
-    const video = videoRef.current
-    if (!video) return
-    video.currentTime = ms / 1000
+    const player = playerRef.current
+    if (!player) return
+    player.seekTo(Math.round((ms / 1000) * stageFps))
     setCurrentMs(ms)
   }
 
   /** Paused: show where the camera lands, not the start of the move. */
   function showLanded(marker: Marker, shot: Shot | null) {
-    const video = videoRef.current
-    if (video && !video.paused) return
+    if (playerRef.current?.isPlaying()) return
     seek(Math.min(durationMs, marker.atMs + (shot?.transitionMs ?? 0)))
   }
 
@@ -404,54 +393,68 @@ export function FootageEditor({
     change({ shots, presentation: next }, `style:${control}`)
   }
 
+  // Stable for the Player's props; reads the latest selection.
+  const pickFocusRef = useRef<(point: { x: number; y: number }) => void>(
+    () => {}
+  )
+  useEffect(() => {
+    pickFocusRef.current = ({ x, y }) => {
+      const shot = selected ? shotOf(selected) : null
+      if (selected && shot) {
+        changeShotFor(
+          selected,
+          { ...shot, camera: { ...shot.camera, focusX: x, focusY: y } },
+          "focus"
+        )
+      }
+      setPickingFocus(false)
+    }
+  })
+  const onPickFocus = useCallback(
+    (point: { x: number; y: number }) => pickFocusRef.current(point),
+    []
+  )
+
   function selectMarker(marker: Marker) {
     setSelectedId(marker.id)
     setPickingFocus(false)
     showLanded(marker, shotOf(marker))
   }
 
-  const togglePlay = useCallback(() => {
-    const video = videoRef.current
-    if (!video) return
+  const play = useCallback(() => {
+    const player = playerRef.current
+    if (!player) return
     // At the end, Play starts again from the beginning.
-    if (video.ended || video.currentTime * 1000 >= durationMs - 50) {
-      video.currentTime = 0
+    if (playerTime(player) >= durationMs - 1000 / stageFps - 1) {
+      player.seekTo(0)
     }
-    if (video.paused) playSafely(video)
-    else video.pause()
+    player.play()
   }, [durationMs])
 
+  const togglePlay = useCallback(() => {
+    const player = playerRef.current
+    if (!player) return
+    if (player.isPlaying()) player.pause()
+    else play()
+  }, [play])
+
   function stop() {
-    videoRef.current?.pause()
+    playerRef.current?.pause()
     seek(0)
   }
 
   // Dragging the playhead pauses playback, then resumes it if it was on.
   const resumeAfterScrub = useRef(false)
   function onScrubbingChange(scrubbing: boolean) {
-    const video = videoRef.current
-    if (!video) return
+    const player = playerRef.current
+    if (!player) return
     if (scrubbing) {
-      resumeAfterScrub.current = !video.paused
-      video.pause()
+      resumeAfterScrub.current = player.isPlaying()
+      player.pause()
     } else if (resumeAfterScrub.current) {
-      playSafely(video)
+      player.play()
     }
   }
-
-  // After fresh links load, carry on from the same spot.
-  useEffect(() => {
-    const video = videoRef.current
-    const resume = resumeAfterRenew.current
-    if (!video || !resume) return
-    const onLoaded = () => {
-      resumeAfterRenew.current = null
-      video.currentTime = resume.atS
-      if (resume.playing) playSafely(video)
-    }
-    video.addEventListener("loadedmetadata", onLoaded, { once: true })
-    return () => video.removeEventListener("loadedmetadata", onLoaded)
-  }, [links.videoUrl])
 
   // Leaving while a save is in flight would lose it: ask first.
   useEffect(() => {
@@ -487,7 +490,7 @@ export function FootageEditor({
   }, [readOnly, stepHistory, togglePlay])
 
   function addAtCurrentTime() {
-    const atMs = Math.round((videoRef.current?.currentTime ?? 0) * 1000)
+    const atMs = Math.round(playerTime(playerRef.current))
     startAdd(async () => {
       const result = await addFootageMarker({ footageId: clip.id, atMs })
       if (result.ok) setSelectedId(result.data.markerId)
@@ -505,7 +508,7 @@ export function FootageEditor({
   function applyLookById(lookId: string) {
     change(applyLook(lookId, markers, history.present), "look")
     stop()
-    playSafely(videoRef.current)
+    play()
   }
 
   function direct(instruction: string) {
@@ -532,7 +535,7 @@ export function FootageEditor({
         },
       })
       stop()
-      playSafely(videoRef.current)
+      play()
       toast.add({
         type: "success",
         title: `Camera set for ${result.data.shots.length} key ${result.data.shots.length === 1 ? "moment" : "moments"}`,
@@ -681,7 +684,7 @@ export function FootageEditor({
                     selected && changeShotFor(selected, shot, control)
                   }
                   onTogglePick={() => {
-                    videoRef.current?.pause()
+                    playerRef.current?.pause()
                     setPickingFocus((picking) => !picking)
                   }}
                   onApplyToAll={() => {
@@ -753,7 +756,7 @@ export function FootageEditor({
         >
           <div className="h-[50vh] bg-muted/60 p-4 sm:p-6 lg:h-auto lg:min-h-0 lg:flex-1">
             <MotionStage
-              videoRef={videoRef}
+              playerRef={playerRef}
               videoUrl={links.videoUrl}
               posterUrl={links.posterUrl}
               presentation={presentation}
@@ -762,29 +765,11 @@ export function FootageEditor({
               aspect={aspect}
               reduceMotion={reduceMotion}
               pickingFocus={pickingFocus}
-              onPickFocus={({ x, y }) => {
-                const shot = selected ? shotOf(selected) : null
-                if (selected && shot) {
-                  changeShotFor(
-                    selected,
-                    {
-                      ...shot,
-                      camera: { ...shot.camera, focusX: x, focusY: y },
-                    },
-                    "focus"
-                  )
-                }
-                setPickingFocus(false)
-              }}
+              onPickFocus={onPickFocus}
               onTimeChange={onTimeChange}
               onPlayingChange={onPlayingChange}
-              onVideoError={() => {
-                const video = videoRef.current
-                resumeAfterRenew.current = video
-                  ? { atS: video.currentTime, playing: !video.paused }
-                  : null
-                if (!renewLinks()) resumeAfterRenew.current = null
-              }}
+              // The Player keeps its frame; the fresh link loads there.
+              onVideoError={renewLinks}
             />
           </div>
           <div className="flex flex-wrap items-center gap-2 border-t bg-card px-3 py-2 sm:gap-3 sm:px-4">

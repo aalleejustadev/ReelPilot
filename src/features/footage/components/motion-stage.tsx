@@ -1,17 +1,17 @@
 "use client"
 
+import { Player, type PlayerRef } from "@remotion/player"
 import { CrosshairIcon } from "lucide-react"
 import { useEffect, useMemo, useRef } from "react"
 
-import { cn } from "@/shared/lib/utils"
 import {
-  backgroundStyle,
-  cameraStyle,
-  cameraTimeline,
-  frameRadiusCss,
-  type Presentation,
-  type TimedShot,
-} from "@/shared/motion"
+  FootageStage,
+  framesFor,
+  stageFps,
+  stageSizes,
+  type FootageStageProps,
+} from "@/remotion/compositions/FootageStage"
+import type { Presentation, TimedShot } from "@/shared/motion"
 
 export const stageAspects = {
   "16:9": "16 / 9",
@@ -21,12 +21,12 @@ export const stageAspects = {
 export type StageAspect = keyof typeof stageAspects
 
 /**
- * The clip in 3D over its background. The frame's transform is written
- * straight to the element every animation frame (no React render per
- * frame), from the same camera timeline Remotion will use in M5.
+ * The clip on its stage, played by Remotion's Player: the same
+ * composition (src/remotion) renders the final video, so the preview is
+ * what gets rendered. Time and play state are reported to the editor.
  */
 export function MotionStage({
-  videoRef,
+  playerRef,
   videoUrl,
   posterUrl,
   presentation,
@@ -40,12 +40,12 @@ export function MotionStage({
   onPlayingChange,
   onVideoError,
 }: {
-  videoRef: React.RefObject<HTMLVideoElement | null>
+  playerRef: React.RefObject<PlayerRef | null>
   videoUrl: string
   posterUrl: string | null
   presentation: Presentation
   shots: TimedShot[]
-  /** The clip's length, so the last shot's drift runs to the end. */
+  /** The clip's length (the composition's length). */
   durationMs: number
   aspect: StageAspect
   reduceMotion: boolean
@@ -57,138 +57,110 @@ export function MotionStage({
   /** The video stopped loading (e.g. its signed link expired). */
   onVideoError?: () => void
 }) {
-  const frameRef = useRef<HTMLDivElement>(null)
-
-  // Reduced motion: shots cut instead of animating, and no intro.
-  const poseAt = useMemo(
-    () =>
-      reduceMotion
-        ? cameraTimeline(
-            shots.map((entry) => ({
-              ...entry,
-              shot: { ...entry.shot, transitionMs: 0 },
-            })),
-            { ...presentation.intro, kind: "none" },
-            durationMs
-          )
-        : cameraTimeline(shots, presentation.intro, durationMs),
-    [shots, presentation.intro, reduceMotion, durationMs]
+  const size = stageSizes[aspect]
+  // Where playback was, so switching shape (a new Player) keeps the spot.
+  const lastFrame = useRef(0)
+  const inputProps: FootageStageProps = useMemo(
+    () => ({
+      videoUrl,
+      posterUrl,
+      presentation,
+      shots,
+      durationMs,
+      flat: pickingFocus,
+      reduceMotion,
+      onPickFocus,
+      onVideoError,
+    }),
+    [
+      videoUrl,
+      posterUrl,
+      presentation,
+      shots,
+      durationMs,
+      pickingFocus,
+      reduceMotion,
+      onPickFocus,
+      onVideoError,
+    ]
   )
 
+  // Tell the editor the time (only when the tenth of a second changes, so
+  // it re-renders 10×/s, not per frame) and whether it's playing.
   useEffect(() => {
-    const video = videoRef.current
-    const frame = frameRef.current
-    if (!video || !frame) return
-    let raf = 0
-    // Report the time to React only when the tenth of a second changes.
+    const player = playerRef.current
+    if (!player) return
     let lastTenth = -1
-    const draw = () => {
-      const ms = video.currentTime * 1000
-      const style = pickingFocus
-        ? { transform: "none", transformOrigin: "50% 50%" }
-        : cameraStyle(poseAt(ms))
-      frame.style.transform = style.transform
-      frame.style.transformOrigin = style.transformOrigin
+    const report = (frame: number) => {
+      lastFrame.current = frame
+      const ms = (frame / stageFps) * 1000
       const tenth = Math.floor(ms / 100)
-      if (tenth !== lastTenth) {
-        lastTenth = tenth
-        onTimeChange(Math.round(ms))
-      }
+      if (tenth === lastTenth) return
+      lastTenth = tenth
+      onTimeChange(Math.round(ms))
     }
-    const loop = () => {
-      draw()
-      raf = requestAnimationFrame(loop)
-    }
-    const start = () => {
-      onPlayingChange(true)
-      cancelAnimationFrame(raf)
-      loop()
-    }
-    const stop = () => {
-      onPlayingChange(false)
-      cancelAnimationFrame(raf)
-      draw()
-    }
-    video.addEventListener("play", start)
-    video.addEventListener("pause", stop)
-    video.addEventListener("ended", stop)
-    video.addEventListener("seeked", draw)
-    video.addEventListener("loadedmetadata", draw)
-    draw()
-    if (!video.paused) start()
+    const onFrame = ({ detail }: { detail: { frame: number } }) =>
+      report(detail.frame)
+    const onPlay = () => onPlayingChange(true)
+    const onStop = () => onPlayingChange(false)
+    player.addEventListener("frameupdate", onFrame)
+    player.addEventListener("seeked", onFrame)
+    player.addEventListener("play", onPlay)
+    player.addEventListener("pause", onStop)
+    player.addEventListener("ended", onStop)
+    report(player.getCurrentFrame())
     return () => {
-      cancelAnimationFrame(raf)
-      video.removeEventListener("play", start)
-      video.removeEventListener("pause", stop)
-      video.removeEventListener("ended", stop)
-      video.removeEventListener("seeked", draw)
-      video.removeEventListener("loadedmetadata", draw)
+      player.removeEventListener("frameupdate", onFrame)
+      player.removeEventListener("seeked", onFrame)
+      player.removeEventListener("play", onPlay)
+      player.removeEventListener("pause", onStop)
+      player.removeEventListener("ended", onStop)
     }
-  }, [videoRef, poseAt, pickingFocus, onTimeChange, onPlayingChange])
+  }, [playerRef, onTimeChange, onPlayingChange, aspect])
 
-  const { frame } = presentation
-  const [w, h] = aspect.split(":").map(Number) as [number, number]
+  const { width: w, height: h } = size
   return (
     // The box fills the space it's given; the stage is the largest
     // rectangle of the chosen shape that fits inside (container units).
     <div className="[container-type:size] flex size-full items-center justify-center">
       <div
-        // An inline-size container, so the frame's radius can be a % of
-        // the stage's width that stays round (see frameRadiusCss).
-        className="[container-type:inline-size] relative overflow-hidden rounded-lg shadow-sm"
+        className="relative overflow-hidden rounded-lg shadow-sm"
         style={{
           aspectRatio: stageAspects[aspect],
           width: `min(100cqw, calc(100cqh * ${w} / ${h}))`,
-          background: backgroundStyle(presentation.background),
         }}
         data-testid="motion-stage"
       >
-        <div
-          className="absolute inset-0 flex items-center justify-center"
-          style={{ perspective: "1400px", padding: `${frame.padding * 100}%` }}
-        >
-          <div
-            ref={frameRef}
-            className={cn(
-              "relative w-full overflow-hidden will-change-transform",
-              pickingFocus && "cursor-crosshair"
-            )}
-            style={{
-              borderRadius: frameRadiusCss(frame.radius),
-              boxShadow: frame.shadow
-                ? "0 30px 60px -12px rgb(0 0 0 / 0.55)"
-                : "none",
-            }}
-            onClick={(event) => {
-              if (!pickingFocus) return
-              const box = event.currentTarget.getBoundingClientRect()
-              onPickFocus({
-                x: Number(((event.clientX - box.left) / box.width).toFixed(3)),
-                y: Number(((event.clientY - box.top) / box.height).toFixed(3)),
-              })
-            }}
-          >
-            <video
-              ref={videoRef}
-              src={videoUrl}
-              poster={posterUrl ?? undefined}
-              playsInline
-              preload="metadata"
-              className="block w-full"
-              onError={onVideoError}
-            >
-              Your browser can’t play this video.
-            </video>
-            {pickingFocus && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/20 text-background">
-                <span className="flex items-center gap-2 rounded-md bg-foreground/80 px-3 py-1.5 text-sm">
-                  <CrosshairIcon aria-hidden className="size-4" />
-                  Click where the camera should focus
-                </span>
-              </div>
-            )}
+        <Player
+          // A new shape is a new composition size.
+          key={aspect}
+          ref={playerRef}
+          component={FootageStage}
+          inputProps={inputProps}
+          durationInFrames={framesFor(durationMs)}
+          compositionWidth={w}
+          compositionHeight={h}
+          fps={stageFps}
+          // Read once, when a new shape mounts a new Player.
+          // eslint-disable-next-line react-hooks/refs
+          initialFrame={lastFrame.current}
+          controls={false}
+          clickToPlay={false}
+          doubleClickToFullscreen={false}
+          spaceKeyToPlayOrPause={false}
+          moveToBeginningWhenEnded={false}
+          // The owner reviews Remotion's licence terms (build plan §17).
+          acknowledgeRemotionLicense
+          style={{ width: "100%", height: "100%" }}
+        />
+        {pickingFocus && (
+          <div className="pointer-events-none absolute inset-x-0 top-3 flex justify-center">
+            <span className="flex items-center gap-2 rounded-md bg-foreground/80 px-3 py-1.5 text-sm text-background">
+              <CrosshairIcon aria-hidden className="size-4" />
+              Click where the camera should focus
+            </span>
           </div>
-        </div>
+        )}
       </div>
     </div>
   )

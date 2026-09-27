@@ -32,7 +32,10 @@ describe("cameraTimeline", () => {
     expect(at(0)).toMatchObject({ x: -1.1, turn: 55 })
     expect(at(500).x).toBeGreaterThan(-1.1)
     expect(at(500).x).toBeLessThan(0)
-    expect(at(1000)).toMatchObject({ ...flatCamera, x: 0 })
+    // Landed (within ~2%) by the intro's length, fully flat soon after.
+    expect(Math.abs(at(1000).turn)).toBeLessThan(55 * 0.03)
+    expect(at(2000).turn).toBeCloseTo(0, 1)
+    expect(at(2000).x).toBeCloseTo(0, 2)
   })
 
   it("holds flat until a shot, moves into it, then holds it", () => {
@@ -51,8 +54,10 @@ describe("cameraTimeline", () => {
       ],
       noIntro
     )
-    expect(at(500).zoom).toBeCloseTo(2) // no jump when the second move starts
-    expect(at(1000).zoom).toBeCloseTo(1.5)
+    // Zoom moves in log space: halfway from 1× to 3× is √3×, not 2×.
+    expect(at(500).zoom).toBeCloseTo(Math.sqrt(3))
+    expect(at(499).zoom).toBeCloseTo(at(500).zoom, 2) // no jump
+    expect(at(1000).zoom).toBeCloseTo(Math.sqrt(Math.sqrt(3)))
     expect(at(1500).zoom).toBeCloseTo(1)
   })
 
@@ -70,13 +75,64 @@ describe("cameraTimeline", () => {
     expect(at(1000).turn).toBeCloseTo(28)
   })
 
-  it("eases smoothly: slow at the ends, fast in the middle", () => {
+  it("moves on a smooth spring: soft start, lands on time, no overshoot", () => {
     const at = cameraTimeline(
       [{ atMs: 0, shot: shot({ easing: "smooth" }) }],
       noIntro
     )
-    expect(at(100).turn).toBeLessThan(28 * 0.1)
-    expect(at(500).turn).toBeCloseTo(14)
+    expect(at(30).turn).toBeLessThan(28 * 0.03) // eases off the mark
+    expect(at(1000).turn).toBeGreaterThan(28 * 0.97) // landed
+    let previous = 0
+    for (let t = 0; t <= 3000; t += 10) {
+      const turn = at(t).turn
+      expect(turn).toBeGreaterThanOrEqual(previous - 1e-9) // never goes back
+      expect(turn).toBeLessThanOrEqual(28 + 1e-9) // never overshoots
+      previous = turn
+    }
+  })
+
+  it("snaps quicker with a snappy spring, overshooting only slightly", () => {
+    const timeline = (easing: "smooth" | "snappy") =>
+      cameraTimeline([{ atMs: 0, shot: shot({ easing }) }], noIntro)
+    const smooth = timeline("smooth")
+    const snappy = timeline("snappy")
+    expect(snappy(250).turn).toBeGreaterThan(smooth(250).turn)
+    const peak = Math.max(
+      ...Array.from({ length: 300 }, (_, i) => snappy(i * 10).turn)
+    )
+    expect(peak).toBeGreaterThan(28)
+    expect(peak).toBeLessThan(28 * 1.02)
+    expect(snappy(3000).turn).toBeCloseTo(28, 1)
+  })
+
+  it("keeps the camera's speed when a new shot interrupts a move", () => {
+    const smooth = shot({ easing: "smooth" })
+    const at = cameraTimeline(
+      [
+        { atMs: 0, shot: smooth },
+        { atMs: 300, shot: { ...smooth, camera: shotPresets.dramatic.camera } },
+      ],
+      noIntro
+    )
+    // Speed just before and just after the second shot starts: the same.
+    const before = at(299).turn - at(298).turn
+    const after = at(301).turn - at(300).turn
+    expect(Math.abs(after - before)).toBeLessThan(0.01)
+  })
+})
+
+describe("cameraSpeed", () => {
+  it("is 0 when still and grows with angle, zoom and pan speed", async () => {
+    const { cameraSpeed } = await import("../timeline")
+    const still = { ...flatCamera, x: 0, y: 0 }
+    expect(cameraSpeed(still, still, 33)).toBe(0)
+    expect(cameraSpeed(still, { ...still, turn: 3 }, 33)).toBeCloseTo(
+      3 / 0.033 / 90,
+      1
+    )
+    expect(cameraSpeed(still, { ...still, zoom: 1.1 }, 100)).toBeCloseTo(
+      Math.log(1.1) * 10
+    )
   })
 })
 

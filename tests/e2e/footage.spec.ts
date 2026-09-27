@@ -113,15 +113,16 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   )
   await page.getByRole("button", { name: "Dramatic", exact: true }).click()
   await expect(saved).toBeVisible()
-  // The 3D stage shows the shot: the frame is turned, not flat.
+  // The 3D stage shows the shot: the frame has (just about) landed on
+  // Dramatic's -34° turn; the camera's spring finishes the last 2%.
   await expect
-    .poll(() =>
-      page
-        .getByTestId("motion-stage")
-        .locator(".will-change-transform")
+    .poll(async () => {
+      const transform = await page
+        .getByTestId("camera-frame")
         .evaluate((el) => (el as HTMLElement).style.transform)
-    )
-    .toContain("rotateY(-34deg)")
+      return Number(/rotateY\((-?[\d.]+)deg\)/.exec(transform)?.[1])
+    })
+    .toBeLessThan(-32.5)
   await tools.getByRole("tab", { name: "Style" }).click()
   await page.getByRole("button", { name: "Solid", exact: true }).click()
   await expect(saved).toBeVisible()
@@ -251,13 +252,8 @@ test("playback keeps going through saves and refreshes to the very end", async (
   const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
   await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
   await card.getByRole("link", { name: "Product demo" }).click()
-  const player = page.locator("video")
-  const state = () =>
-    player.evaluate((v: HTMLVideoElement) => ({
-      paused: v.paused,
-      ended: v.ended,
-      t: v.currentTime,
-    }))
+  // The Remotion Player owns time: read it from the transport bar.
+  const position = page.getByLabel("Playback position")
 
   // A look saves every moment; wait out the saves while paused.
   await page.getByRole("button", { name: /^Showcase/ }).click()
@@ -276,10 +272,12 @@ test("playback keeps going through saves and refreshes to the very end", async (
   await page.waitForTimeout(600)
   await page.getByRole("button", { name: /^Add marker at/ }).click()
   await expect(page.getByText(/^Marker added at/)).toBeVisible()
-  await expect
-    .poll(async () => (await state()).ended, { timeout: 10_000 })
-    .toBe(true)
-  expect((await state()).t).toBeGreaterThan(4.9)
+  await expect(position).toHaveText(/^0:0(4\.9|5\.0) \/ 0:05\.0$/, {
+    timeout: 10_000,
+  })
+  await expect(
+    page.getByRole("button", { name: "Play", exact: true })
+  ).toBeVisible()
   expect(consoleProblems).toEqual([])
 })
 

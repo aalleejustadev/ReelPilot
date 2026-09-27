@@ -71,5 +71,10 @@ export const presentationSchema = z.object({
     kind: z.enum(introKinds),
     durationMs: z.number().int().min(300).max(3000),
   }),
+  /**
+   * A touch of blur while the camera moves fast, as a real camera shutter
+   * would show. Styles saved before it existed read as on.
+   */
+  motionBlur: z.boolean().default(true),
 })
-export type Presentation = z.infer<typeof presentationSchema>
+export type Presentation = z.output<typeof presentationSchema>

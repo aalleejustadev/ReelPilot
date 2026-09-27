@@ -158,6 +158,7 @@ export const defaultPresentation: Presentation = {
   // Owner-chosen defaults (2026-09-27): 2% corners, 2% space, shadow.
   frame: { radius: 2, shadow: true, padding: 0.02 },
   intro: { kind: "none", durationMs: 1200 },
+  motionBlur: true,
 }
 
 /** The preset a camera matches exactly, if any. */

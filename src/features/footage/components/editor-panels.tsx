@@ -31,6 +31,7 @@ import {
 import { Button } from "@/shared/ui/button"
 import {
   Field,
+  FieldContent,
   FieldDescription,
   FieldGroup,
   FieldLabel,
@@ -637,6 +638,22 @@ export function StylePanel({
           <FieldLabel htmlFor="frame-shadow">
             Shadow under the screen
           </FieldLabel>
+        </Field>
+        <Field orientation="horizontal">
+          <Switch
+            id="motion-blur"
+            aria-describedby="motion-blur-hint"
+            checked={presentation.motionBlur}
+            onCheckedChange={(motionBlur) =>
+              onChange({ ...presentation, motionBlur }, "motion-blur")
+            }
+          />
+          <FieldContent>
+            <FieldLabel htmlFor="motion-blur">Motion blur</FieldLabel>
+            <FieldDescription id="motion-blur-hint">
+              A touch of blur on fast camera moves, like a real camera.
+            </FieldDescription>
+          </FieldContent>
         </Field>
         <Field>
           <FieldLabel htmlFor="intro-kind">Intro</FieldLabel>

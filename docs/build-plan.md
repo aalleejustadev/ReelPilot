@@ -918,7 +918,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [ ] Final prices and top-up price. `TODO(owner)`
 - [x] Jobs platform: own worker + pg-boss on Neon (2026-09-23).
 - [x] Render infra: Remotion in the same worker (2026-09-23).
-- [ ] Worker host (Railway, Fly.io or VPS) and Remotion company-license check. `TODO(owner)`
+- [ ] Worker host (Railway, Fly.io or VPS) and Remotion company-license check (now needed from M3c: the editor preview uses Remotion Player). `TODO(owner)`
 - [x] Voice: self-hosted Kokoro (2026-09-23).
 - [ ] Avatar provider bake-off — `[V1.1]`.
 - [x] Stock presenter portraits (2026-09-25): AI-generated photoreal faces with a commercial licence (no real person). Placeholders (CC0 illustrations) until the owner supplies them — drop into `prisma/seed-assets/presenters/` and re-seed.
