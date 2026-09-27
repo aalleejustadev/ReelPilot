@@ -204,7 +204,6 @@ export function MotionStage({
         />
         {interactive && !pickingFocus && onSelectItem && onMoveItem && (
           <StageItemsLayer
-            key={aspect}
             playerRef={playerRef}
             width={w}
             height={h}
