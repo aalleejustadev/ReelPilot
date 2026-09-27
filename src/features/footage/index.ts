@@ -1,6 +1,6 @@
 // Public API of the footage slice. Other code imports only from here; the
 // worker imports its job handlers from "@/features/footage/jobs".
-export { ClipEditor } from "./components/clip-editor"
+export { FootageEditor } from "./components/footage-editor"
 export { DeleteClipButton } from "./components/delete-clip-button"
 export { FootageGrid } from "./components/footage-grid"
 export { FootageUploader } from "./components/footage-uploader"

@@ -49,6 +49,7 @@ describe("AI direction", () => {
             focusX: -1,
             focusY: 0.3,
             transitionMs: 50,
+            drift: null,
           },
           {
             markerId: "a",
@@ -57,6 +58,7 @@ describe("AI direction", () => {
             focusX: null,
             focusY: null,
             transitionMs: 800,
+            drift: null,
           },
           {
             markerId: "ghost",
@@ -65,6 +67,7 @@ describe("AI direction", () => {
             focusX: null,
             focusY: null,
             transitionMs: 800,
+            drift: null,
           },
         ],
       },
@@ -85,6 +88,7 @@ describe("AI direction", () => {
           },
           transitionMs: 300,
           easing: "smooth",
+          drift: 0,
         },
       },
     ])
@@ -102,6 +106,7 @@ describe("AI direction", () => {
             focusX: null,
             focusY: null,
             transitionMs: 900,
+            drift: null,
           },
         ],
       })

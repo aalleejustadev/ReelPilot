@@ -16,6 +16,7 @@ const shot = (overrides: Partial<Shot> = {}): Shot => ({
   camera: shotPresets["tilt-left"].camera,
   transitionMs: 1000,
   easing: "linear",
+  drift: 0,
   ...overrides,
 })
 
@@ -130,5 +131,52 @@ describe("schemas", () => {
       intro: { kind: "rise", durationMs: 1000 },
     })
     expect(parsed.background.from).toBe("#ff5a1f")
+  })
+})
+
+describe("drift", () => {
+  it("keeps pushing in while a shot holds, until the next shot", () => {
+    const at = cameraTimeline(
+      [
+        {
+          atMs: 0,
+          shot: shot({ camera: flatCamera, transitionMs: 0, drift: 1 }),
+        },
+        { atMs: 10_000, shot: shot({ camera: flatCamera, transitionMs: 0 }) },
+      ],
+      noIntro
+    )
+    expect(at(0).zoom).toBeCloseTo(1)
+    expect(at(5000).zoom).toBeCloseTo(1.05)
+    expect(at(9999).zoom).toBeCloseTo(1.1, 2)
+    expect(at(10_000).zoom).toBeCloseTo(1) // the next shot takes over
+  })
+
+  it("drifts the last shot until the clip ends", () => {
+    const at = cameraTimeline(
+      [
+        {
+          atMs: 0,
+          shot: shot({ camera: flatCamera, transitionMs: 0, drift: 0.5 }),
+        },
+      ],
+      noIntro,
+      4000
+    )
+    expect(at(4000).zoom).toBeCloseTo(1.05)
+  })
+
+  it("reads old shots without drift as still", () => {
+    const { drift: _drift, ...old } = shot()
+    expect(shotSchema.parse(old).drift).toBe(0)
+  })
+})
+
+describe("presets", () => {
+  it("offers 18 shots, each in exactly one group", async () => {
+    const { shotPresetGroups, shotPresetNames } = await import("../index")
+    const grouped = shotPresetGroups.flatMap((group) => group.presets)
+    expect(shotPresetNames).toHaveLength(18)
+    expect([...grouped].sort()).toEqual([...shotPresetNames].sort())
   })
 })

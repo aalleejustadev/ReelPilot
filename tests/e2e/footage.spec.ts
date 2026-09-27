@@ -72,13 +72,13 @@ test("a file that isn't a video is refused before uploading", async ({
   ).toBeVisible()
 })
 
-test("upload a clip, let the worker process it, then edit its markers", async ({
+test("upload a clip, let the worker process it, then edit it in the editor", async ({
   page,
   signedInUser: _user,
   consoleProblems,
 }) => {
   test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
-  test.setTimeout(120_000)
+  test.setTimeout(150_000)
   const video = await makeTestVideo()
   await createKitByHand(page)
   await page.getByRole("tab", { name: "Footage" }).click()
@@ -92,31 +92,25 @@ test("upload a clip, let the worker process it, then edit its markers", async ({
   await expect(card.getByText("0:05")).toBeVisible()
   await card.getByRole("link", { name: "Product demo" }).click()
 
+  // The full-screen editor: no app sidebar, the clip's name in its top bar.
   await expect(
-    page.getByRole("heading", { name: "Product demo" })
+    page.getByRole("heading", { level: 1, name: "Product demo" })
   ).toBeVisible()
-  await expect(page.getByRole("tab", { name: "Footage" })).toHaveAttribute(
+  await expect(page.locator('[data-slot="sidebar"]')).toHaveCount(0)
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  const timeline = page.getByRole("group", { name: "Timeline" })
+  const saved = page.getByText("Saved", { exact: true })
+
+  // The cut at 2s was found. Selecting it opens its shot.
+  await timeline
+    .getByRole("button", { name: /^Select the moment at 0:02\.\d/ })
+    .click()
+  await expect(tools.getByRole("tab", { name: "Shot" })).toHaveAttribute(
     "aria-selected",
     "true"
   )
-  // The cut at 2s was found: on the timeline and in the list.
-  await expect(
-    page.getByRole("group", { name: "Timeline" }).getByRole("button", {
-      name: /^Select the moment at 0:02\.\d/,
-    })
-  ).toBeVisible()
-
-  // Give the cut a camera shot and a style; both survive a reload.
-  await page
-    .getByRole("group", { name: "Timeline" })
-    .getByRole("button", { name: /^Select the moment at 0:02/ })
-    .click()
-  const inspector = page.getByRole("complementary", { name: "Motion controls" })
-  await inspector.getByRole("button", { name: "Dramatic" }).click()
-  await expect(inspector.getByText("Saved")).toBeVisible()
-  await inspector.getByRole("tab", { name: "Style" }).click()
-  await inspector.getByRole("button", { name: "Solid" }).click()
-  await expect(inspector.getByText("Saved")).toBeVisible()
+  await page.getByRole("button", { name: "Dramatic", exact: true }).click()
+  await expect(saved).toBeVisible()
   // The 3D stage shows the shot: the frame is turned, not flat.
   await expect
     .poll(() =>
@@ -126,20 +120,19 @@ test("upload a clip, let the worker process it, then edit its markers", async ({
         .evaluate((el) => (el as HTMLElement).style.transform)
     )
     .toContain("rotateY(-34deg)")
+  await tools.getByRole("tab", { name: "Style" }).click()
+  await page.getByRole("button", { name: "Solid", exact: true }).click()
+  await expect(saved).toBeVisible()
+
+  // Both survive a reload.
   await page.reload()
-  await page
-    .getByRole("group", { name: "Timeline" })
-    .getByRole("button", { name: /camera set/ })
-    .click()
+  await timeline.getByRole("button", { name: /camera set/ }).click()
   await expect(
-    page
-      .getByRole("complementary", { name: "Motion controls" })
-      .getByRole("button", { name: "Dramatic" })
+    page.getByRole("button", { name: "Dramatic", exact: true })
   ).toHaveAttribute("aria-pressed", "true")
   await expectNoViolations(page)
 
   // Drag the playhead to 60% of the 5s clip, then nudge it with the keyboard.
-  const timeline = page.getByRole("group", { name: "Timeline" })
   const box = await timeline.boundingBox()
   if (!box) throw new Error("Timeline not visible")
   const middleY = box.y + box.height / 2
@@ -161,32 +154,52 @@ test("upload a clip, let the worker process it, then edit its markers", async ({
   await page.getByRole("button", { name: "Stop" }).click()
   await expect(playhead).toHaveAttribute("aria-valuetext", "0:00.0")
 
-  // Each key moment can take its own shot right in the list.
+  // Each key moment can take its own shot right in the Moments list.
+  await tools.getByRole("tab", { name: "Moments" }).click()
   const shotSelect = page.getByRole("combobox", {
     name: /^Camera shot at 0:02/,
   })
   await shotSelect.click()
   await page.getByRole("option", { name: "Tilt left" }).click()
   await expect(shotSelect).toContainText("Tilt left")
-  await expect(inspector.getByText("Saved")).toBeVisible()
+  await expect(saved).toBeVisible()
+
+  // ⌘Z / Ctrl+Z undoes it; Redo brings it back.
+  await playhead.focus()
+  await page.keyboard.press("ControlOrMeta+z")
+  await expect(shotSelect).toContainText("Dramatic")
+  await page.getByRole("button", { name: /^Redo/ }).click()
+  await expect(shotSelect).toContainText("Tilt left")
+
+  // One click on a look styles every moment; the Undo button reverts it.
+  await tools.getByRole("tab", { name: "Effects" }).click()
+  await page.getByRole("button", { name: /^Showcase/ }).click()
+  await tools.getByRole("tab", { name: "Moments" }).click()
+  await expect(shotSelect).toContainText("Orbit left")
+  await page.getByRole("button", { name: /^Undo/ }).click()
+  await expect(shotSelect).toContainText("Tilt left")
+  await expect(saved).toBeVisible()
 
   // Ready-made AI prompts fill the instruction.
-  await inspector.getByRole("tab", { name: "AI" }).click()
-  await inspector.getByRole("button", { name: "Feature tour" }).click()
+  await tools.getByRole("tab", { name: "AI", exact: true }).click()
+  await page.getByRole("button", { name: "Feature tour" }).click()
   await expect(
-    inspector.getByRole("textbox", { name: "Describe the motion" })
+    page.getByRole("textbox", { name: "Describe the motion" })
   ).toHaveValue(/^Zoom into each key moment/)
 
-  // Add a marker at the start, label it, then remove it.
-  await page
-    .getByRole("group", { name: "Timeline" })
-    .click({ position: { x: 1, y: 30 } })
+  // Add a moment at the start, label it, then remove it.
+  await page.getByRole("button", { name: "Stop" }).click()
   await page.getByRole("button", { name: /Add marker at 0:00\.0/ }).click()
   await expect(page.getByText("Marker added at 0:00.0")).toBeVisible()
+  await tools.getByRole("tab", { name: "Moments" }).click()
   const label = page.getByRole("textbox", { name: "Label for 0:00.0" })
   await label.fill("Opening screen")
   await label.press("Enter")
   await page.reload()
+  await page
+    .getByRole("tablist", { name: "Editor tools" })
+    .getByRole("tab", { name: "Moments" })
+    .click()
   await expect(
     page.getByRole("textbox", { name: "Label for 0:00.0" })
   ).toHaveValue("Opening screen")

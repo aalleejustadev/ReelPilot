@@ -30,6 +30,7 @@ export function MotionStage({
   posterUrl,
   presentation,
   shots,
+  durationMs,
   aspect,
   reduceMotion,
   pickingFocus,
@@ -42,6 +43,8 @@ export function MotionStage({
   posterUrl: string | null
   presentation: Presentation
   shots: TimedShot[]
+  /** The clip's length, so the last shot's drift runs to the end. */
+  durationMs: number
   aspect: StageAspect
   reduceMotion: boolean
   /** While true the frame is shown flat and a click sets the focus point. */
@@ -61,10 +64,11 @@ export function MotionStage({
               ...entry,
               shot: { ...entry.shot, transitionMs: 0 },
             })),
-            { ...presentation.intro, kind: "none" }
+            { ...presentation.intro, kind: "none" },
+            durationMs
           )
-        : cameraTimeline(shots, presentation.intro),
-    [shots, presentation.intro, reduceMotion]
+        : cameraTimeline(shots, presentation.intro, durationMs),
+    [shots, presentation.intro, reduceMotion, durationMs]
   )
 
   useEffect(() => {
@@ -119,60 +123,64 @@ export function MotionStage({
   }, [videoRef, poseAt, pickingFocus, onTimeChange, onPlayingChange])
 
   const { frame } = presentation
+  const [w, h] = aspect.split(":").map(Number) as [number, number]
   return (
-    <div
-      className="relative mx-auto max-h-[70vh] w-full overflow-hidden rounded-lg"
-      style={{
-        aspectRatio: stageAspects[aspect],
-        background: backgroundStyle(presentation.background),
-        maxWidth:
-          aspect === "9:16" ? "22rem" : aspect === "1:1" ? "32rem" : undefined,
-      }}
-      data-testid="motion-stage"
-    >
+    // The box fills the space it's given; the stage is the largest
+    // rectangle of the chosen shape that fits inside (container units).
+    <div className="[container-type:size] flex size-full items-center justify-center">
       <div
-        className="absolute inset-0 flex items-center justify-center"
-        style={{ perspective: "1400px", padding: `${frame.padding * 100}%` }}
+        className="relative overflow-hidden rounded-lg shadow-sm"
+        style={{
+          aspectRatio: stageAspects[aspect],
+          width: `min(100cqw, calc(100cqh * ${w} / ${h}))`,
+          background: backgroundStyle(presentation.background),
+        }}
+        data-testid="motion-stage"
       >
         <div
-          ref={frameRef}
-          className={cn(
-            "relative w-full overflow-hidden will-change-transform",
-            pickingFocus && "cursor-crosshair"
-          )}
-          style={{
-            borderRadius: `${frame.radius}%`,
-            boxShadow: frame.shadow
-              ? "0 30px 60px -12px rgb(0 0 0 / 0.55)"
-              : "none",
-          }}
-          onClick={(event) => {
-            if (!pickingFocus) return
-            const box = event.currentTarget.getBoundingClientRect()
-            onPickFocus({
-              x: Number(((event.clientX - box.left) / box.width).toFixed(3)),
-              y: Number(((event.clientY - box.top) / box.height).toFixed(3)),
-            })
-          }}
+          className="absolute inset-0 flex items-center justify-center"
+          style={{ perspective: "1400px", padding: `${frame.padding * 100}%` }}
         >
-          <video
-            ref={videoRef}
-            src={videoUrl}
-            poster={posterUrl ?? undefined}
-            playsInline
-            preload="metadata"
-            className="block w-full"
+          <div
+            ref={frameRef}
+            className={cn(
+              "relative w-full overflow-hidden will-change-transform",
+              pickingFocus && "cursor-crosshair"
+            )}
+            style={{
+              borderRadius: `${frame.radius}%`,
+              boxShadow: frame.shadow
+                ? "0 30px 60px -12px rgb(0 0 0 / 0.55)"
+                : "none",
+            }}
+            onClick={(event) => {
+              if (!pickingFocus) return
+              const box = event.currentTarget.getBoundingClientRect()
+              onPickFocus({
+                x: Number(((event.clientX - box.left) / box.width).toFixed(3)),
+                y: Number(((event.clientY - box.top) / box.height).toFixed(3)),
+              })
+            }}
           >
-            Your browser can’t play this video.
-          </video>
-          {pickingFocus && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/20 text-background">
-              <span className="flex items-center gap-2 rounded-md bg-foreground/80 px-3 py-1.5 text-sm">
-                <CrosshairIcon aria-hidden className="size-4" />
-                Click where the camera should focus
-              </span>
-            </div>
-          )}
+            <video
+              ref={videoRef}
+              src={videoUrl}
+              poster={posterUrl ?? undefined}
+              playsInline
+              preload="metadata"
+              className="block w-full"
+            >
+              Your browser can’t play this video.
+            </video>
+            {pickingFocus && (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-foreground/20 text-background">
+                <span className="flex items-center gap-2 rounded-md bg-foreground/80 px-3 py-1.5 text-sm">
+                  <CrosshairIcon aria-hidden className="size-4" />
+                  Click where the camera should focus
+                </span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

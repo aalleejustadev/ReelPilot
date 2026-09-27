@@ -192,7 +192,7 @@ export function ClipTimeline({
         aria-hidden
       >
         {parts.length === 0 ? (
-          <span className="absolute inset-0 flex items-center px-2 text-xs text-muted-foreground">
+          <span className="absolute inset-0 truncate px-2 text-xs leading-6 text-muted-foreground">
             Flat all the way. Pick a shot for a key moment to add camera motion.
           </span>
         ) : (

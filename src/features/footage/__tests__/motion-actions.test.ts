@@ -89,6 +89,7 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
     camera: shotPresets.dramatic.camera,
     transitionMs: 900,
     easing: "smooth" as const,
+    drift: 0,
   }
 
   it("saves and clears a marker's shot", async () => {
@@ -175,6 +176,7 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
           focusX: 0.7,
           focusY: 0.2,
           transitionMs: 700,
+          drift: null,
         },
       ],
     })

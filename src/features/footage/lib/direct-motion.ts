@@ -28,6 +28,12 @@ export const motionDirectionSchema = z.object({
       focusX: z.number().nullable().describe("0 = left edge, 1 = right edge."),
       focusY: z.number().nullable().describe("0 = top edge, 1 = bottom edge."),
       transitionMs: z.number().describe("How long the move takes, 300–2000."),
+      drift: z
+        .number()
+        .nullable()
+        .describe(
+          "Optional 0–1: a slow push while the shot holds. 0.3–0.6 feels cinematic."
+        ),
     })
   ),
 })
@@ -39,7 +45,7 @@ The recording floats in 3D over a background. At each key moment (marker) you ch
 ${Object.entries(shotPresets)
   .map(([name, { label }]) => `- ${name}: ${label}`)
   .join("\n")}
-Optional per shot: zoom (1–3, higher = closer), focusX/focusY (0–1, the point to zoom toward, e.g. a button), transitionMs (300–2000).
+Optional per shot: zoom (1–3, higher = closer), focusX/focusY (0–1, the point to zoom toward, e.g. a button), transitionMs (300–2000), drift (0–1, a slow cinematic push while the shot holds).
 Intro options: ${introKinds.join(", ")}.
 
 Rules:
@@ -76,6 +82,7 @@ export function toDirection(
       },
       transitionMs: Math.round(clamp(choice.transitionMs, 300, 2000)),
       easing: "smooth",
+      drift: clamp(choice.drift ?? 0, 0, 1),
     }
     return [{ markerId: choice.markerId, shot }]
   })

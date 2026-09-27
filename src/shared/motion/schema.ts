@@ -30,8 +30,14 @@ export const shotSchema = z.object({
   camera: cameraSchema,
   transitionMs: z.number().int().min(0).max(3000),
   easing: z.enum(easingNames),
+  /**
+   * Slow cinematic push while the shot holds (0 = still, 1 = strongest):
+   * the camera keeps drifting in and around until the next shot. Shots
+   * saved before drift existed read as 0.
+   */
+  drift: z.number().min(0).max(1).default(0),
 })
-export type Shot = z.infer<typeof shotSchema>
+export type Shot = z.output<typeof shotSchema>
 
 export const introKinds = [
   "none",

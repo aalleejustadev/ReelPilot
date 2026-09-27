@@ -32,9 +32,14 @@ export type TimedShot = { atMs: number; shot: Shot }
  * it was (even mid-move) into that shot over the shot's transition.
  * Deterministic, so the preview and the rendered video agree.
  */
+/** Strongest drift over a whole hold: a gentle push in and around. */
+const driftReach = { zoom: 0.1, turn: 5, tilt: 2.5 }
+
 export function cameraTimeline(
   shots: TimedShot[],
-  intro: Presentation["intro"]
+  intro: Presentation["intro"],
+  /** The clip's length: how long the last shot holds (for its drift). */
+  durationMs = Infinity
 ): (timeMs: number) => CameraPose {
   const ordered = [...shots].sort((a, b) => a.atMs - b.atMs)
 
@@ -57,7 +62,18 @@ export function cameraTimeline(
         shot.transitionMs === 0
           ? 1
           : clamp01((timeMs - entry.atMs) / shot.transitionMs)
-      return mix(from, target, easings[shot.easing](t))
+      const pose = mix(from, target, easings[shot.easing](t))
+      if (!shot.drift) return pose
+      // Drift runs across the shot's whole segment, until the next shot.
+      const segmentEnd = ordered[i + 1]?.atMs ?? durationMs
+      const span = Math.max(1, segmentEnd - entry.atMs)
+      const d = shot.drift * clamp01((timeMs - entry.atMs) / span)
+      return {
+        ...pose,
+        zoom: pose.zoom * (1 + driftReach.zoom * d),
+        turn: pose.turn + driftReach.turn * d,
+        tilt: pose.tilt + driftReach.tilt * d,
+      }
     }
     return before(timeMs)
   }

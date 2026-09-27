@@ -52,9 +52,14 @@ export function DeleteClipButton({
       open={open}
       onOpenChange={(next) => !isDeleting && setOpen(next)}
     >
-      <AlertDialogTrigger render={<Button type="button" variant="outline" />}>
+      <AlertDialogTrigger
+        render={
+          <Button type="button" variant="outline" aria-label="Delete clip" />
+        }
+      >
         <TrashIcon data-icon="inline-start" />
-        Delete clip
+        {/* Icon only on narrow screens, where the editor's top bar is full. */}
+        <span className="hidden sm:inline">Delete clip</span>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
