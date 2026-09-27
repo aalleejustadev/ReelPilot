@@ -93,3 +93,8 @@ export const directMotionSchema = z.object({
     .min(1, "Describe the motion you want.")
     .max(500, "Keep the instruction under 500 characters."),
 })
+
+export const moveMarkerSchema = z.object({
+  markerId: idSchema,
+  atMs: z.number().int().min(0),
+})

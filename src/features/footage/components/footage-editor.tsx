@@ -38,6 +38,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   addFootageMarker,
   directFootageMotion,
+  moveFootageMarker,
   updateFootagePresentation,
   updateMarkerShot,
 } from "../actions"
@@ -88,6 +89,18 @@ const prefersReducedMotion = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches
 const isMac = () => /Mac|iPhone|iPad/.test(navigator.platform)
 const noSubscribe = () => () => {}
+
+/**
+ * Starts playback, ignoring the rejection browsers raise when a pause
+ * interrupts a pending play() (e.g. Play then Pause straight away).
+ */
+function playSafely(video: HTMLVideoElement | null) {
+  video?.play().catch((error: unknown) => {
+    if (!(error instanceof DOMException && error.name === "AbortError")) {
+      console.error(error)
+    }
+  })
+}
 
 /** Typing in a field keeps the browser's own shortcuts (text undo, space). */
 function isTyping(target: EventTarget | null) {
@@ -159,6 +172,51 @@ export function FootageEditor({
   )
   const { shots, presentation } = history.present
 
+  // Moments moved on the timeline show at their new time at once; the
+  // server copy catches up after the save.
+  const [timeOverrides, setTimeOverrides] = useState<Record<string, number>>({})
+  const markers = useMemo(
+    () =>
+      clip.markers
+        .map((marker) =>
+          marker.id in timeOverrides
+            ? { ...marker, atMs: timeOverrides[marker.id] ?? marker.atMs }
+            : marker
+        )
+        .sort((a, b) => a.atMs - b.atMs),
+    [clip.markers, timeOverrides]
+  )
+  const moveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+
+  /**
+   * Moves a moment. Drags save at once (so leaving right after keeps the
+   * change); rapid arrow-key nudges save once they stop.
+   */
+  function moveMoment(
+    id: string,
+    atMs: number,
+    options: { nudge?: boolean } = {}
+  ) {
+    setTimeOverrides((overrides) => ({ ...overrides, [id]: atMs }))
+    clearTimeout(moveTimers.current.get(id))
+    const save = async () => {
+      moveTimers.current.delete(id)
+      setSaveState("saving")
+      const result = await moveFootageMarker({ markerId: id, atMs })
+      setSaveState(result.ok ? "saved" : "failed")
+      if (!result.ok) {
+        setTimeOverrides(({ [id]: _dropped, ...rest }) => rest)
+        toast.add({ type: "error", title: result.error.message })
+      }
+    }
+    if (options.nudge) {
+      setSaveState("saving")
+      moveTimers.current.set(id, setTimeout(save, 400))
+    } else {
+      void save()
+    }
+  }
+
   const durationMs = clip.durationMs ?? 1
   // The strip covers count × interval ms, which can run past the clip's end.
   const stripWidth =
@@ -177,14 +235,13 @@ export function FootageEditor({
   )
   const timedShots = useMemo(
     () =>
-      clip.markers.flatMap((marker) => {
+      markers.flatMap((marker) => {
         const shot = shotOf(marker)
         return shot ? [{ atMs: marker.atMs, shot }] : []
       }),
-    [clip.markers, shotOf]
+    [markers, shotOf]
   )
-  const selected =
-    clip.markers.find((marker) => marker.id === selectedId) ?? null
+  const selected = markers.find((marker) => marker.id === selectedId) ?? null
 
   const onTimeChange = useCallback((ms: number) => setCurrentMs(ms), [])
   const onPlayingChange = useCallback(
@@ -302,7 +359,7 @@ export function FootageEditor({
     if (video.ended || video.currentTime * 1000 >= durationMs - 50) {
       video.currentTime = 0
     }
-    if (video.paused) void video.play()
+    if (video.paused) playSafely(video)
     else video.pause()
   }, [durationMs])
 
@@ -320,9 +377,17 @@ export function FootageEditor({
       resumeAfterScrub.current = !video.paused
       video.pause()
     } else if (resumeAfterScrub.current) {
-      void video.play()
+      playSafely(video)
     }
   }
+
+  // Leaving while a save is in flight would lose it: ask first.
+  useEffect(() => {
+    if (saveState !== "saving") return
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault()
+    window.addEventListener("beforeunload", warn)
+    return () => window.removeEventListener("beforeunload", warn)
+  }, [saveState])
 
   // ⌘Z / Ctrl+Z undo, ⇧⌘Z / Ctrl+Y redo, Space play/pause.
   useEffect(() => {
@@ -366,9 +431,9 @@ export function FootageEditor({
   }
 
   function applyLookById(lookId: string) {
-    change(applyLook(lookId, clip.markers, history.present), "look")
+    change(applyLook(lookId, markers, history.present), "look")
     stop()
-    void videoRef.current?.play()
+    playSafely(videoRef.current)
   }
 
   function direct(instruction: string) {
@@ -395,7 +460,7 @@ export function FootageEditor({
         },
       })
       stop()
-      void videoRef.current?.play()
+      playSafely(videoRef.current)
       toast.add({
         type: "success",
         title: `Camera set for ${result.data.shots.length} key ${result.data.shots.length === 1 ? "moment" : "moments"}`,
@@ -518,11 +583,11 @@ export function FootageEditor({
             <div className="w-full overflow-y-auto p-4 lg:w-80">
               <TabsContent value="effects">
                 <EffectsPanel
-                  hasMoments={clip.markers.length > 0}
+                  hasMoments={markers.length > 0}
                   brandColors={brandColors}
                   onApplyLook={applyLookById}
                   onReset={() =>
-                    change(resetLook(clip.markers, presentation), "reset")
+                    change(resetLook(markers, presentation), "reset")
                   }
                   onBackground={(background) =>
                     changePresentation(
@@ -550,7 +615,7 @@ export function FootageEditor({
                     change(
                       {
                         shots: Object.fromEntries(
-                          clip.markers.map((marker) => [marker.id, shot])
+                          markers.map((marker) => [marker.id, shot])
                         ),
                         presentation,
                       },
@@ -558,7 +623,7 @@ export function FootageEditor({
                     )
                     toast.add({
                       type: "success",
-                      title: `Shot used on all ${clip.markers.length} moments`,
+                      title: `Shot used on all ${markers.length} moments`,
                     })
                   }}
                 />
@@ -572,17 +637,24 @@ export function FootageEditor({
               </TabsContent>
               <TabsContent value="ai">
                 <DirectPanel
-                  hasMoments={clip.markers.length > 0}
+                  hasMoments={markers.length > 0}
                   isDirecting={isDirecting}
                   onDirect={direct}
                 />
               </TabsContent>
               <TabsContent value="moments">
                 <MomentsPanel
-                  markers={clip.markers}
+                  markers={markers}
                   selectedId={selectedId}
                   readOnly={readOnly}
                   shotOf={shotOf}
+                  strip={{
+                    url: thumbnailsUrl,
+                    count: clip.thumbnailCount,
+                    intervalMs: clip.thumbnailIntervalMs,
+                  }}
+                  playheadMs={currentMs}
+                  onMove={(marker, atMs) => moveMoment(marker.id, atMs)}
                   onSelect={(marker) => {
                     selectMarker(marker)
                   }}
@@ -713,7 +785,7 @@ export function FootageEditor({
           currentMs={currentMs}
           thumbnailsUrl={thumbnailsUrl}
           stripWidth={stripWidth}
-          moments={clip.markers.map((marker) => {
+          moments={markers.map((marker) => {
             const shot = shotOf(marker)
             return {
               id: marker.id,
@@ -726,8 +798,13 @@ export function FootageEditor({
           selectedId={selectedId}
           onSeek={seek}
           onScrubbingChange={onScrubbingChange}
+          onMoveMoment={
+            readOnly
+              ? undefined
+              : (id, atMs, nudge) => moveMoment(id, atMs, { nudge })
+          }
           onSelect={(id) => {
-            const marker = clip.markers.find((m) => m.id === id)
+            const marker = markers.find((m) => m.id === id)
             if (!marker) return
             selectMarker(marker)
             if (!readOnly) setTool("shot")

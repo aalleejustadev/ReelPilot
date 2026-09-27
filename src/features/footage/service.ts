@@ -311,3 +311,27 @@ export async function applyMotionDirection(
     }
   })
 }
+
+/**
+ * Moves a marker to `atMs` (dragged on the timeline). A moved marker is the
+ * owner's choice now, so it becomes MANUAL: reprocessing only replaces AUTO.
+ */
+export async function moveMarker(
+  workspaceId: string,
+  markerId: string,
+  atMs: number
+) {
+  const marker = await db.footageMarker.findFirst({
+    where: markerInWorkspace(markerId, workspaceId),
+    select: { footage: { select: { durationMs: true } } },
+  })
+  if (!marker?.footage) throw new AppError("NOT_FOUND", "That marker is gone.")
+  const end = marker.footage.durationMs
+  if (end !== null && atMs > end) {
+    throw new AppError("VALIDATION", "That moment is past the end of the clip.")
+  }
+  await db.footageMarker.update({
+    where: { id: markerId },
+    data: { atMs, source: "MANUAL" },
+  })
+}

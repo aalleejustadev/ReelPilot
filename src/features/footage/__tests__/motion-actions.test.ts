@@ -228,4 +228,26 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
     ).toMatchObject({ ok: false, error: { code: "RATE_LIMITED" } })
     expect(generateStructured).not.toHaveBeenCalled()
   })
+
+  it("moves a moment to a new time; a moved auto moment becomes manual", async () => {
+    expect(await actions.moveFootageMarker({ markerId, atMs: 6500 })).toEqual({
+      ok: true,
+      data: null,
+    })
+    expect(
+      await db.footageMarker.findUniqueOrThrow({ where: { id: markerId } })
+    ).toMatchObject({
+      atMs: 6500,
+      source: "MANUAL",
+    })
+  })
+
+  it("won't move a moment past the end of the clip", async () => {
+    expect(
+      await actions.moveFootageMarker({ markerId, atMs: 99_000 })
+    ).toMatchObject({
+      ok: false,
+      error: { code: "VALIDATION" },
+    })
+  })
 })

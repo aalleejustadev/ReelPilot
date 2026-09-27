@@ -192,7 +192,9 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
   await page.getByRole("button", { name: /Add marker at 0:00\.0/ }).click()
   await expect(page.getByText("Marker added at 0:00.0")).toBeVisible()
   await tools.getByRole("tab", { name: "Moments" }).click()
-  const label = page.getByRole("textbox", { name: "Label for 0:00.0" })
+  const label = page.getByRole("textbox", {
+    name: "What’s on screen at 0:00.0",
+  })
   await label.fill("Opening screen")
   await label.press("Enter")
   await page.reload()
@@ -201,7 +203,7 @@ test("upload a clip, let the worker process it, then edit it in the editor", asy
     .getByRole("tab", { name: "Moments" })
     .click()
   await expect(
-    page.getByRole("textbox", { name: "Label for 0:00.0" })
+    page.getByRole("textbox", { name: "What’s on screen at 0:00.0" })
   ).toHaveValue("Opening screen")
   await page.getByRole("button", { name: "Remove marker at 0:00.0" }).click()
   await expect(page.getByText("Marker at 0:00.0 removed")).toBeVisible()
@@ -263,5 +265,71 @@ test("playback keeps going through saves and refreshes to the very end", async (
     .poll(async () => (await state()).ended, { timeout: 10_000 })
     .toBe(true)
   expect((await state()).t).toBeGreaterThan(4.9)
+  expect(consoleProblems).toEqual([])
+})
+
+test("key moments can be dragged, nudged and moved to the playhead", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}) => {
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+
+  const timeline = page.getByRole("group", { name: "Timeline" })
+  const cut = timeline.getByRole("button", {
+    name: /^Select the moment at 0:02/,
+  })
+  await expect(cut).toBeVisible()
+  // Wait until the editor is interactive: switching tools needs React.
+  const tools = page.getByRole("tablist", { name: "Editor tools" })
+  await tools.getByRole("tab", { name: "Moments" }).click()
+  await expect(page.getByRole("list", { name: "Key moments" })).toBeVisible()
+
+  // Drag the cut at 2s to 80% of the 5s clip.
+  const track = await timeline.boundingBox()
+  const handle = await cut.boundingBox()
+  if (!track || !handle) throw new Error("Timeline not visible")
+  const y = handle.y + handle.height / 2
+  await page.mouse.move(handle.x + handle.width / 2, y)
+  await page.mouse.down()
+  await page.mouse.move(track.x + track.width * 0.8, y, { steps: 8 })
+  await page.mouse.up()
+  const moved = timeline.getByRole("button", {
+    name: /^Select the moment at 0:0(3\.9|4\.\d)/,
+  })
+  await expect(moved).toBeVisible()
+
+  // It's saved: after a reload it's still there, and now counts as yours.
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+  await page.reload()
+  await expect(moved).toBeVisible()
+  await tools.getByRole("tab", { name: "Moments" }).click()
+  await expect(
+    page.getByRole("list", { name: "Key moments" }).getByText("Added by you")
+  ).toBeVisible()
+
+  // Arrow keys nudge a focused moment by 0.1s.
+  const before = (await moved.getAttribute("aria-label")) ?? ""
+  await moved.focus()
+  await page.keyboard.press("ArrowRight")
+  await expect(moved).not.toHaveAttribute("aria-label", before)
+
+  // "Move to playhead" puts it wherever the playhead is.
+  await page.getByRole("slider", { name: "Playhead" }).press("Home")
+  await page
+    .getByRole("button", { name: /^Move the moment at .* to the playhead$/ })
+    .click()
+  await expect(
+    timeline.getByRole("button", { name: /^Select the moment at 0:00\.0/ })
+  ).toBeVisible()
+  await expectNoViolations(page)
   expect(consoleProblems).toEqual([])
 })

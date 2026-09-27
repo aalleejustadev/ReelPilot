@@ -1,8 +1,9 @@
 "use client"
 
-import { TrashIcon, VideoIcon } from "lucide-react"
+import { MoveHorizontalIcon, TrashIcon, VideoIcon } from "lucide-react"
 import { useState, useTransition } from "react"
 
+import { cn } from "@/shared/lib/utils"
 import {
   defaultShot,
   presetOf,
@@ -11,7 +12,6 @@ import {
   type Shot,
   type ShotPresetName,
 } from "@/shared/motion"
-import { Badge } from "@/shared/ui/badge"
 import { Button } from "@/shared/ui/button"
 import { Input } from "@/shared/ui/input"
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/shared/ui/select"
 import { Spinner } from "@/shared/ui/spinner"
 import { toast } from "@/shared/ui/toast"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 import { deleteFootageMarker, updateFootageMarker } from "../actions"
 import { formatTimecode } from "../lib/format"
@@ -33,43 +34,60 @@ import { PanelHeading } from "./editor-panels"
 
 type Marker = FootageDetail["markers"][number]
 
-/** Every key moment: label it, give it a shot, or remove it. */
+/** Where the thumbnail strip is, to show each moment's frame. */
+export type ThumbnailStrip = {
+  url: string | null
+  count: number | null
+  intervalMs: number | null
+}
+
+/** Every key moment as a card: its frame, time, shot and description. */
 export function MomentsPanel({
   markers,
   selectedId,
   readOnly,
+  strip,
+  playheadMs,
   shotOf,
   onSelect,
   onShotChange,
+  onMove,
 }: {
   markers: Marker[]
   selectedId: string | null
   readOnly: boolean
+  strip: ThumbnailStrip
+  playheadMs: number
   shotOf: (marker: Marker) => Shot | null
   onSelect: (marker: Marker) => void
   onShotChange: (marker: Marker, shot: Shot | null) => void
+  onMove: (marker: Marker, atMs: number) => void
 }) {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <PanelHeading
         title="Key moments"
-        description="Scripts cut to these moments, and the camera moves at each one. Auto ones come from scene changes; label them so you know what each shows."
+        description="The beats your ad cuts to. The camera moves at each one. Drag them on the timeline to change when they happen."
       />
       {markers.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No key moments yet. Play the clip and add one where something happens.
+        <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
+          No key moments yet. Play the clip and press “Add marker” where
+          something happens.
         </p>
       ) : (
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col gap-3" aria-label="Key moments">
           {markers.map((marker) => (
-            <MarkerRow
+            <MomentCard
               key={marker.id}
               marker={marker}
               readOnly={readOnly}
               isSelected={marker.id === selectedId}
+              strip={strip}
+              playheadMs={playheadMs}
               shot={shotOf(marker)}
               onSelect={() => onSelect(marker)}
               onShotChange={(shot) => onShotChange(marker, shot)}
+              onMove={(atMs) => onMove(marker, atMs)}
             />
           ))}
         </ul>
@@ -78,25 +96,53 @@ export function MomentsPanel({
   )
 }
 
-function MarkerRow({
+/** The moment's frame, cut from the timeline's thumbnail strip. */
+function MomentFrame({ strip, atMs }: { strip: ThumbnailStrip; atMs: number }) {
+  if (!strip.url || !strip.count || !strip.intervalMs) {
+    return <span aria-hidden className="block h-9 w-16 rounded-md bg-muted" />
+  }
+  const index = Math.min(strip.count - 1, Math.floor(atMs / strip.intervalMs))
+  const position = strip.count > 1 ? (index / (strip.count - 1)) * 100 : 0
+  return (
+    <span
+      aria-hidden
+      className="block h-9 w-16 shrink-0 rounded-md border bg-muted bg-no-repeat"
+      style={{
+        // Quoted: signed links contain characters CSS url() would misread.
+        backgroundImage: `url("${strip.url}")`,
+        backgroundSize: `${strip.count * 100}% 100%`,
+        backgroundPosition: `${position}% 0`,
+      }}
+    />
+  )
+}
+
+function MomentCard({
   marker,
   readOnly,
   isSelected,
+  strip,
+  playheadMs,
   shot,
   onSelect,
   onShotChange,
+  onMove,
 }: {
   marker: Marker
   readOnly: boolean
   isSelected: boolean
+  strip: ThumbnailStrip
+  playheadMs: number
   shot: Shot | null
   onSelect: () => void
   onShotChange: (shot: Shot | null) => void
+  onMove: (atMs: number) => void
 }) {
   const [label, setLabel] = useState(marker.label ?? "")
   const [isSaving, startSave] = useTransition()
   const [isDeleting, startDelete] = useTransition()
   const time = formatTimecode(marker.atMs)
+  const labelId = `moment-${marker.id}-label`
 
   function saveLabel() {
     if (label.trim() === (marker.label ?? "")) return
@@ -118,53 +164,99 @@ function MarkerRow({
   }
 
   return (
-    // Narrow screens: time, badge and delete on one line, label below.
-    <li className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <Button
-        type="button"
-        variant={isSelected ? "secondary" : "ghost"}
-        className="font-mono"
-        aria-label={`Select the moment at ${time}`}
-        aria-pressed={isSelected}
-        onClick={onSelect}
-      >
-        {time}
-      </Button>
-      <Input
-        aria-label={`Label for ${time}`}
-        placeholder="What happens here?"
-        value={label}
-        maxLength={footageLimits.label}
-        disabled={readOnly || isSaving}
-        onChange={(event) => setLabel(event.target.value)}
-        onBlur={saveLabel}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") event.currentTarget.blur()
-        }}
-        className="order-last w-full"
-      />
-      <div className="ml-auto flex items-center gap-2">
-        <ShotSelect
-          time={time}
-          shot={shot}
-          disabled={readOnly}
-          onChange={onShotChange}
-        />
-        <Badge variant={marker.source === "AUTO" ? "secondary" : "outline"}>
-          {marker.source === "AUTO" ? "Auto" : "Manual"}
-        </Badge>
+    <li
+      className={cn(
+        "flex flex-col gap-3 rounded-lg border bg-background p-3 transition-shadow",
+        isSelected && "border-ring ring-2 ring-ring/25"
+      )}
+    >
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          aria-label={`Select the moment at ${time}`}
+          aria-pressed={isSelected}
+          onClick={onSelect}
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-md text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <MomentFrame strip={strip} atMs={marker.atMs} />
+          <span className="flex min-w-0 flex-col">
+            <span className="font-mono text-sm font-medium">{time}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {marker.source === "AUTO" ? "Auto-detected" : "Added by you"}
+            </span>
+          </span>
+        </button>
         {!readOnly && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            aria-label={`Remove marker at ${time}`}
-            disabled={isDeleting}
-            onClick={remove}
-          >
-            {isDeleting ? <Spinner /> : <TrashIcon />}
-          </Button>
+          <div className="flex shrink-0 items-center">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Move the moment at ${time} to the playhead`}
+                    disabled={Math.abs(playheadMs - marker.atMs) < 50}
+                    onClick={() => onMove(playheadMs)}
+                  />
+                }
+              >
+                <MoveHorizontalIcon />
+              </TooltipTrigger>
+              <TooltipContent>
+                Move to playhead ({formatTimecode(playheadMs)})
+              </TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label={`Remove marker at ${time}`}
+                    disabled={isDeleting}
+                    onClick={remove}
+                  />
+                }
+              >
+                {isDeleting ? <Spinner /> : <TrashIcon />}
+              </TooltipTrigger>
+              <TooltipContent>Remove</TooltipContent>
+            </Tooltip>
+          </div>
         )}
+      </div>
+
+      <ShotSelect
+        time={time}
+        shot={shot}
+        disabled={readOnly}
+        onChange={onShotChange}
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor={labelId} className="text-xs font-medium">
+          What’s on screen
+        </label>
+        <Input
+          id={labelId}
+          aria-label={`What’s on screen at ${time}`}
+          aria-describedby={`${labelId}-hint`}
+          placeholder="e.g. Opens the invoice dashboard"
+          value={label}
+          maxLength={footageLimits.label}
+          disabled={readOnly || isSaving}
+          onChange={(event) => setLabel(event.target.value)}
+          onBlur={saveLabel}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") event.currentTarget.blur()
+          }}
+        />
+        <p id={`${labelId}-hint`} className="text-xs text-muted-foreground">
+          The AI uses this to aim the camera and to write lines that match this
+          moment.
+        </p>
       </div>
     </li>
   )
@@ -173,7 +265,7 @@ function MarkerRow({
 const keepPrevious = "keep"
 const customShot = "custom"
 
-/** A moment's shot, right in its row: keep the previous one or pick one. */
+/** A moment's shot: keep the previous one, or pick one. */
 function ShotSelect({
   time,
   shot,
@@ -206,11 +298,7 @@ function ShotSelect({
         onChange({ ...(shot ?? defaultShot), camera: preset.camera })
       }}
     >
-      <SelectTrigger
-        size="sm"
-        aria-label={`Camera shot at ${time}`}
-        className="w-36"
-      >
+      <SelectTrigger aria-label={`Camera shot at ${time}`} className="w-full">
         <VideoIcon data-icon="inline-start" />
         <SelectValue />
       </SelectTrigger>

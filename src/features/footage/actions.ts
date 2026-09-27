@@ -23,6 +23,7 @@ import {
   completeUploadSchema,
   directMotionSchema,
   footageIdSchema,
+  moveMarkerSchema,
   requestUploadSchema,
   updateMarkerSchema,
   updatePresentationSchema,
@@ -297,6 +298,26 @@ export async function directFootageMotion(input: unknown): Promise<
     // No page refresh: the editor already shows this, and nothing else
     // renders shots or style (refreshing mid-playback was wasted work).
     return ok(direction)
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+export async function moveFootageMarker(input: unknown): Promise<Result<null>> {
+  try {
+    const parsed = moveMarkerSchema.safeParse(input)
+    if (!parsed.success) throw invalid(parsed.error, "Check the new time.")
+
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    await service.moveMarker(
+      workspace.id,
+      parsed.data.markerId,
+      parsed.data.atMs
+    )
+
+    refreshFootage()
+    return ok(null)
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

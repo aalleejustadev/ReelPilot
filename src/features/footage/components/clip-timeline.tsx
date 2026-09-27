@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef } from "react"
+import { useRef, useState } from "react"
 
 import { cn } from "@/shared/lib/utils"
 
@@ -34,6 +34,7 @@ export function ClipTimeline({
   onSeek,
   onScrubbingChange,
   onSelect,
+  onMoveMoment,
 }: {
   durationMs: number
   currentMs: number
@@ -45,9 +46,63 @@ export function ClipTimeline({
   /** True while the user drags, so playback can pause and resume. */
   onScrubbingChange: (scrubbing: boolean) => void
   onSelect: (id: string) => void
+  /** Drag (or arrow keys on a focused moment) moved it; omit = read-only. */
+  onMoveMoment?: (id: string, atMs: number, nudge?: boolean) => void
 }) {
   const trackRef = useRef<HTMLDivElement>(null)
   const dragging = useRef(false)
+  // A moment being dragged: where it started, and where it is now.
+  const momentDrag = useRef<{
+    id: string
+    startX: number
+    moved: boolean
+  } | null>(null)
+  const [dragPreview, setDragPreview] = useState<{
+    id: string
+    atMs: number
+  } | null>(null)
+  const justDragged = useRef(false)
+
+  function startMomentDrag(event: React.PointerEvent, id: string) {
+    if (!onMoveMoment) return
+    event.stopPropagation()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    momentDrag.current = { id, startX: event.clientX, moved: false }
+  }
+
+  function dragMoment(event: React.PointerEvent) {
+    const drag = momentDrag.current
+    if (!drag) return
+    // A few pixels of slack, so a click still selects instead of moving.
+    if (!drag.moved && Math.abs(event.clientX - drag.startX) < 4) return
+    drag.moved = true
+    setDragPreview({ id: drag.id, atMs: msAt(event.clientX) })
+  }
+
+  function endMomentDrag(event: React.PointerEvent) {
+    const drag = momentDrag.current
+    momentDrag.current = null
+    if (!drag) return
+    event.currentTarget.releasePointerCapture(event.pointerId)
+    if (drag.moved && onMoveMoment) {
+      onMoveMoment(drag.id, msAt(event.clientX))
+      justDragged.current = true // swallow the click that follows
+    }
+    setDragPreview(null)
+  }
+
+  function nudgeMoment(event: React.KeyboardEvent, moment: TimelineMoment) {
+    if (!onMoveMoment) return
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return
+    event.preventDefault()
+    const step =
+      (event.shiftKey ? 1000 : 100) * (event.key === "ArrowLeft" ? -1 : 1)
+    onMoveMoment(
+      moment.id,
+      Math.min(durationMs, Math.max(0, moment.atMs + step)),
+      true
+    )
+  }
 
   const msAt = (clientX: number) => {
     const box = trackRef.current?.getBoundingClientRect()
@@ -104,8 +159,70 @@ export function ClipTimeline({
   }))
   const playhead = clampPercent(currentMs, durationMs)
 
+  // Ruler marks: whole seconds, labelled at a spacing that stays readable.
+  const seconds = Math.floor(durationMs / 1000)
+  const labelEvery =
+    [1, 2, 5, 10, 15, 30, 60].find((n) => seconds / n <= 10) ?? 120
+
   return (
     <div className="flex flex-col gap-1.5">
+      {/* Ruler: second marks and the playhead's handle (press or drag it,
+          or anywhere on the ruler, to move the playhead). */}
+      <div
+        className="relative h-6 cursor-ew-resize touch-none select-none"
+        onPointerDown={startDrag}
+        onPointerMove={drag}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+      >
+        {Array.from({ length: seconds + 1 }, (_, second) => (
+          <span
+            key={second}
+            aria-hidden
+            // The first and last labels sit inside the ruler, not half off it.
+            className={cn(
+              "absolute bottom-0 flex flex-col gap-0.5",
+              second === 0
+                ? "items-start"
+                : second * 1000 >= durationMs - 250
+                  ? "-translate-x-full items-end"
+                  : "-translate-x-1/2 items-center"
+            )}
+            style={{ left: `${clampPercent(second * 1000, durationMs)}%` }}
+          >
+            {second % labelEvery === 0 && (
+              <span className="font-mono text-[10px] leading-none text-muted-foreground">
+                {Math.floor(second / 60)}:{String(second % 60).padStart(2, "0")}
+              </span>
+            )}
+            <span
+              className={cn(
+                "w-px bg-border",
+                second % labelEvery === 0 ? "h-2" : "h-1"
+              )}
+            />
+          </span>
+        ))}
+        <div
+          role="slider"
+          tabIndex={0}
+          aria-label="Playhead"
+          aria-valuemin={0}
+          aria-valuemax={durationMs}
+          aria-valuenow={currentMs}
+          aria-valuetext={formatTimecode(currentMs)}
+          className="group absolute inset-y-0 z-20 -ml-3 flex w-6 cursor-ew-resize items-end justify-center outline-none"
+          // Kept just inside the ends so the handle is never cut off.
+          style={{ left: `clamp(0.75rem, ${playhead}%, calc(100% - 0.75rem))` }}
+          onKeyDown={onKeyDown}
+        >
+          <span
+            aria-hidden
+            className="mb-0.5 size-4 rounded-full bg-foreground ring-2 ring-background group-focus-visible:ring-4 group-focus-visible:ring-ring/60"
+          />
+        </div>
+      </div>
+
       <div
         ref={trackRef}
         className="relative h-16 cursor-ew-resize touch-none overflow-hidden rounded-md border bg-muted select-none"
@@ -132,14 +249,34 @@ export function ClipTimeline({
             key={moment.id}
             type="button"
             data-moment
-            className="group absolute inset-y-0 z-10 -ml-2.5 flex w-5 cursor-pointer justify-center outline-none"
+            className={cn(
+              "group absolute inset-y-0 z-10 -ml-3 flex w-6 justify-center outline-none",
+              onMoveMoment
+                ? "cursor-grab active:cursor-grabbing"
+                : "cursor-pointer"
+            )}
             // Kept just inside the ends so a moment at 0:00 stays visible.
             style={{
-              left: `clamp(0.375rem, ${clampPercent(moment.atMs, durationMs)}%, calc(100% - 0.375rem))`,
+              left: `clamp(0.75rem, ${clampPercent(dragPreview?.id === moment.id ? dragPreview.atMs : moment.atMs, durationMs)}%, calc(100% - 0.75rem))`,
             }}
             aria-label={`Select the moment at ${formatTimecode(moment.atMs)}${moment.label ? `, ${moment.label}` : ""}${moment.shotLabel ? ", camera set" : ""}`}
             aria-pressed={moment.id === selectedId}
-            onClick={() => onSelect(moment.id)}
+            aria-keyshortcuts={
+              onMoveMoment ? "ArrowLeft ArrowRight" : undefined
+            }
+            title={onMoveMoment ? "Drag to move · arrow keys nudge" : undefined}
+            onPointerDown={(event) => startMomentDrag(event, moment.id)}
+            onPointerMove={dragMoment}
+            onPointerUp={endMomentDrag}
+            onPointerCancel={endMomentDrag}
+            onKeyDown={(event) => nudgeMoment(event, moment)}
+            onClick={() => {
+              if (justDragged.current) {
+                justDragged.current = false
+                return
+              }
+              onSelect(moment.id)
+            }}
           >
             <span
               aria-hidden
@@ -156,34 +293,24 @@ export function ClipTimeline({
                 className="absolute bottom-1 size-2.5 rounded-full bg-background ring-2 ring-foreground"
               />
             )}
+            {dragPreview?.id === moment.id && (
+              <span
+                aria-hidden
+                className="absolute top-1 rounded bg-foreground px-1.5 py-0.5 font-mono text-[11px] text-background"
+              >
+                {formatTimecode(dragPreview.atMs)}
+              </span>
+            )}
           </button>
         ))}
 
-        {/* The playhead: a line with a handle you can drag or focus. */}
-        <div
-          role="slider"
-          tabIndex={0}
-          aria-label="Playhead"
-          aria-valuemin={0}
-          aria-valuemax={durationMs}
-          aria-valuenow={currentMs}
-          aria-valuetext={formatTimecode(currentMs)}
-          className="group absolute inset-y-0 z-20 -ml-2 flex w-4 cursor-ew-resize justify-center outline-none"
-          // Kept just inside the ends so the handle is never cut off.
-          style={{
-            left: `clamp(0.5rem, ${playhead}%, calc(100% - 0.5rem))`,
-          }}
-          onKeyDown={onKeyDown}
-        >
-          <span
-            aria-hidden
-            className="h-full w-0.5 bg-foreground ring-1 ring-background"
-          />
-          <span
-            aria-hidden
-            className="absolute top-1 size-3.5 rounded-full bg-foreground ring-2 ring-background group-focus-visible:ring-4 group-focus-visible:ring-ring/60"
-          />
-        </div>
+        {/* The playhead's line; its handle lives in the ruler above, so
+            it never covers a moment. */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 z-20 -ml-px w-0.5 bg-foreground ring-1 ring-background"
+          style={{ left: `clamp(0.75rem, ${playhead}%, calc(100% - 0.75rem))` }}
+        />
       </div>
 
       {/* Which shot each part of the clip uses. */}
