@@ -19,6 +19,7 @@ import {
   outputDuration,
   outputLayout,
   progressiveBlurLayers,
+  toSource,
   isScreenGraphic,
   type GraphicItem,
   type Presentation,
@@ -26,6 +27,11 @@ import {
   type Transition,
 } from "@/shared/motion"
 
+import {
+  PlayerFootage,
+  PlayerMagnifierVideo,
+  type PlayerPart,
+} from "../components/PlayerFootage"
 import {
   BackgroundLight,
   MagnifierLens,
@@ -74,6 +80,15 @@ export type FootageStageProps = {
   onPickFocus?: (point: { x: number; y: number }) => void
   /** The video stopped loading (e.g. its signed link expired). */
   onVideoError?: () => void
+  /**
+   * The editor's live preview (Remotion Player): persistent videos that
+   * never wait on the network. Renders leave it off for frame-exact parts.
+   * (A prop, not getRemotionEnvironment(): that differs between the
+   * server's HTML and the browser, which broke hydration.)
+   */
+  preview?: boolean
+  /** Editor preview: whether the Player is playing forward. */
+  playing?: boolean
   /** The brand kit's fonts for text, and accent colours (best first). */
   fonts?: StageFonts
   accents?: string[]
@@ -117,6 +132,8 @@ export function FootageStage({
   reduceMotion = false,
   onPickFocus,
   onVideoError,
+  preview = false,
+  playing = false,
   fonts = defaultStageFonts,
   accents = [],
   logoUrl = null,
@@ -182,6 +199,22 @@ export function FootageStage({
     : []
 
   const colors = textColors(presentation.background, accents)
+  const irisAt = { x: pose.focusX, y: pose.focusY }
+  const playerParts: PlayerPart[] = layout.map((part, i) => {
+    const next = layout[i + 1]
+    return {
+      startMs: part.startMs,
+      endMs: part.endMs,
+      outStartMs: part.outStartMs,
+      outEndMs: part.outEndMs,
+      speed: part.speed,
+      enter: i > 0 ? { ...part.transition, durationMs: part.inMs } : null,
+      exit: next ? { ...next.transition, durationMs: next.inMs } : null,
+    }
+  })
+  const speedAt = (ms: number) =>
+    layout.find((part) => ms >= part.outStartMs && ms < part.outEndMs)?.speed ??
+    1
   const timed = timedGraphics(presentation.graphics, edit, durationMs, fps)
   const screenItems = timed.filter(
     ({ item }) => isScreenGraphic(item.kind) && item.kind !== "magnifier"
@@ -258,46 +291,81 @@ export function FootageStage({
               clipPath: `inset(0 round ${(frame.radius * unit).toFixed(2)}px)`,
             }}
           >
-            {layout.map((part, i) => {
-              const next = layout[i + 1]
-              const from = Math.round((part.outStartMs / 1000) * fps)
-              const to = Math.round((part.outEndMs / 1000) * fps)
-              return (
-                <Sequence
-                  key={part.startMs}
-                  from={from}
-                  durationInFrames={Math.max(1, to - from)}
-                  // Loads and seeks the next part a second early: no blank
-                  // frame at a cut.
-                  premountFor={fps}
-                >
-                  <PartLayer
-                    videoUrl={videoUrl}
-                    posterUrl={posterUrl}
-                    trimBefore={Math.round((part.startMs / 1000) * fps)}
-                    speed={part.speed}
-                    lengthMs={part.outEndMs - part.outStartMs}
-                    enter={
-                      i > 0
-                        ? { ...part.transition, durationMs: part.inMs }
-                        : null
-                    }
-                    exit={
-                      next
-                        ? { ...next.transition, durationMs: next.inMs }
-                        : null
-                    }
-                    irisAt={{ x: pose.focusX, y: pose.focusY }}
-                    unit={unit}
-                    onVideoError={onVideoError}
-                    partFrom={from}
+            {preview ? (
+              <>
+                <PlayerFootage
+                  videoUrl={videoUrl}
+                  posterUrl={posterUrl}
+                  parts={playerParts}
+                  adMs={timeMs}
+                  playing={playing}
+                  styleFor={(part, localMs) =>
+                    partLook(part, localMs, irisAt, unit)
+                  }
+                  onVideoError={onVideoError}
+                />
+                {magnifiers.length > 0 && (
+                  <PlayerMagnifier
                     magnifiers={magnifiers}
+                    frame={frameNumber}
                     frameWidth={frameWidth}
                     frameHeight={frameHeight}
+                    video={
+                      <PlayerMagnifierVideo
+                        videoUrl={videoUrl}
+                        at={toSource(edit, durationMs, timeMs) / 1000}
+                        speed={speedAt(timeMs)}
+                        playing={playing}
+                      />
+                    }
                   />
-                </Sequence>
-              )
-            })}
+                )}
+              </>
+            ) : (
+              <>
+                {layout.map((part, i) => {
+                  const next = layout[i + 1]
+                  const from = Math.round((part.outStartMs / 1000) * fps)
+                  const to = Math.round((part.outEndMs / 1000) * fps)
+                  return (
+                    <Sequence
+                      key={part.startMs}
+                      from={from}
+                      durationInFrames={Math.max(1, to - from)}
+                      // Loads and seeks each part's video 5s before it plays, so the
+                      // cut never waits on the network (1s wasn't enough over the
+                      // internet: playback stalled at every part).
+                      premountFor={5 * fps}
+                    >
+                      <PartLayer
+                        videoUrl={videoUrl}
+                        posterUrl={posterUrl}
+                        trimBefore={Math.round((part.startMs / 1000) * fps)}
+                        speed={part.speed}
+                        lengthMs={part.outEndMs - part.outStartMs}
+                        enter={
+                          i > 0
+                            ? { ...part.transition, durationMs: part.inMs }
+                            : null
+                        }
+                        exit={
+                          next
+                            ? { ...next.transition, durationMs: next.inMs }
+                            : null
+                        }
+                        irisAt={{ x: pose.focusX, y: pose.focusY }}
+                        unit={unit}
+                        onVideoError={onVideoError}
+                        partFrom={from}
+                        magnifiers={magnifiers}
+                        frameWidth={frameWidth}
+                        frameHeight={frameHeight}
+                      />
+                    </Sequence>
+                  )
+                })}
+              </>
+            )}
             <BlurLayers layers={depthLayers} testId="depth-of-field" />
             <BlurLayers layers={edgeLayers} testId="progressive-blur" />
             {!flat && (
@@ -585,4 +653,65 @@ export function exitStyle(
     default:
       return {}
   }
+}
+
+/** A part's transition look at `localMs` into it (enter and exit). */
+function partLook(
+  part: {
+    outStartMs: number
+    outEndMs: number
+    enter: Transition | null
+    exit: Transition | null
+  },
+  localMs: number,
+  irisAt: { x: number; y: number },
+  unit: number
+): LayerLook {
+  const lengthMs = part.outEndMs - part.outStartMs
+  const { enter, exit } = part
+  const inT =
+    enter && enter.durationMs > 0 ? clamp01(localMs / enter.durationMs) : 1
+  const outT =
+    exit && exit.durationMs > 0
+      ? clamp01((localMs - (lengthMs - exit.durationMs)) / exit.durationMs)
+      : 0
+  return {
+    ...(enter && inT < 1 ? enterStyle(enter, inT, irisAt, unit) : {}),
+    ...(exit && outT > 0 ? exitStyle(exit, outT, unit) : {}),
+  }
+}
+
+/**
+ * The preview's magnifier: one lens that follows whichever magnifier is
+ * showing, around one persistent video (see PlayerFootage).
+ */
+function PlayerMagnifier({
+  magnifiers,
+  frame,
+  frameWidth,
+  frameHeight,
+  video,
+}: {
+  magnifiers: { item: GraphicItem; from: number; frames: number }[]
+  frame: number
+  frameWidth: number
+  frameHeight: number
+  video: React.ReactNode
+}) {
+  const current =
+    magnifiers.find((m) => frame >= m.from && frame < m.from + m.frames) ?? null
+  const shown = current ?? magnifiers[0]!
+  return (
+    <div style={{ visibility: current ? "visible" : "hidden" }}>
+      <MagnifierLens
+        z={screenZ(shown.item)}
+        box={shown.item.box}
+        frames={shown.frames}
+        frame={current ? frame - current.from : 0}
+        width={frameWidth}
+        height={frameHeight}
+        video={video}
+      />
+    </div>
+  )
 }

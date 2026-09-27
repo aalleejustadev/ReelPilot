@@ -20,7 +20,7 @@ import { directEdit, type EditPlan } from "./lib/direct-edit"
 import { parseStoredRecording } from "./lib/recording"
 import { parseStoredInsight } from "./lib/insight"
 import { suggestGraphic, type GraphicSuggestion } from "./lib/suggest-graphic"
-import { getFootage } from "./queries"
+import { clipMediaUrls, getFootage } from "./queries"
 import {
   addMarkerSchema,
   completeUploadSchema,
@@ -423,6 +423,33 @@ export async function suggestMomentGraphic(
         brandName: kit?.name ?? "the product",
       })
     )
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+/**
+ * Fresh signed links for a clip's video, poster and thumbnails (they're
+ * signed for an hour). The editor asks before they expire, and when a
+ * video fails to load, so long sessions never stall on a dead link.
+ */
+export async function freshFootageLinks(
+  footageId: unknown
+): Promise<
+  Result<{
+    videoUrl: string | null
+    posterUrl: string | null
+    thumbnailsUrl: string | null
+  }>
+> {
+  try {
+    const parsed = footageIdSchema.safeParse(footageId)
+    if (!parsed.success) throw new AppError("NOT_FOUND", "That clip is gone.")
+    const { workspace } = await requireWorkspaceAccess("workspace:view")
+    const clip = await getFootage(workspace.id, parsed.data)
+    if (!clip) throw new AppError("NOT_FOUND", "That clip is gone.")
+    return ok(await clipMediaUrls(clip))
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

@@ -68,6 +68,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 import {
   addFootageMarker,
   directFootageEdit,
+  freshFootageLinks,
   moveFootageMarker,
   suggestMomentGraphic,
   updateFootagePresentation,
@@ -167,21 +168,59 @@ const playerTime = (player: PlayerRef | null) =>
 /**
  * Signed links change on every server render (each refresh re-signs
  * them), and a new <video> src restarts playback from 0. So the first
- * links are kept; `renew` switches to the latest ones, for when the kept
- * ones stop working (they expire after an hour).
+ * links are kept, and replaced only by fresh ones from the server: before
+ * they expire (they're signed for an hour), and when a video fails to
+ * load. A stale link used to stall playback at the next part or magnifier,
+ * whose new video element couldn't load it.
  */
-function useStableLinks<T extends Record<string, string | null>>(links: T) {
+type Links = {
+  videoUrl: string
+  posterUrl: string | null
+  thumbnailsUrl: string | null
+}
+
+/** Refresh a little before the hour-long signatures run out. */
+const linkLifetimeMs = 45 * 60 * 1000
+
+function useStableLinks(footageId: string, links: Links) {
   const [stable, setStable] = useState(links)
-  const latest = useRef(links)
+  const signedAt = useRef(0)
+  const inFlight = useRef(false)
   useEffect(() => {
-    latest.current = links
-  })
-  const renew = useCallback(() => {
-    if (JSON.stringify(latest.current) === JSON.stringify(stable)) return false
-    setStable(latest.current)
-    return true
-  }, [stable])
-  return [stable, renew] as const
+    signedAt.current = Date.now()
+  }, [])
+  const renew = useCallback(async () => {
+    // One refresh at a time, and not more than every 5s (several parts can
+    // fail together).
+    if (inFlight.current || Date.now() - signedAt.current < 5000) return
+    inFlight.current = true
+    try {
+      const result = await freshFootageLinks(footageId)
+      if (result.ok && result.data.videoUrl) {
+        signedAt.current = Date.now()
+        setStable({ ...result.data, videoUrl: result.data.videoUrl })
+      }
+    } finally {
+      inFlight.current = false
+    }
+  }, [footageId])
+  // Before they expire: on a timer, and when a tab comes back to view.
+  useEffect(() => {
+    const check = () => {
+      if (Date.now() - signedAt.current > linkLifetimeMs) void renew()
+    }
+    const timer = setInterval(check, 60_000)
+    document.addEventListener("visibilitychange", check)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener("visibilitychange", check)
+    }
+  }, [renew])
+  const renewNow = useCallback(() => {
+    signedAt.current = 0
+    void renew()
+  }, [renew])
+  return [stable, renewNow] as const
 }
 
 /** Typing in a field keeps the browser's own shortcuts (text undo, space). */
@@ -229,7 +268,7 @@ export function FootageEditor({
   kitSite: string
 }) {
   const playerRef = useRef<PlayerRef>(null)
-  const [links, renewLinks] = useStableLinks({
+  const [links, renewLinks] = useStableLinks(clip.id, {
     videoUrl,
     posterUrl,
     thumbnailsUrl,
@@ -1450,6 +1489,7 @@ export function FootageEditor({
               pickingFocus={pickingFocus || pickingGraphic !== null}
               onPickFocus={onPickFocus}
               playbackRate={rate}
+              playing={isPlaying && rate > 0}
               interactive={!readOnly && !isPlaying}
               selectedItemId={
                 tool === "text"

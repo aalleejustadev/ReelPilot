@@ -826,3 +826,68 @@ test("layers: drop items on the timeline, stack them, and move them on the video
   await expect(page.getByText("Saved", { exact: true })).toBeVisible()
   expect(consoleProblems).toEqual([])
 })
+
+test("playback never freezes at a cut, even on a slow connection", async ({
+  page,
+  signedInUser: _user,
+  consoleProblems,
+}, info) => {
+  // Regression (2026-09-27): each part's new video element had to load at
+  // the cut and the Player waited for it, so playback stalled at part
+  // boundaries over the internet.
+  test.skip(!hasStorage, "Needs a bucket (NEON_BRANCH or STORAGE_TESTS)")
+  test.skip(info.project.name === "mobile", "One run is enough")
+  test.setTimeout(150_000)
+  const video = await makeTestVideo()
+  await createKitByHand(page)
+  await page.getByRole("tab", { name: "Footage" }).click()
+  await page.getByTestId("footage-file").setInputFiles(video)
+  const card = page.getByRole("listitem").filter({ hasText: "Product demo" })
+  await expect(card.getByText("Ready")).toBeVisible({ timeout: 60_000 })
+  await card.getByRole("link", { name: "Product demo" }).click()
+  const position = page.getByLabel("Playback position")
+
+  // Three parts: 0–1s, then 1–3s and 3–5s at 2× (a split keeps the speed).
+  const playhead = page.getByRole("slider", { name: "Playhead" })
+  await playhead.focus()
+  await page.keyboard.press("Shift+ArrowRight")
+  await page.keyboard.press("s")
+  await page.getByRole("button", { name: "2×", exact: true }).click()
+  await playhead.focus()
+  await page.keyboard.press("Home")
+  for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowRight")
+  await page.keyboard.press("s")
+  await expect(position).toHaveText(/\/ 0:03\.0$/)
+  await expect(page.getByText("Saved", { exact: true })).toBeVisible()
+
+  // A slow, far-away bucket: every request 800ms slower (a new video
+  // element needs several, so the old per-part elements missed the cut).
+  await page.context().route("**/*", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 800))
+    await route.continue()
+  })
+  await playhead.focus()
+  await page.keyboard.press("Home")
+  await page.getByRole("button", { name: "Play", exact: true }).click()
+  let last = ""
+  let stuckSince = Date.now()
+  let longestStuckMs = 0
+  const started = Date.now()
+  while (Date.now() - started < 20_000) {
+    const text = (await position.textContent()) ?? ""
+    const playing = await page
+      .getByRole("button", { name: "Pause", exact: true })
+      .isVisible()
+    if (text !== last) {
+      last = text
+      stuckSince = Date.now()
+    } else if (playing) {
+      longestStuckMs = Math.max(longestStuckMs, Date.now() - stuckSince)
+    }
+    if (!playing && text.startsWith("0:0")) break
+    await page.waitForTimeout(100)
+  }
+  expect(last).toMatch(/^0:0(2\.9|3\.0) \/ 0:03\.0$/)
+  expect(longestStuckMs).toBeLessThan(1000)
+  expect(consoleProblems).toEqual([])
+})

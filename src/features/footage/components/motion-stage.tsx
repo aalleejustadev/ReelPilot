@@ -51,6 +51,7 @@ export function MotionStage({
   brandName,
   siteLabel,
   playbackRate = 1,
+  playing = false,
   selectedItemId = null,
   onSelectItem,
   onMoveItem,
@@ -82,6 +83,8 @@ export function MotionStage({
   siteLabel: string
   /** −4…4 (J/K/L shuttle); never 0. */
   playbackRate?: number
+  /** Playing forward (the preview's videos play; otherwise they seek). */
+  playing?: boolean
   /** Select and drag text and graphics on the video (while paused). */
   selectedItemId?: string | null
   onSelectItem?: (id: string) => void
@@ -109,6 +112,8 @@ export function MotionStage({
       logoUrl,
       brandName,
       siteLabel,
+      playing,
+      preview: true,
     }),
     [
       videoUrl,
@@ -127,6 +132,7 @@ export function MotionStage({
       logoUrl,
       brandName,
       siteLabel,
+      playing,
     ]
   )
 
