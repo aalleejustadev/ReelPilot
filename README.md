@@ -17,7 +17,7 @@ neon checkout dev            # your dev branch; `--create` makes a new one
 npm install                  # also generates the Prisma client
 npm run db:deploy            # apply migrations
 npx prisma db seed           # stock presenters (first run downloads the voice model, ~90 MB)
-npm run dev:all              # app + background worker
+npm run dev                  # app + background worker
 ```
 
 Once per Neon branch, let browsers upload to the bucket: `npm run storage:cors`.
@@ -28,9 +28,9 @@ Development runs on the Neon `dev` branch; `production` is left alone until depl
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Start the dev server |
-| `npm run worker` | Start the job worker (pg-boss queue; ffmpeg is bundled) |
-| `npm run dev:all` | Dev server and worker together (worker restarts on change) |
+| `npm run dev` | Dev server and job worker together (worker restarts on change); footage processing and exports need the worker |
+| `npm run dev:web` | Dev server only (queued jobs wait until a worker runs) |
+| `npm run worker` | Start the job worker alone (pg-boss queue; ffmpeg is bundled) |
 | `npm run build` | Production build |
 | `npm run lint` | ESLint, including slice-boundary rules |
 | `npm run typecheck` | TypeScript, no emit |

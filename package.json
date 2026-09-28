@@ -4,10 +4,10 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -k -n web,worker -c blue,magenta \"npm run dev:web\" \"npm run worker:dev\"",
+    "dev:web": "next dev",
     "worker": "tsx --conditions=react-server --env-file-if-exists=.env src/worker/index.ts",
     "worker:dev": "tsx watch --conditions=react-server --env-file-if-exists=.env src/worker/index.ts",
-    "dev:all": "concurrently -k -n web,worker -c blue,magenta \"npm run dev\" \"npm run worker:dev\"",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
