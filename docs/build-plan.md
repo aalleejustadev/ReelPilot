@@ -721,7 +721,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [x] Render infra: Remotion in the same worker (2026-09-23).
 - [ ] Worker host — needs ffmpeg and headless Chrome — and the Remotion company-license check (the editor already uses Remotion Player). Needed for M5. `TODO(owner)`
 - [x] Voice: self-hosted Kokoro (2026-09-23); presenters only.
-- [x] Stock presenter portraits (2026-09-25): placeholders until the owner supplies them.
+- [x] Stock presenter portraits: Avataaars illustrations (Pablo Stanley, free for commercial use), each set by hand to match its name (2026-09-28); real portraits can replace them any time.
 - [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
 - [ ] Legal review of Terms and Privacy. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
