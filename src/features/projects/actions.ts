@@ -7,6 +7,7 @@ import type { z } from "zod"
 import { requireWorkspaceAccess } from "@/features/workspaces"
 import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
+import { deleteFolder } from "@/shared/storage"
 
 import {
   appendClipSchema,
@@ -73,7 +74,14 @@ export async function deleteProject(input: unknown): Promise<Result<null>> {
     const parsed = projectIdSchema.safeParse(input)
     if (!parsed.success) throw invalid(parsed.error, "Check the video.")
     const { workspace } = await requireWorkspaceAccess("content:edit")
-    await service.deleteProject(workspace.id, parsed.data.projectId)
+    const { folder } = await service.deleteProject(
+      workspace.id,
+      parsed.data.projectId
+    )
+    // Its exports' MP4s. The rows went with the project.
+    await deleteFolder(folder).catch((error: unknown) =>
+      console.error("[projects] couldn't delete a video's files", error)
+    )
     refreshProjects()
     return ok(null)
   } catch (error) {

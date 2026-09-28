@@ -2,6 +2,7 @@ import "server-only"
 
 import { db, type Prisma } from "@/shared/db"
 import { AppError } from "@/shared/lib/errors"
+import { workspaceFileKey } from "@/shared/storage"
 import {
   defaultClipTransition,
   projectLimits,
@@ -38,11 +39,19 @@ export async function renameProject(
   if (count === 0) throw projectNotFound()
 }
 
+/** Deletes the project; returns its folder (its exports' files live there). */
 export async function deleteProject(workspaceId: string, projectId: string) {
+  const project = await db.project.findFirst({
+    where: { id: projectId, workspaceId },
+    select: { brandKitId: true },
+  })
   const { count } = await db.project.deleteMany({
     where: { id: projectId, workspaceId },
   })
-  if (count === 0) throw projectNotFound()
+  if (!project || count === 0) throw projectNotFound()
+  return {
+    folder: `${workspaceFileKey(workspaceId, "brand-kits", project.brandKitId, "projects", projectId)}/`,
+  }
 }
 
 /**

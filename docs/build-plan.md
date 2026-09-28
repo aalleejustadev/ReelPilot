@@ -89,7 +89,7 @@ Audio (voiceover, music, sound effects, auto captions), recorder upgrades (micro
 | AI text | **Vercel AI SDK** with a provider registry | Model-agnostic; no vendor lock-in |
 | Background jobs | **pg-boss** (job queue stored in Neon Postgres), run by our own worker in `src/worker` | No extra service; code against the `src/shared/jobs` wrapper. Worker connects via `DATABASE_URL_UNPOOLED` |
 | Video composition | **Remotion** (compositions in `src/remotion`): `FootageStage` (one clip) and `ProjectStage` (a project); the editor previews them in `@remotion/player` | `TODO(owner)`: review Remotion's license terms for commercial use |
-| Render infra | Remotion renderer inside the same worker (one Docker image), from M5 | `TODO(owner)`: worker host — it needs ffmpeg and headless Chrome (try-it recording too), which plain Node hosting may not allow |
+| Render infra | Remotion renderer run by the worker (`src/shared/render`): each render in its own Node process, Chrome Headless Shell + Remotion's ffmpeg; the render bundle is `src/remotion/index.ts` with the kit fonts self-hosted from Fontsource | Worker host (owner, 2026-09-28): local for now; a Hostinger VPS (Docker) at launch, the app stays on Hostinger Node.js |
 | Storage | **Neon Object Storage** (S3-compatible, branches with the database) via the Files SDK `neon` adapter | Signed URLs only; credentials come from `neon env pull` |
 | Email | Resend + React Email | |
 | Rate limiting | Postgres (Neon) table in `src/shared/rate-limit`; Better Auth's database rate-limit storage | No Redis service |
@@ -262,8 +262,8 @@ Stock presenters (a still portrait + a Kokoro voice) were built in M3 and remove
 - **Acceptance:** start a video, record or upload into it and edit it right away; add clips, reorder, set transitions, kept after a reload; it plays through its joins; delete from its card; a stale tab can't overwrite.
 
 ### 7.15 export & share (M5)
-- **Export:** "Export MP4" renders the project (or a single clip) in the chosen shape — 16:9, 9:16, 1:1, 4:5 — at 1080p in the worker with Remotion, reusing the preview's compositions; progress on the page, then download.
-- **Share:** a public link (`/v/[token]`) that anyone can watch without an account, playing the exported MP4; the owner can turn it off.
+- **Export:** "Export" in the clip editor and the video editor opens *Export and share*: pick Landscape 16:9, Portrait 9:16 or Square 1:1 (the stage's shapes), "Export MP4" renders it at 1080p in the worker with the same composition the preview plays (a clip is rendered as a one-clip video), with progress, then "Download MP4" (named after the clip or video). Only the newest file per shape is kept; an edit since then shows "You've edited this since the last export" and offers "Export again" (a hash of what was rendered). A one-clip video's editor exports the video.
+- **Share:** "Anyone with the link can watch" makes one link per clip or video (`/v/[token]`), which plays its newest finished export, signed out, not indexed; off, it 404s; on again, the same link returns.
 - **Acceptance:** the export matches the preview; share links work signed out and stop working when turned off.
 
 ### 7.16 templates & AI first cut (M6)
@@ -506,7 +506,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
 | M3c ✅ | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **done 2026-09-27** (see 14.7) |
 | M4 ✅ | Videos | projects in code (§7.14), versioned saves, dashboard | Record or upload into a video and edit it; clips joined with transitions; stale tabs can't overwrite — **done 2026-09-28** (see 14.8) |
-| M5 | Export & share | export jobs (Remotion renderer in the worker), share links (§7.15) | Download an MP4 in any shape; share a public link |
+| M5 ✅ | Export & share | export jobs (Remotion renderer in the worker), share links (§7.15) | Download an MP4 in any shape; share a public link — **done 2026-09-28** (see 14.9) |
 | M6 | Templates | templates + AI first cut (§7.16) | One click from clips to a finished-looking video |
 | M7 | Try-it | try-it (§7.1) | Anonymous URL → recorded tour → edited preview → sign-up |
 | M8 | Launch polish | landing, legal, SEO, error/empty states, e2e sweep, deploy (Hostinger) | Public launch |
@@ -651,6 +651,22 @@ Reworked the same day (owner: "do we need projects?"): projects became invisible
 
 Also in M4: shared player hooks (Space, full screen) used by both editors; a browser-safe `@/features/footage/client` entry (the index exports server queries); the clip editor's "Saved" now waits for in-flight saves (a reload could lose the last change); a project join checked frame by frame on the GPU (no flashes).
 
+### 14.9 M5 completion record (2026-09-28)
+Export & share (§7.15), for clips and videos (owner, 2026-09-28).
+
+| Item | Evidence |
+|---|---|
+| Prisma + migration | `exports` (status, progress, file, fingerprint; one of footage/project, checked in SQL), `share_links` (unique token, one per clip or video) — migration `exports_and_share_links` |
+| Zod schemas | target (clip/video), shape, start export, share on/off |
+| Logic with tests | render input built exactly as the editors play (presentation defaults, shots, kit fonts via Fontsource, accents, logo, end card), fingerprint ignoring link signatures, newest-per-shape kept (older rows and files removed), duplicate clicks, not-ready/empty/failed/other-workspace refusals, 50 exports/day per workspace, share link on/off/revive, public lookup; a real 9:16 render (Chrome + ffmpeg) of a stored clip, probed at 1080×1920 — 463 unit/integration tests |
+| UI | "Export" in both editors → *Export and share* dialog (shape, progress, download with size, out-of-date note, export again, share switch, link + copy); `/v/[token]` public page; download route `/api/exports/[id]/download` |
+| States | not ready, queued, rendering %, failed (keeps the older file), ready, out of date, sharing off, shared but not exported yet, link off → 404 |
+| Accessible | axe on the dialog and the public page; the button keeps its name on phones (icon only) |
+| Responsive | dialog and public page at 375px (mobile e2e) |
+| Playwright | export a clip in 9:16 → download "Product demo 9x16.mp4" → share → watch signed out (plays 5s) → off → 404; edit after export → out of date; a one-clip video exports and shares as the video, same state from its clip list (desktop + mobile) — 150 e2e checks in the suite |
+
+Found on the way: Neon's storage ignores `response-content-disposition`, so a signed link can't name a download; MP4s download through our own route instead. Remotion's renderer can't load under the worker's `react-server` condition, so each render runs in a child process. The render path now uses `OffthreadVideo` (frame-exact) and writes standard-range `yuv420p` (the default JPEG frames came out as full-range `yuvj420p`, which some players show washed out).
+
 ## 15. Environment variables (`.env.example`)
 
 ```
@@ -690,6 +706,9 @@ AWS_SECRET_ACCESS_KEY=
 AWS_ENDPOINT_URL_S3=
 AWS_REGION=
 
+# Optional: Remotion company licence key, used when rendering exports
+# REMOTION_LICENSE_KEY=
+
 SENTRY_DSN=
 NEXT_PUBLIC_APP_URL=
 ```
@@ -710,7 +729,9 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [ ] Pricing, when billing returns (not in V1). `TODO(owner)`
 - [x] Jobs platform: own worker + pg-boss on Neon (2026-09-23).
 - [x] Render infra: Remotion in the same worker (2026-09-23).
-- [ ] Worker host — needs ffmpeg and headless Chrome — and the Remotion company-license check (the editor already uses Remotion Player). Needed for M5. `TODO(owner)`
+- [x] Worker host (2026-09-28): local now; a Hostinger VPS with Docker at launch (it needs ffmpeg and headless Chrome); the app on Hostinger Node.js.
+- [ ] Remotion licence: free for individuals and companies of up to 3 people; larger companies need a company licence (set `REMOTION_LICENSE_KEY`). `TODO(owner)`: confirm which applies.
+- [x] Share links play the newest export (2026-09-28), not one link per export.
 - [x] Voice and presenters: removed (2026-09-28); no voice in V1.
 - [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
 - [ ] Legal review of Terms and Privacy. `TODO(owner)`

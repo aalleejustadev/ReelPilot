@@ -59,6 +59,7 @@ export default async function FootageEditorPage({
   }
   const video = project
     ? {
+        id: project.id,
         name: project.name,
         single,
         addClipHref: `/videos/${project.id}?clips=1`,

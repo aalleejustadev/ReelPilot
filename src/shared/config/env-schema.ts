@@ -41,6 +41,10 @@ const envSchema = z.object({
   AWS_ENDPOINT_URL_S3: z.url(),
   AWS_REGION: z.string().min(1),
 
+  // Remotion company licence key for renders (M5 exports). Optional: not
+  // needed for individuals and small teams (see remotion.dev/license).
+  REMOTION_LICENSE_KEY: z.string().min(1).optional(),
+
   NEXT_PUBLIC_APP_URL: z.url(),
 })
 

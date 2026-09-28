@@ -32,6 +32,7 @@ import {
 } from "@/shared/motion"
 import { Button } from "@/shared/ui/button"
 import { ConflictDialog } from "@/shared/ui/conflict-dialog"
+import { ExportDialog } from "@/features/exports/client"
 import {
   Empty,
   EmptyContent,
@@ -374,6 +375,10 @@ export function ProjectEditor({
             <DeleteProjectButton projectId={project.id} name={project.name} />
           </>
         )}
+        <ExportDialog
+          target={{ kind: "video", id: project.id }}
+          canEdit={!readOnly}
+        />
       </header>
 
       <main

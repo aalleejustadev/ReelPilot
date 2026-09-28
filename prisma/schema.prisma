@@ -127,6 +127,8 @@ model Workspace {
   brandKits     BrandKit[]
   footage       Footage[]
   projects      Project[]
+  exports       Export[]
+  shareLinks    ShareLink[]
 
   @@map("workspaces")
 }
@@ -286,6 +288,8 @@ model Footage {
   brandKit     BrandKit        @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
   markers      FootageMarker[]
   projectClips ProjectClip[]
+  exports      Export[]
+  shareLink    ShareLink?
 
   @@index([brandKitId, createdAt])
   @@index([workspaceId])
@@ -332,6 +336,8 @@ model Project {
   workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   brandKit  BrandKit      @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
   clips     ProjectClip[]
+  exports   Export[]
+  shareLink ShareLink?
 
   @@index([workspaceId, updatedAt])
   @@index([brandKitId])
@@ -355,4 +361,70 @@ model ProjectClip {
   @@index([projectId, position])
   @@index([footageId])
   @@map("project_clips")
+}
+
+// ─── M5: export & share ──────────────────────────────────────────────────
+
+enum ExportStatus {
+  QUEUED
+  RENDERING
+  READY
+  FAILED
+}
+
+// An MP4 of a clip or a video (exactly one of footageId / projectId, checked
+// in SQL), rendered by the worker. Only the newest per target and shape is
+// kept: a finished export replaces the one before (row and file).
+model Export {
+  id           String       @id @default(cuid())
+  workspaceId  String
+  footageId    String?
+  projectId    String?
+  // "16:9" | "9:16" | "1:1" (the stage shapes, validated by the exports slice).
+  shape        String
+  status       ExportStatus @default(QUEUED)
+  // 0–1 while rendering.
+  progress     Float        @default(0)
+  // The clip's or video's name when exported (the download's file name).
+  name         String
+  fileKey      String?
+  sizeBytes    Int?
+  durationMs   Int?
+  // What was rendered (edit, clips, brand kit) as a hash: when the current
+  // one differs, the editor says the export is out of date.
+  fingerprint  String?
+  // User-safe reason when status is FAILED.
+  errorMessage String?
+  finishedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  footage   Footage?  @relation(fields: [footageId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([footageId, shape])
+  @@index([projectId, shape])
+  @@index([workspaceId])
+  @@map("exports")
+}
+
+// A public link (/v/<token>) to a clip or a video (exactly one, checked in
+// SQL). It plays the target's newest finished export; turned off, it 404s.
+model ShareLink {
+  id          String   @id @default(cuid())
+  workspaceId String
+  token       String   @unique
+  footageId   String?  @unique
+  projectId   String?  @unique
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  footage   Footage?  @relation(fields: [footageId], references: [id], onDelete: Cascade)
+  project   Project?  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("share_links")
 }

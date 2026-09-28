@@ -58,6 +58,8 @@ export async function signedFileUrl(
   key: string,
   expiresInSeconds = DEFAULT_URL_EXPIRY_SECONDS
 ) {
+  // No responseContentDisposition: Neon's storage ignores it (checked
+  // 2026-09-28). Downloads that need a file name go through our own route.
   try {
     return await reuse(key, expiresInSeconds, () =>
       files().url(key, { expiresIn: expiresInSeconds })

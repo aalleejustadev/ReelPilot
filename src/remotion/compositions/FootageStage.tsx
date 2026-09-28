@@ -1,7 +1,7 @@
 import { useId, useMemo } from "react"
 import {
   AbsoluteFill,
-  Html5Video,
+  OffthreadVideo,
   Sequence,
   useCurrentFrame,
   useVideoConfig,
@@ -365,7 +365,6 @@ export function FootageStage({
                     >
                       <PartLayer
                         videoUrl={videoUrl}
-                        posterUrl={posterUrl}
                         trimBefore={Math.round((part.startMs / 1000) * fps)}
                         speed={part.speed}
                         lengthMs={part.outEndMs - part.outStartMs}
@@ -469,7 +468,6 @@ function BlurLayers({
  */
 function PartLayer({
   videoUrl,
-  posterUrl,
   trimBefore,
   speed,
   lengthMs,
@@ -484,7 +482,6 @@ function PartLayer({
   frameHeight,
 }: {
   videoUrl: string
-  posterUrl?: string | null
   trimBefore: number
   speed: number
   lengthMs: number
@@ -539,11 +536,10 @@ function PartLayer({
           </filter>
         </svg>
       )}
-      <Html5Video
+      {/* Renders only (the preview plays PlayerFootage): exact frames. */}
+      <OffthreadVideo
         src={videoUrl}
-        poster={posterUrl ?? undefined}
         muted
-        pauseWhenBuffering
         trimBefore={trimBefore}
         playbackRate={speed}
         onError={onVideoError}
@@ -570,10 +566,9 @@ function PartLayer({
               width={frameWidth}
               height={frameHeight}
               video={
-                <Html5Video
+                <OffthreadVideo
                   src={videoUrl}
                   muted
-                  pauseWhenBuffering
                   trimBefore={trimBefore}
                   playbackRate={speed}
                   style={{

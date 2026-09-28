@@ -66,6 +66,7 @@ import { useFullscreen, useSpaceToPlay } from "@/shared/hooks/use-player-keys"
 import { ConflictDialog } from "@/shared/ui/conflict-dialog"
 import { toast } from "@/shared/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
+import { ExportDialog } from "@/features/exports/client"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
 
 import {
@@ -306,7 +307,12 @@ export function FootageEditor({
    * it's titled with the video's name; "Add clip" opens its clip list.
    * "Delete clip" is hidden (it would delete the video's recording).
    */
-  video?: { name: string; single: boolean; addClipHref: string } | null
+  video?: {
+    id: string
+    name: string
+    single: boolean
+    addClipHref: string
+  } | null
 }) {
   const playerRef = useRef<PlayerRef>(null)
   const [links, renewLinks] = useStableLinks(clip.id, {
@@ -1338,6 +1344,16 @@ export function FootageEditor({
               <span className="hidden sm:inline">Add clip</span>
             </LinkButton>
           )}
+          {/* A one-clip video is exported as the video (its share link too). */}
+          <ExportDialog
+            target={
+              video?.single
+                ? { kind: "video", id: video.id }
+                : { kind: "clip", id: clip.id }
+            }
+            defaultShape={aspect}
+            canEdit={!readOnly}
+          />
           {!readOnly && !video && (
             <DeleteClipButton
               footageId={clip.id}

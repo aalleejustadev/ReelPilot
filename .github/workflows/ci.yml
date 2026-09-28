@@ -56,6 +56,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Exports render in Chrome Headless Shell, which Remotion downloads on
+      # first use (~190 MB); restored after npm ci, which clears node_modules.
+      - name: Cache Remotion's headless browser
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.remotion
+          key: remotion-browser-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: remotion-browser-${{ runner.os }}-
       - name: Start S3 server (SeaweedFS)
         run: |
           docker run -d --name s3 -p 8333:8333 \
@@ -71,6 +79,8 @@ jobs:
       - run: npx prettier --check "src/**/*.{ts,tsx}"
       # Fresh database: apply every migration exactly as production would.
       - run: npx prisma migrate deploy
+      # The export render test runs headless Chrome: its system libraries.
+      - run: npx playwright install-deps chromium
       # Includes the database tests (they run whenever DATABASE_URL is set).
       - run: npm test
       - run: npm run build
@@ -97,6 +107,14 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Exports render in Chrome Headless Shell, which Remotion downloads on
+      # first use (~190 MB); restored after npm ci, which clears node_modules.
+      - name: Cache Remotion's headless browser
+        uses: actions/cache@v4
+        with:
+          path: node_modules/.remotion
+          key: remotion-browser-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: remotion-browser-${{ runner.os }}-
       - name: Start S3 server (SeaweedFS)
         run: |
           docker run -d --name s3 -p 8333:8333 \
