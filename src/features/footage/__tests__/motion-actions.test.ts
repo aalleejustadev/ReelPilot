@@ -124,15 +124,62 @@ describe.runIf(hasDatabase)("footage motion actions", () => {
     }
 
     expect(
-      await actions.updateFootagePresentation({ footageId, presentation })
-    ).toEqual({
-      ok: true,
-      data: null,
+      await actions.updateFootagePresentation({
+        footageId,
+        presentation,
+        baseVersion: 0,
+      })
+    ).toEqual({ ok: true, data: { version: 1 } })
+    const saved = await db.footage.findUniqueOrThrow({
+      where: { id: footageId },
     })
+    expect(saved.presentation).toEqual(presentation)
+    expect(saved.presentationVersion).toBe(1)
+  })
+
+  it("refuses a save from a stale copy instead of overwriting newer work", async () => {
+    const mine = {
+      ...defaultPresentation,
+      frame: { radius: 4, shadow: false, padding: 0.2 },
+    }
+    const theirs = { ...defaultPresentation, motionBlur: false }
+    // Another tab saved first, from the same version 0…
+    expect(
+      await actions.updateFootagePresentation({
+        footageId,
+        presentation: theirs,
+        baseVersion: 0,
+      })
+    ).toMatchObject({ ok: true, data: { version: 1 } })
+    // …so this tab's save (still at 0) is a conflict, and theirs stays.
+    expect(
+      await actions.updateFootagePresentation({
+        footageId,
+        presentation: mine,
+        baseVersion: 0,
+      })
+    ).toMatchObject({ ok: false, error: { code: "CONFLICT" } })
     expect(
       (await db.footage.findUniqueOrThrow({ where: { id: footageId } }))
         .presentation
-    ).toEqual(presentation)
+    ).toEqual(theirs)
+    // From the latest version it saves.
+    expect(
+      await actions.updateFootagePresentation({
+        footageId,
+        presentation: mine,
+        baseVersion: 1,
+      })
+    ).toMatchObject({ ok: true, data: { version: 2 } })
+  })
+
+  it("needs the version the edit started from", async () => {
+    expect(
+      await actions.updateFootagePresentation({
+        footageId,
+        presentation: defaultPresentation,
+      })
+    ).toMatchObject({ ok: false, error: { code: "VALIDATION" } })
   })
 
   it("never touches another workspace's markers", async () => {

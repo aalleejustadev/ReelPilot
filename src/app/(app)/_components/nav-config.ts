@@ -1,4 +1,5 @@
 import {
+  ClapperboardIcon,
   LayoutDashboardIcon,
   PaletteIcon,
   SettingsIcon,
@@ -6,12 +7,12 @@ import {
 } from "lucide-react"
 
 /**
- * Sidebar items: only pages that exist. Campaigns, Library, Brand kits and
- * Presenters (§12.4) are added here as their milestones ship.
+ * Sidebar items: only pages that exist (§12.4), added as milestones ship.
  * Add each new top-level route to the matcher in src/proxy.ts too.
  */
 export const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
+  { title: "Projects", href: "/projects", icon: ClapperboardIcon },
   { title: "Brand kits", href: "/brand-kits", icon: PaletteIcon },
   { title: "Presenters", href: "/presenters", icon: UsersIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
@@ -23,6 +24,7 @@ const pageTitles: { prefix: string; title: string }[] = [
   { prefix: "/settings/workspace", title: "Workspace" },
   { prefix: "/settings", title: "Settings" },
   { prefix: "/dashboard", title: "Dashboard" },
+  { prefix: "/projects", title: "Projects" },
   { prefix: "/brand-kits", title: "Brand kits" },
   { prefix: "/presenters", title: "Presenters" },
 ]

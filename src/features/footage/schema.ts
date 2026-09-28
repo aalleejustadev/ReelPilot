@@ -87,6 +87,8 @@ export const updateShotSchema = z.object({
 export const updatePresentationSchema = z.object({
   footageId: idSchema,
   presentation: presentationSchema,
+  /** The version this edit started from (a stale one is refused). */
+  baseVersion: z.number().int().min(0),
 })
 
 export const directEditSchema = z.object({

@@ -7,6 +7,8 @@ export type AppErrorCode =
   | "PROVIDER_FAILED"
   | "RATE_LIMITED"
   | "VALIDATION"
+  // Saved from a stale copy: someone (or another tab) saved since.
+  | "CONFLICT"
   | "INTERNAL"
 
 /**

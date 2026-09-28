@@ -12,9 +12,13 @@ import { env } from "@/shared/config/env"
 import { AppError } from "@/shared/lib/errors"
 
 import { MEDIA_BUCKET } from "./keys"
+import { createUrlCache } from "./url-cache"
 
 /** Signed download links last this long unless a caller asks for less. */
 const DEFAULT_URL_EXPIRY_SECONDS = 60 * 60
+
+/** The same link for repeated requests (see url-cache.ts). */
+const reuse = createUrlCache({ maxEntries: 5000 })
 
 let client: Files | undefined
 const files = () =>
@@ -55,7 +59,9 @@ export async function signedFileUrl(
   expiresInSeconds = DEFAULT_URL_EXPIRY_SECONDS
 ) {
   try {
-    return await files().url(key, { expiresIn: expiresInSeconds })
+    return await reuse(key, expiresInSeconds, () =>
+      files().url(key, { expiresIn: expiresInSeconds })
+    )
   } catch (error) {
     throw storageFailed(error)
   }

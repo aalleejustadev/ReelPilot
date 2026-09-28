@@ -686,7 +686,7 @@ export function exitStyle(
 }
 
 /** A part's transition look at `localMs` into it (enter and exit). */
-function partLook(
+export function partLook(
   part: {
     outStartMs: number
     outEndMs: number

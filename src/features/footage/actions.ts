@@ -241,21 +241,22 @@ export async function updateMarkerShot(input: unknown): Promise<Result<null>> {
 
 export async function updateFootagePresentation(
   input: unknown
-): Promise<Result<null>> {
+): Promise<Result<{ version: number }>> {
   try {
     const parsed = updatePresentationSchema.safeParse(input)
     if (!parsed.success) throw invalid(parsed.error, "Check the clip’s style.")
 
     const { workspace } = await requireWorkspaceAccess("content:edit")
-    await service.setFootagePresentation(
+    const version = await service.setFootagePresentation(
       workspace.id,
       parsed.data.footageId,
-      parsed.data.presentation
+      parsed.data.presentation,
+      parsed.data.baseVersion
     )
 
     // No page refresh: the editor already shows this, and nothing else
     // renders shots or style (refreshing mid-playback was wasted work).
-    return ok(null)
+    return ok({ version })
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

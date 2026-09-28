@@ -6,9 +6,9 @@ export { FootageGrid } from "./components/footage-grid"
 export { FootageUploader } from "./components/footage-uploader"
 export { RefreshWhileProcessing } from "./components/refresh-while-processing"
 export { ScreenRecorder } from "./components/screen-recorder"
-export { formatDuration } from "./lib/format"
+export { formatDuration, formatTimecode } from "./lib/format"
 export { footageLimitsFor, footageUsage } from "./lib/limits"
-export { presentationFor } from "./lib/motion"
+export { parseStoredShot, presentationFor } from "./lib/motion"
 export {
   clipMediaUrls,
   getFootage,

@@ -12,6 +12,7 @@ import {
   presentationFor,
   RefreshWhileProcessing,
 } from "@/features/footage"
+import { getProjectName } from "@/features/projects"
 import { can, requireWorkspaceAccess } from "@/features/workspaces"
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert"
 import { LinkButton } from "@/shared/ui/link-button"
@@ -30,14 +31,23 @@ function siteLabelFor(url: string) {
 
 export default async function FootageEditorPage({
   params,
+  searchParams,
 }: PageProps<"/brand-kits/[kitId]/footage/[footageId]">) {
   const { kitId, footageId } = await params
+  const { project: projectId } = await searchParams
   const { workspace, role } = await requireWorkspaceAccess("workspace:view")
-  const [kit, clip] = await Promise.all([
+  const [kit, clip, project] = await Promise.all([
     getBrandKit(workspace.id, kitId),
     getFootage(workspace.id, footageId),
+    typeof projectId === "string"
+      ? getProjectName(workspace.id, projectId)
+      : null,
   ])
   if (!kit || !clip || clip.brandKitId !== kitId) notFound()
+  // Opened from a project's clip strip: back returns to it.
+  const backTo = project
+    ? { href: `/projects/${project.id}`, label: project.name }
+    : null
 
   const canEdit = can(role, "content:edit")
   const colors = kit.colors
@@ -92,6 +102,7 @@ export default async function FootageEditorPage({
           kitFonts={kit.fonts}
           kitLogoUrl={await logoUrlFor(kit.logoKey)}
           kitSite={siteLabelFor(kit.url)}
+          backTo={backTo}
         />
       )
     }

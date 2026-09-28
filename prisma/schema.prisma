@@ -126,6 +126,7 @@ model Workspace {
   memberships   Membership[]
   brandKits     BrandKit[]
   footage       Footage[]
+  projects      Project[]
 
   @@map("workspaces")
 }
@@ -173,6 +174,7 @@ model BrandKit {
   workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   claims    AllowedClaim[]
   footage   Footage[]
+  projects  Project[]
 
   @@index([workspaceId, createdAt])
   @@map("brand_kits")
@@ -267,6 +269,9 @@ model Footage {
   // Presentation (background, frame, intro) for the 3D motion (§7.4a),
   // validated by shared/motion. Null = defaults from the brand kit.
   presentation        Json?
+  // Bumped by every saved presentation; a save must name the version it
+  // started from, so a stale tab can't overwrite newer work.
+  presentationVersion Int                    @default(0)
   // What the recorder saw besides the video (surface, cursor track when
   // the browser shares it), validated by lib/recording. Null for uploads.
   recording           Json?
@@ -277,9 +282,10 @@ model Footage {
   createdAt           DateTime               @default(now())
   updatedAt           DateTime               @updatedAt
 
-  workspace Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  brandKit  BrandKit        @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
-  markers   FootageMarker[]
+  workspace    Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandKit     BrandKit        @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+  markers      FootageMarker[]
+  projectClips ProjectClip[]
 
   @@index([brandKitId, createdAt])
   @@index([workspaceId])
@@ -305,6 +311,50 @@ model FootageMarker {
 
   @@index([footageId, atMs])
   @@map("footage_markers")
+}
+
+// ─── Projects (M4) ──────────────────────────────────────────────────────────
+
+// A video: a brand kit's clips in order, each played with its own edit
+// (footage.presentation and markers), joined by transitions.
+model Project {
+  id          String   @id @default(cuid())
+  workspaceId String
+  // Its clips, fonts, colours and logo come from this kit.
+  brandKitId  String
+  name        String
+  // Bumped by every saved change to the clip list; saves name the version
+  // they started from (a stale tab gets a conflict, not an overwrite).
+  version     Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  brandKit  BrandKit      @relation(fields: [brandKitId], references: [id], onDelete: Cascade)
+  clips     ProjectClip[]
+
+  @@index([workspaceId, updatedAt])
+  @@index([brandKitId])
+  @@map("projects")
+}
+
+// One clip in a project. The same footage may appear more than once.
+model ProjectClip {
+  id         String @id @default(cuid())
+  projectId  String
+  footageId  String
+  // 0, 1, 2… in playing order.
+  position   Int
+  // How it comes in from the clip before (ignored on the first), validated
+  // by shared/motion's transition schema.
+  transition Json
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  footage Footage @relation(fields: [footageId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, position])
+  @@index([footageId])
+  @@map("project_clips")
 }
 
 // ─── Presenters ─────────────────────────────────────────────────────────────

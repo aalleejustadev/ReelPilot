@@ -87,6 +87,8 @@ export function FullscreenControls({
             min={0}
             max={Math.max(1, durationMs)}
             step={100}
+            // Shift+arrows jump a second (the default is 10 of these ms).
+            largeStep={1000}
             onValueChange={(value) => {
               const ms = Array.isArray(value) ? value[0] : value
               if (typeof ms === "number") onSeek(ms)

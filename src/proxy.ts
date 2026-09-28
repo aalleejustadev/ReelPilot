@@ -17,6 +17,7 @@ export const config = {
   // App routes only. Add each (app) route here as it ships.
   matcher: [
     "/dashboard/:path*",
+    "/projects/:path*",
     "/brand-kits/:path*",
     "/presenters/:path*",
     "/settings/:path*",

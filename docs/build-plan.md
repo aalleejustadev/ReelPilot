@@ -1,9 +1,10 @@
 # ReelPilot — Product & Build Plan
 
 > **Working name:** ReelPilot (placeholder — check domain and trademark before launch).
-> **One-liner:** Turn your app into scroll-stopping video ads in minutes: your real product footage, a presenter who sells it, and a batch of variations to test — without filming anything.
-> **Audience:** SaaS and app founders (solo and small teams) who run or want to run paid social ads.
-> **Status:** Pre-build. This document is the single source of truth for the build agent.
+> **One-liner:** A browser video editor for product videos: record or upload your app, let the AI make the first cut, refine it in a real editor, then export an MP4 or share a link.
+> **Audience:** SaaS and app founders (solo and small teams) who need launch videos, feature demos, walkthroughs and social ads of their product.
+> **Status:** In build (M0–M4 done). This document is the single source of truth for the build agent.
+> **Direction change (owner, 2026-09-28):** ReelPilot is now a **video editor**, not a UGC ad platform. Campaigns, scripts, compliance, presenter-led ads, credits/billing, admin and audio are out of V1; everything is kept as minimal as possible. Sections below reflect the new direction; the completion records in §14 are history.
 
 Markers used in this doc:
 - `TODO(owner)` — a decision or value the owner (Ali) still needs to set or confirm.
@@ -19,7 +20,7 @@ Markers used in this doc:
 3. Build in **vertical slices** (Section 5). Finish one slice end to end (DB → server → UI → tests) before starting the next, following the order in Section 14.
 4. Every slice must meet the Definition of Done (Section 14.1) before moving on.
 5. When a decision is ambiguous, pick the simplest option that fits this doc, write it down in `docs/decisions.md` (one line: date, decision, reason), and continue.
-6. Never hardcode secrets, prices, credit costs, or provider names in feature code. Prices and credit costs live in `src/shared/config/plans.ts`; providers live behind adapters (Section 10).
+6. Never hardcode secrets, limits, or provider names in feature code. Per-plan limits live in `src/shared/config/plans.ts`; providers live behind adapters (Section 10).
 7. Follow the design system (Section 12) and code style guide (Section 13) exactly. If a component you need isn't in the design system, add it to `src/shared/ui` first, then use it.
 
 ---
@@ -27,95 +28,49 @@ Markers used in this doc:
 ## 1. Product summary
 
 ### 1.1 The problem
-Founders need a steady stream of fresh video ads (15–30 variants a month for accounts spending seriously) to beat creative fatigue. Hiring UGC creators costs roughly $200 per video and takes weeks. Existing AI UGC tools are expensive to start, expire credits, charge a full re-render for any edit, and use AI actors pretending to hold a product — which doesn't work for software.
+Founders need polished product videos all the time — launches, feature announcements, walkthroughs, social clips. Screen recorders capture the raw footage, but turning it into something that looks directed (camera moves, cuts, text, motion graphics, pacing) takes a video editor's skills and hours in heavyweight desktop tools.
 
-### 1.2 What ReelPilot does differently
+### 1.2 What ReelPilot does
 | Pain | ReelPilot's answer |
 |---|---|
-| AI actors can't demo software | Ads are built around the founder's **real screen recordings**, with a presenter layered on top |
-| Fake testimonials are legally risky | **Compliance guard** blocks fake-customer claims and adds AI disclosure automatically |
-| Generic AI actors feel fake | **Founder avatar**: the real founder, recorded once, with consent |
-| Any edit = full paid re-render | **Segment-level editing**: text/cut edits are free, a changed line re-renders only that segment |
-| Hidden pricing, no trial, expiring credits | Public pricing, a real free tier, **rollover credits**, cost shown before every render |
-| "Here's a video, good luck" | (V2) connects to ad accounts, finds winners, makes more like them |
+| Raw screen recordings look flat | A 3D stage with a camera that moves to what matters, plus cuts, speed, transitions, text, graphics and lens effects (the motion studio, §7.4b) |
+| Editing takes skill and time | AI analyses the footage and directs a first cut; templates give a finished style in one click |
+| Desktop editors are heavy | Everything runs in the browser, projects save as you go |
+| Getting the video out | Export an MP4 in every shape (16:9, 9:16, 1:1, 4:5) or share a link anyone can watch |
+| "Show me before I sign up" | Try-it: paste your site's URL, get an edited video of it |
 
 ### 1.3 Core user journey (V1)
-1. Visitor pastes their app URL on the landing page → gets an AI brief, 10 hooks, and 1 watermarked preview (no account).
-2. Signs up (Google / GitHub / email).
-3. Onboarding builds a **brand kit**: brief, allowed claims, logo/colors, screen footage, presenter.
-4. Creates a **campaign**: goal/platform → angles → script matrix → presenter/layout → preview → render.
-5. Edits variants in the **segment editor**.
-6. Exports from the **library** in 9:16, 4:5, 1:1.
-7. Manages plan, credits, and team in **settings**.
+1. Visitor pastes their app URL on the landing page → we record a short tour of the site and hand back an edited, watermarked preview (no account).
+2. Signs up (Google / GitHub / email) and creates a **brand kit** (colours, fonts, logo — drafted from the site).
+3. Adds **footage**: records their app or uploads recordings; the analysis finds key moments.
+4. Starts a **project**, adds clips, picks a **template** or lets the AI make the first cut, and refines each clip in the editor.
+5. **Exports** an MP4 or **shares** a public link.
 
 ---
 
-## 2. Pricing, plans & credits
+## 2. Pricing
 
-All values live in `src/shared/config/plans.ts`. `TODO(owner)`: confirm final prices after measuring real per-render API cost in the admin cost monitor.
-
-| Plan | Price (draft) | Ad credits / month | Brand kits | Seats | Notes |
-|---|---|---|---|---|---|
-| **Free** | $0 | **2 watermarked previews** (720p) | 1 | 1 | No HD export, stock presenters only |
-| **Starter** | ~$29/mo | **10 HD ads** | 1 | 1 | Rollover; founder avatar in V1.1 |
-| **Growth** | ~$79/mo | **30 HD ads** | 3 | 3 | Priority render queue; ad-account connection in V2 |
-| **Agency** | ~$199/mo | **100 HD ads** | 10 client workspaces | 5 (+$15/extra seat) | Review links for clients, bulk render |
-
-Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99. `TODO(owner)`: keep each tier's margin positive against measured cost per render (target ≥ 60% gross margin).
-
-### 2.1 Credit rules
-- **1 ad credit** = one final HD render of one variant, up to 30 seconds, in all three aspect ratios.
-- **Previews (animatics) are free** within a fair-use cap (Starter 40/mo, Growth 120/mo, Agency 400/mo). A preview is a low-cost storyboard: presenter still frame + synthesized voice + real footage + captions. No avatar video generation.
-- **Free edits** (0 credits): captions, text overlays, trims, clip reordering, footage swaps, layout changes. (Music arrives with the music library in `[V1.1]`.)
-- **Segment re-voice** (0.25 credit): rewriting one spoken line regenerates only that segment.
-- **Rollover:** unused credits roll over one month, capped at one month's allowance.
-- **Top-ups:** packs of 5 ad credits. `TODO(owner)`: price.
-- **Failed renders** are refunded automatically.
-- Credit cost is always shown **before** confirming a render.
+**Not in V1 (owner, 2026-09-28): no billing, credits or paid plans.** `src/shared/config/plans.ts` stays as the one place for per-plan limits (footage caps, brand kits); every workspace is on Free until pricing is decided. `TODO(owner)`: pricing model when billing returns (export minutes, resolution and AI actions were the suggested levers).
 
 ---
 
-## 3. Scope by release
+## 3. Scope
 
-### 3.1 `[V1]` — MVP (the build video / "today")
-- Marketing site: landing, pricing, legal pages.
-- **Try-it flow:** URL → brief + 10 hooks + 1 watermarked preview, no account (rate-limited).
-- Auth: Better Auth with Google, GitHub, email magic link.
-- Workspaces: one personal workspace per user. Roles (owner, editor, viewer) exist in the model; team invites are `[V1.1]`.
-- **Brand kit:** URL extraction, brief editing, allowed claims, logo/colors/fonts, multiple kits per plan limit.
-- **Footage:** upload or in-browser screen recording, auto-detected key moments, manual markers.
-- **Presenters:** stock presenter library — a still portrait paired with a stock voice. Lip-synced avatar video and founder avatars are `[V1.1]`.
-- **Campaign wizard:** goal & platform → angles → script matrix → presenter/voice/layout/captions → preview → render.
-- **Compliance guard** inline in the script matrix; blocking rules on render.
-- **Render pipeline:** background jobs, progress, email on completion, automatic refunds on failure.
-- **Segment editor:** timeline of segments, free edits, segment re-voice, side-by-side compare.
-- **Library & export:** filters, 9:16/4:5/1:1 export, AI-disclosure label, shareable review link (view + comment).
-- **Billing:** Stripe subscriptions, credit ledger, top-ups, invoices, rollover logic.
-- **Admin panel:** users & plans, credit adjustments, cost monitor, moderation queue, render health.
+### 3.1 `[V1]` — the video editor
+- Auth (Google, GitHub, magic link) and one personal workspace per user. ✅
+- **Brand kits:** colours, fonts, logo, drafted from a URL. ✅
+- **Footage:** upload or in-browser recording, key moments, smart analysis. ✅
+- **Motion studio:** camera, cuts/speed/transitions, text, motion graphics, layouts, lens, AI director, full-screen preview. ✅
+- **Projects:** a video made of clips in order, joined by transitions; versioned saves. ✅ (M4)
+- **Export & share:** MP4 in each shape; a public share link anyone can watch, revocable. (M5)
+- **Templates & AI first cut.** (M6)
+- **Try-it:** URL → recorded site tour → edited preview → sign-up. (M7)
+- **Launch polish:** landing, legal pages, SEO, error/empty states, deploy. (M8)
 
-### 3.2 `[V1.1]` — Fast follows ("tomorrow")
-- Hook library: save and reuse best hooks across campaigns.
-- Team invites, role changes and member removal.
-- **Founder avatar + lip-synced presenter video** (consent flow in 7.5, `AvatarProvider` in Section 10).
-- Founder voice cloning (needs a provider with consent support; Kokoro has no cloning).
-- Music library with auto-ducking under voice.
-- More caption styles and layout templates.
-- Brand kit auto-refresh when the site changes.
-- Bulk re-render of a campaign with a new presenter.
-- Onboarding checklist + in-app tips.
-- Referral credits.
-- Localization of ads into additional languages (voice + captions).
+Presenters (M3: stock portraits + Kokoro voices) stay as built; no further presenter work is planned.
 
-### 3.3 `[V2]` — Performance loop
-- Connect Meta and TikTok ad accounts (OAuth).
-- One-click publish of variants to an ad set.
-- Pull back hook rate, CTR, CPC, cost per result per variant.
-- **Winners view** with AI explanation of *why* variants win.
-- "Make more like this" generation from winners.
-- Creative fatigue alerts and auto-refresh suggestions.
-- **Ad structure cloner:** paste a public ad (e.g., from Meta Ad Library) → extract structure (hook timing, pacing, angle) → rebuild for your app. Copies format only, never content, voice, or likeness.
-- Agency client portal with approval workflows.
-- Public API + MCP server so agents can generate ads.
+### 3.2 Later (not scheduled)
+Audio (voiceover, music, sound effects, auto captions), recorder upgrades (microphone, webcam bubble, click tracking via a Chrome extension), billing and plans, admin, team invites, avatars and lip-sync, variants, localisation, ad-account publishing. Don't scaffold any of these.
 
 ✏️ Owner notes (scope):
 >
@@ -133,18 +88,16 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 | Styling | **Tailwind CSS** + **shadcn/ui** primitives, restyled to the ReelPilot design system | Tokens in Section 12 |
 | AI text | **Vercel AI SDK** with a provider registry | Model-agnostic; no vendor lock-in |
 | Background jobs | **pg-boss** (job queue stored in Neon Postgres), run by our own worker in `src/worker` | No extra service; code against the `src/shared/jobs` wrapper. Worker connects via `DATABASE_URL_UNPOOLED` |
-| Video composition | **Remotion** (compositions in `src/remotion`) | Captions, overlays, zooms, layouts. `TODO(owner)`: review Remotion's license terms for commercial use |
-| Render infra | Remotion renderer inside the same worker (one Docker image) | `TODO(owner)`: worker host (Railway, Fly.io or a VPS) |
-| Avatar / lip-sync video | `[V1.1]` provider adapter (Section 10) | Not in V1: ads use presenter stills + voiceover |
+| Video composition | **Remotion** (compositions in `src/remotion`): `FootageStage` (one clip) and `ProjectStage` (a project); the editor previews them in `@remotion/player` | `TODO(owner)`: review Remotion's license terms for commercial use |
+| Render infra | Remotion renderer inside the same worker (one Docker image), from M5 | `TODO(owner)`: worker host — it needs ffmpeg and headless Chrome (try-it recording too), which plain Node hosting may not allow |
 | Voice | **Kokoro** (open-source TTS, Apache-2.0) self-hosted in the worker via `kokoro-js`, behind the `VoiceProvider` adapter | No API key, no per-ad cost; stock voices only |
 | Storage | **Neon Object Storage** (S3-compatible, branches with the database) via the Files SDK `neon` adapter | Signed URLs only; credentials come from `neon env pull` |
-| Payments | **Stripe** (Billing + Checkout + Customer Portal) | |
 | Email | Resend + React Email | |
 | Rate limiting | Postgres (Neon) table in `src/shared/rate-limit`; Better Auth's database rate-limit storage | No Redis service |
 | Validation | Zod | All inputs at the boundary |
 | Testing | Vitest (unit), Playwright (e2e) | |
-| Observability | Sentry + structured logs; per-render cost logging | |
-| Hosting | **Hostinger** (Node.js) | Deployment is planned after M12; until then, development only |
+| Observability | Sentry + structured logs | |
+| Hosting | **Hostinger** (Node.js) | Deployment after M8 (launch polish); until then, development only |
 
 ---
 
@@ -156,8 +109,7 @@ Price per ad sanity check: Starter ≈ $2.90, Growth ≈ $2.63, Agency ≈ $1.99
 - A feature exposes a **public API** through its `index.ts`. Other features may import only from that file — never from another feature's internals.
 - Shared, feature-agnostic code lives in `src/shared` (UI kit, db client, auth helpers, provider adapters, config).
 - Business rules live in `service.ts` (pure where possible, easy to unit-test). Server actions are thin: validate → authorize → call service → revalidate. Reference implementation: `src/features/workspaces/actions.ts` (`renameWorkspace`).
-- Every mutation that spends credits goes through the **billing** feature's `spendCredits()` / `refundCredits()` — never direct DB writes.
-- Every script that will be rendered goes through **compliance**'s `checkScript()`.
+- A slice may also expose a browser-safe `client.ts` for other slices' client components (its `index.ts` can export server-only queries, which must never reach a browser bundle). Lint enforces both entries.
 
 ### 5.2 Slice anatomy
 ```
@@ -197,70 +149,41 @@ reelpilot/
 │   ├── app/
 │   │   ├── (marketing)/
 │   │   │   ├── page.tsx                  # landing + try-it input
-│   │   │   ├── pricing/page.tsx
-│   │   │   ├── try/[trialId]/page.tsx    # anonymous try-it results
-│   │   │   └── legal/{terms,privacy,ai-disclosure}/page.tsx
+│   │   │   ├── try/[trialId]/page.tsx    # anonymous try-it result (M7)
+│   │   │   └── legal/{terms,privacy}/page.tsx
 │   │   ├── (auth)/
 │   │   │   ├── sign-in/page.tsx
 │   │   │   └── sign-up/page.tsx
-│   │   ├── (app)/
-│   │   │   ├── layout.tsx                # app shell: sidebar, workspace switcher, credits
-│   │   │   ├── onboarding/page.tsx
-│   │   │   ├── dashboard/page.tsx
+│   │   ├── (app)/                    # app shell: sidebar, top bar
+│   │   │   ├── dashboard/page.tsx        # recent projects
+│   │   │   ├── projects/page.tsx         # M4
 │   │   │   ├── brand-kits/
 │   │   │   │   ├── page.tsx
-│   │   │   │   └── [kitId]/page.tsx
-│   │   │   ├── campaigns/
-│   │   │   │   ├── page.tsx
-│   │   │   │   ├── new/page.tsx          # wizard
-│   │   │   │   └── [campaignId]/page.tsx # contact sheet of variants
-│   │   │   ├── editor/[variantId]/page.tsx
-│   │   │   ├── library/page.tsx
+│   │   │   │   └── [kitId]/{page,footage/page}.tsx
 │   │   │   ├── presenters/page.tsx
-│   │   │   └── settings/
-│   │   │       ├── profile/page.tsx      # name, email, sign out
-│   │   │       ├── workspace/page.tsx    # rename; plan and role
-│   │   │       ├── billing/page.tsx      # M6
-│   │   │       └── team/page.tsx         # [V1.1]
-│   │   ├── (admin)/admin/
-│   │   │   ├── page.tsx                  # overview
-│   │   │   ├── users/page.tsx
-│   │   │   ├── costs/page.tsx
-│   │   │   ├── moderation/page.tsx
-│   │   │   └── renders/page.tsx
-│   │   ├── review/[shareToken]/page.tsx  # public review link
-│   │   └── api/
-│   │       ├── auth/[...all]/route.ts    # Better Auth
-│   │       └── webhooks/stripe/route.ts
+│   │   │   └── settings/{profile,workspace}/page.tsx
+│   │   ├── (editor)/                 # full-screen editors, no sidebar
+│   │   │   ├── brand-kits/[kitId]/footage/[footageId]/page.tsx   # clip editor
+│   │   │   └── projects/[projectId]/page.tsx                     # project page (M4)
+│   │   ├── v/[token]/page.tsx        # public share link (M5)
+│   │   └── api/auth/[...all]/route.ts    # Better Auth
 │   ├── features/
-│   │   ├── try-it/           # anonymous URL → brief, hooks, preview
-│   │   ├── auth/             # session helpers, guards, workspace context
-│   │   ├── workspaces/       # workspaces, members, roles, invites
-│   │   ├── brand-kits/       # extraction, brief, claims, visual identity
-│   │   ├── footage/          # upload, screen recording, key-moment detection
-│   │   ├── presenters/       # stock library (founder avatars + consent in V1.1)
-│   │   ├── campaigns/        # wizard state, angles, variant matrix
-│   │   ├── scripts/          # AI script generation (hooks/bodies/CTAs)
-│   │   ├── compliance/       # rules engine, disclosure, flags
-│   │   ├── renders/          # preview + HD render orchestration, segments
-│   │   ├── editor/           # segment timeline, edits, compare
-│   │   ├── library/          # browsing, filters, export, review links
-│   │   ├── billing/          # plans, Stripe, credit ledger, rollover
-│   │   ├── notifications/    # emails, in-app toasts
-│   │   └── admin/            # users, costs, moderation, render health
+│   │   ├── auth/             # session helpers, guards
+│   │   ├── workspaces/       # workspaces, roles
+│   │   ├── brand-kits/       # extraction, visual identity
+│   │   ├── footage/          # upload, recording, analysis, the clip editor (motion studio)
+│   │   ├── presenters/       # stock library (frozen)
+│   │   ├── projects/         # clips joined into a video (M4)
+│   │   ├── exports/          # MP4 export jobs and share links (M5)
+│   │   └── try-it/           # anonymous URL → recorded tour → preview (M7)
 │   ├── worker/               # our own job worker: pg-boss + Remotion + Kokoro (own Dockerfile)
 │   ├── remotion/
-│   │   ├── Root.tsx
-│   │   ├── compositions/
-│   │   │   ├── CornerPresenter.tsx       # presenter bubble over app footage
-│   │   │   ├── FullPresenterCutaways.tsx
-│   │   │   └── FootageVoiceover.tsx
-│   │   ├── components/                    # captions, zoom-on-click, logo sting, disclosure label
-│   │   └── schema.ts                      # Zod props shared with renders feature
+│   │   ├── compositions/     # FootageStage (a clip), ProjectStage (a project)
+│   │   └── components/       # player footage, text, graphics, layouts
 │   └── shared/
 │       ├── ui/               # design system components (Section 12)
 │       ├── config/
-│       │   ├── plans.ts      # prices, credits, limits — single source of truth
+│       │   ├── plans.ts      # per-plan limits — single source of truth
 │       │   ├── site.ts       # name, URLs, copy constants
 │       │   └── env.ts        # typed, validated env vars
 │       ├── db/               # Prisma client
@@ -283,13 +206,11 @@ reelpilot/
 
 Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 
-### 7.1 try-it
-- **Purpose:** Let an anonymous visitor see their own app in an ad before signing up.
-- **Routes:** `(marketing)/page.tsx` input, `(marketing)/try/[trialId]`.
-- **Flow:** validate URL → fetch page server-side → AI extracts brief → generate 10 hooks → build 1 preview animatic (stock presenter still + TTS + site screenshots) → watermark.
-- **Actions/jobs:** `startTrial(url)`, job `buildTrialPreview`.
-- **Limits:** 3 trials per IP per day (Postgres rate-limit table). Trials expire after 7 days. On sign-up, the trial converts into the user's first brand kit.
-- **Acceptance:** A valid URL produces a brief, 10 hooks, and a playable watermarked preview in under ~60s; invalid/blocked URLs show a clear error; rate limit enforced.
+### 7.1 try-it (M7)
+- **Purpose:** An anonymous visitor sees their own site as an edited video before signing up.
+- **Flow:** validate the URL → the worker records a ~30s tour of the public page in headless Chrome (scroll through its sections, as the Stripe and Apple demos were made) → processing + analysis → AI first cut with a template → a watermarked share page.
+- **Guards:** public pages only (no logins, no form filling); rate limit per visitor (Postgres rate-limit table); trials expire after 7 days; on sign-up the trial becomes the user's first brand kit and project.
+- **Acceptance:** A valid URL produces a playable edited preview; invalid or blocked URLs show a clear error; the rate limit holds.
 
 ### 7.2 auth + workspaces
 - **Purpose:** Sign-in, and a personal workspace created on first use with the user as owner. Team invites are `[V1.1]`.
@@ -331,78 +252,34 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **H. AI director v2:** plans the whole edit from the analysis and brand kit, explained and undoable.
 - **Acceptance:** each part ships with tests and axe checks; the preview is the composition M5 renders.
 
-### 7.5 presenters
-- **Purpose:** Stock presenters: a licensed still portrait paired with a Kokoro stock voice. `TODO(owner)`: source of the portraits (licensed stock photos or generated faces).
-- **`[V1.1]` — everything below in this section.**
-- **Founder avatar flow:** record ~2-minute video following on-screen script → record spoken consent statement → submit → provider training job → admin moderation check (face in consent video matches training video) → available.
-- **Rules:** Only the person themselves can create their avatar. Owner can revoke/delete anytime; deletion removes provider-side data via adapter.
-- **Acceptance (V1):** Stock library browsable; each presenter plays a short voice sample.
-- **Acceptance (V1.1):** founder avatar goes through consent → processing → approved → usable; revoke works end to end.
+### 7.5 presenters (built in M3, frozen)
+Stock presenters (a still portrait + a Kokoro voice) exist from M3. No further presenter work is planned in V1.
 
-### 7.6 campaigns + scripts
-- **Wizard steps:**
-  1. **Goal & platform** — objective (installs, signups, trials, demo bookings); platforms (Meta, TikTok, YouTube Shorts, LinkedIn) → sets aspect ratios, max length, tone.
-  2. **Angles** — AI suggests 5–8 angles from templates: problem/solution, "I tried every tool," feature demo, founder story, before/after, old way vs new way, objection buster. User picks 2–3.
-  3. **Script matrix** — hooks × bodies × CTAs grid; every cell editable; compliance flags inline; variant count and credit cost shown live.
-  4. **Presenter, voice, layout, captions** — one or more presenters; layout: corner presenter / full presenter with cutaways / footage + voiceover; caption style; footage markers mapped to body beats.
-  5. **Preview & render** — free animatic previews of every variant; select variants; confirm with credit cost; render.
-- **Wizard state** persists as a draft campaign so users can leave and return.
-- **Acceptance:** A user can go from empty to confirmed render; drafts persist; matrix math and credit cost are correct; compliance blocks unsafe scripts from rendering.
+### 7.14 projects (M4 ✅)
+- **Purpose:** A video: a brand kit's clips in order, each played with its own edit (the motion studio's presentation and camera shots), joined by transitions.
+- **Where:** Projects in the sidebar and on the dashboard (recent projects); `/projects` lists them; `/projects/[projectId]` is the full-screen project page. A project belongs to one brand kit and uses its footage, fonts, colours and logo.
+- **Project page:** the whole video playing (`ProjectStage`, the composition M5 exports) with play/stop, a scrubber, full screen and 16:9 / 9:16 / 1:1; a clip strip to add (from the kit's ready footage), remove and reorder clips (buttons or drag), a transition on every join (cut, push, whip, zoom through, blur dissolve, circle reveal); "Edit clip" opens the clip editor, whose back link returns to the project.
+- **Versioned saves:** projects and clip edits carry a version; a save must name the version it started from, so a stale tab gets "changed somewhere else — reload" instead of overwriting newer work.
+- **Acceptance:** create, rename, delete; add, reorder, remove clips and set transitions, kept after a reload; the project plays through its joins; a stale tab can't overwrite.
 
-### 7.7 compliance
-- **Purpose:** Keep users' ads safe to run.
-- **Rule types:**
-  - **Block:** first-person customer testimonials by a non-founder presenter ("I've been using this for a year", "as a customer…"); claims not in the brand kit's allowed claims that include numbers/guarantees; impersonation of real people or brands.
-  - **Warn:** health, finance, earnings, or "#1/best" superlatives; competitor names.
-  - **Auto-apply:** AI-disclosure label on every export (position/style configurable, removal not allowed); disclosure text in export metadata.
-- **Implementation:** deterministic rules first (patterns, claim matching), then an AI classifier pass; every flag stored with reason and suggested rewrite.
-- **Acceptance:** Seeded bad scripts are blocked/warned with a clear reason and rewrite; clean scripts pass; disclosure label present on all exports.
+### 7.15 export & share (M5)
+- **Export:** "Export MP4" renders the project (or a single clip) in the chosen shape — 16:9, 9:16, 1:1, 4:5 — at 1080p in the worker with Remotion, reusing the preview's compositions; progress on the page, then download.
+- **Share:** a public link (`/v/[token]`) that anyone can watch without an account, playing the exported MP4; the owner can turn it off.
+- **Acceptance:** the export matches the preview; share links work signed out and stop working when turned off.
 
-### 7.8 renders
-- **Purpose:** Turn a variant into video.
-- **Pipeline (per variant):**
-  1. Split script into segments (hook, body beats, CTA).
-  2. Per segment: TTS (Kokoro) → store audio. (`[V1.1]`: avatar lip-sync video for HD.)
-  3. Remotion composition assembles segments + footage + captions + overlays + disclosure label.
-  4. Render 9:16, then derive 4:5 and 1:1 (smart reframing rules per layout).
-  5. Upload outputs, update status, log cost, notify.
-- **Preview vs HD:** both use the presenter still + TTS in V1. Preview renders at 720p with a watermark; HD renders at 1080p without one.
-- **Idempotency:** each segment keyed by a hash of (script text, voice, presenter, settings) so unchanged segments are reused on edits.
-- **Credits:** reserve on confirm → capture on success → release/refund on failure.
-- **Acceptance:** Batch renders complete in the background with live status; a failed provider call retries then refunds; unchanged segments are never regenerated.
+### 7.16 templates & AI first cut (M6)
+- **Templates:** launch video, feature demo, social ad (9:16), walkthrough — each a preset of look, text style, lens, transitions, an intro slide and an end card.
+- **AI first cut:** pick a template; the AI director (§7.4b H) edits every clip of the project in that style, as one undoable change.
+- **Acceptance:** applying a template gives a finished-looking video; it can be undone.
 
-### 7.9 editor
-- **Purpose:** Fix a variant without starting over.
-- **UI:** preview player + horizontal segment timeline; inspector panel for the selected segment.
-- **Free edits:** captions, overlay text, trim, reorder, swap footage clip/marker, layout, caption style. Music is `[V1.1]` (music library).
-- **Paid edit:** rewrite a spoken line → 0.25 credit segment re-voice (cost shown before confirming).
-- **Compare:** two variants side by side, synced playback.
-- **Acceptance:** Free edits re-compose without spending credits; re-voice spends exactly 0.25 and regenerates one segment; compare works.
-
-### 7.10 library
-- **Purpose:** Find, export, and share ads.
-- **Features:** filters (campaign, angle, presenter, platform, status), bulk select + bulk download (zip), per-ad download in each ratio, review link (public token, view + timestamped comments, revocable).
-- **Acceptance:** Filters work; exports include disclosure; review link works logged-out and can be revoked.
-
-### 7.11 billing
-- **Purpose:** Plans, credits, money.
-- **Pieces:** Stripe Checkout for plans and top-ups, Customer Portal, webhook handler, **append-only credit ledger** (grant, spend, reserve, release, refund, rollover, expire, admin-adjust), monthly grant + rollover job.
-- **Acceptance:** Upgrading/downgrading updates limits; balance always equals the ledger sum; rollover cap enforced; webhook replays are idempotent.
-
-### 7.12 admin
-- **Access:** users with `role = admin` on the User model only; separate layout.
-- **Pages:** users (search, plan, balance, adjust credits with required reason, impersonate read-only); **costs** (provider spend per render/user/day vs revenue, margin per plan); **moderation** (compliance flags, avatar consent reviews, reported review links); **renders** (queue depth, failures, retry, refund).
-- **Acceptance:** Non-admins get 404; every admin mutation writes an audit log entry.
-
-### 7.13 notifications
-- Emails: welcome, invite, render complete, render failed (refunded), avatar approved/rejected, low credits, receipt.
-- In-app toasts for action results, using the same verb as the button ("Render" → "Rendering started").
+### Dropped with the 2026-09-28 direction change
+Campaigns and scripts (old 7.6), compliance (7.7), variant renders (7.8), the segment editor (7.9 — the footage editor is the editor), the ad library (7.10, replaced by projects + share), billing (7.11), admin (7.12) and notification emails (7.13).
 
 ---
 
 ## 8. Data model (Prisma sketch)
 
-This is the original sketch. Implemented models live in `prisma/schema.prisma`, which is the source of truth for them (M0: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, plus `Workspace` and `Membership`; M1: `BrandKit`, `AllowedClaim`). Each later slice expands its models from this sketch; keep the names.
+`prisma/schema.prisma` is the source of truth. Built: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, `Workspace`, `Membership` (M0); `BrandKit`, `AllowedClaim` (M1); `Footage`, `FootageMarker` (M2, with the motion studio's presentation, analysis and insight JSON); `Presenter` (M3); `Project`, `ProjectClip` (M4). Models of dropped slices (campaigns, scripts, variants, segments, renders, compliance, credits, review links, audit log, avatars) were removed from this sketch with the 2026-09-28 direction change; M5's export and share models are defined when M5 is planned.
 
 ```prisma
 model User {
@@ -423,7 +300,6 @@ model Workspace {
   stripeCustomerId String?
   memberships    Membership[]
   brandKits      BrandKit[]
-  creditEntries  CreditLedgerEntry[]
   createdAt      DateTime @default(now())
 }
 
@@ -469,141 +345,43 @@ model Presenter {
   stillUrl String
   previewUrl String?
   status PresenterStatus  // PENDING_CONSENT | PROCESSING | IN_REVIEW | APPROVED | REJECTED | REVOKED
-  consent AvatarConsent?
-}
-model AvatarConsent { id String @id @default(cuid()) presenterId String @unique userId String consentVideoKey String statementText String recordedAt DateTime reviewedById String? reviewedAt DateTime? }
-
-model Campaign {
-  id String @id @default(cuid())
-  brandKitId String
-  name String
-  goal CampaignGoal
-  platforms Json          // Platform[]
-  status CampaignStatus   // DRAFT | RENDERING | READY
-  wizardState Json        // persisted draft
-  angles Json             // selected angle keys
-  scriptLines ScriptLine[]
-  variants Variant[]
 }
 
-model ScriptLine {
-  id String @id @default(cuid())
-  campaignId String
-  kind ScriptLineKind     // HOOK | BODY | CTA
-  angle String
-  text String
-  complianceFlags ComplianceFlag[]
-}
-
-model Variant {
-  id String @id @default(cuid())
-  campaignId String
-  hookId String
-  bodyId String
-  ctaId String
-  presenterId String
-  voiceId String
-  layout Layout
-  captionStyle String
-  settings Json
-  segments Segment[]
-  renders Render[]
-}
-
-model Segment {
-  id String @id @default(cuid())
-  variantId String
-  order Int
-  kind SegmentKind        // HOOK | BODY | CTA
-  text String
-  footageMarkerId String?
-  contentHash String      // reuse key
-  audioKey String?
-  avatarVideoKey String?
-}
-
-model Render {
-  id String @id @default(cuid())
-  variantId String
-  quality RenderQuality   // PREVIEW | HD
-  status RenderStatus     // QUEUED | RUNNING | SUCCEEDED | FAILED
-  outputs Json            // { "9:16": key, "4:5": key, "1:1": key }
-  creditCost Decimal
-  providerCostUsd Decimal?
-  error String?
-  createdAt DateTime @default(now())
-}
-
-model ComplianceFlag { id String @id @default(cuid()) scriptLineId String severity FlagSeverity rule String reason String suggestion String? resolved Boolean @default(false) }
-
-model CreditLedgerEntry {
+model Project {           // M4
   id String @id @default(cuid())
   workspaceId String
-  type LedgerType         // GRANT | SPEND | RESERVE | RELEASE | REFUND | ROLLOVER | EXPIRE | ADMIN_ADJUST | TOPUP
-  amount Decimal          // positive or negative
-  renderId String?
-  reason String?
-  idempotencyKey String   @unique
-  createdAt DateTime @default(now())
+  brandKitId String       // its footage, fonts, colours, logo
+  name String
+  version Int @default(0) // versioned saves
+  clips ProjectClip[]
 }
+model ProjectClip { id String @id @default(cuid()) projectId String footageId String position Int transition Json }
 
-model ReviewLink { id String @id @default(cuid()) token String @unique campaignId String revokedAt DateTime? comments ReviewComment[] }
-model ReviewComment { id String @id @default(cuid()) reviewLinkId String variantId String atMs Int? authorName String body String createdAt DateTime @default(now()) }
-
-model Trial { id String @id @default(cuid()) url String ipHash String brief Json hooks Json previewKey String? convertedWorkspaceId String? expiresAt DateTime }
-
-model AuditLog { id String @id @default(cuid()) actorId String action String targetType String targetId String meta Json createdAt DateTime @default(now()) }
 ```
 
 ---
 
-## 9. Rendering pipeline notes
+## 9. Export pipeline notes (M5)
 
-- All heavy work runs in background jobs; the UI polls or subscribes to status.
-- **Job graph per HD variant:** `prepareSegments` → fan-out `generateSegmentAudio` (skip if `contentHash` exists; `generateSegmentAvatar` joins in V1.1) → `composeVariant` (Remotion) → `deriveAspectRatios` → `finalizeRender` (store outputs, capture credits, log cost, notify).
-- Retries: 3 attempts with backoff per provider call; after that, mark failed and refund.
-- Concurrency limits per workspace by plan (Growth/Agency get priority queue).
-- Log `providerCostUsd` per step; admin cost monitor aggregates it.
-- Watermark and disclosure label are Remotion components, applied in composition (never optional for disclosure).
+- Heavy work runs in background jobs (pg-boss in the worker); the page shows progress.
+- One job per export: render `ProjectStage` (or `FootageStage` for one clip) with Remotion at 1080p in the chosen shape → store the MP4 → the page offers the download and the share link.
+- The render path is frame-exact (a Sequence per part); the editor preview uses persistent videos for smooth playback. Both run the same compositions, so they match; M5 checks that on real renders. Fonts the editor loads through next/font must be available to the renderer.
+- Retries: 3 attempts with backoff; then mark failed with a clear message.
 
 ---
 
 ## 10. Provider adapters
 
-All external AI/media providers sit behind interfaces in `src/shared/providers`. Feature code never imports a vendor SDK directly.
-
-```ts
-// src/shared/providers/types.ts
-export interface VoiceProvider {
-  listVoices(): Promise<Voice[]>;
-  synthesize(input: { text: string; voiceId: string }): Promise<{ audioKey: string; durationMs: number; costUsd: number }>;
-  cloneVoice?(input: { sampleKeys: string[]; consentId: string }): Promise<{ voiceId: string }>;
-  deleteVoice?(voiceId: string): Promise<void>;
-}
-
-export interface AvatarProvider {
-  createAvatar(input: { trainingVideoKey: string; consentId: string }): Promise<{ providerRef: string }>;
-  getAvatarStatus(providerRef: string): Promise<"processing" | "ready" | "failed">;
-  lipSync(input: { providerRef: string; audioKey: string; aspect: "9:16" }): Promise<{ videoKey: string; costUsd: number }>;
-  deleteAvatar(providerRef: string): Promise<void>;
-}
-
-export interface TextModel { /* via Vercel AI SDK registry in src/shared/ai */ }
-```
-
-V1 voice: Kokoro, self-hosted (no `cloneVoice`/`deleteVoice`). `AvatarProvider` is `[V1.1]`: don't build it in V1. When avatars start, run the bake-off (quality, API stability, per-second cost, commercial terms, deletion support) and record the choice in `docs/decisions.md`.
+External AI and media providers sit behind interfaces in `src/shared/providers` and `src/shared/ai`; feature code never imports a vendor SDK directly. In use: the Vercel AI SDK registry (text and vision), Kokoro (`VoiceProvider`, self-hosted, stock voices; used by presenters only). No avatar or voice-cloning providers are planned.
 
 ---
 
-## 11. Trust, safety & compliance
+## 11. Trust & safety
 
-- **No fake testimonials.** Stock presenters may present, explain, demo, and compare — never claim to be a customer. Founder avatars may speak as the founder.
-- **AI disclosure** on every export and in the review link player. Users cannot remove it.
-- **Avatar consent:** recorded consent statement, admin review, revocable, provider-side deletion.
-- **No impersonation:** block uploads/avatars of public figures; block scripts naming real people as endorsers.
-- **Claims:** numeric or guaranteed claims must match the brand kit's allowed claims.
-- **Terms of Service** must state users are responsible for complying with ad-platform policies and local laws. `TODO(owner)`: legal review of Terms, Privacy, and AI-disclosure pages before launch.
-- **Data:** signed URLs only; footage and avatars are private to the workspace; deletion on account close.
+- **Private by default:** footage, projects and exports are private to the workspace, served through signed, short-lived URLs only; deletion on account close.
+- **Share links** are unguessable tokens, can be turned off, and show only the exported video.
+- **Try-it recording:** public pages only (no logins, no form filling, no crawling beyond the page), rate-limited, and trials expire.
+- **Terms of Service** state that users are responsible for having the right to the footage they upload or record. `TODO(owner)`: legal review of Terms and Privacy before launch.
 
 ---
 
@@ -629,8 +407,8 @@ ReelPilot is an editing bay for ads, not a generic SaaS dashboard. The visual la
 | `--well` | `#E4E7EC` | Recessed fills one step below stage: tab tracks, hovers, skeletons (`muted`/`accent`) |
 | `--chroma` | `#18B26B` | Accent: primary actions on dark, selection, "ready" states (green-screen green) |
 | `--chroma-soft` | `#DDF5E9` | Selected rows, success backgrounds |
-| `--tally` | `#E5484D` | Recording, live render, destructive, blocking compliance flags |
-| `--amber` | `#E8A23A` | Warnings, compliance "warn" |
+| `--tally` | `#E5484D` | Recording, the playhead, destructive actions |
+| `--amber` | `#E8A23A` | Warnings |
 | `--projector` | `#1B1D23` | Dark surfaces: video player, preview stage |
 
 Dark mode `[V1.1]`: invert `stage`/`surface`/`ink`; keep `chroma` and `tally`.
@@ -641,42 +419,41 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 | Role | Typeface | Notes |
 |---|---|---|
 | UI, body and headings | **Geist** (400/500/600) | Headings are semibold with tight tracking; no separate display face |
-| Timecodes and credit counts | **Geist Mono** | Fixed-width digits and punctuation |
+| Timecodes and counts | **Geist Mono** | Fixed-width digits and punctuation |
 
 Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
-- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (M0: Dashboard, Settings; M1: Brand kits) — add Campaigns, Library and Presenters as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher). Credit balance joins the top bar in M6; a workspace switcher arrives with teams (V1.1).
-- **Campaign page:** a **contact sheet** — a Card grid of 9:16 frames, each with a checkbox, hook text, status badge and angle; selected frames get a primary outline.
-- **Editor:** player on top (on `--projector`), segment timeline below, inspector on the right.
-- **Landing:** left-aligned hero with the URL input; to the right, a phone-frame player looping real example ads; below, one before/after (raw screen recording → finished ad).
+- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Projects, Brand kits, Presenters, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
+- **Editors** (clip editor, project page) are full screen without the sidebar: a top bar (back, name, save state, actions), the stage on `--projector`, a transport, and the timeline or clip strip below.
+- **Landing:** left-aligned hero with the URL input (try-it); to the right, a player looping a real edited video; below, one before/after (raw screen recording → edited video).
 
 ```
 Landing (desktop)
 ┌───────────────────────────────────────────────────────────┐
-│ Logo                                   Pricing   Sign in   │
+│ Logo                                             Sign in   │
 │                                                           │
-│  Your app, in ads that sell it.          ┌────────┐       │
-│  Paste your URL. Get ads in minutes.     │ phone  │       │
-│  [ https://yourapp.com      ][Make ads]  │ player │       │
-│                                          └────────┘       │
+│  Your product, in videos that show it.   ┌────────────┐   │
+│  Paste your URL. Get a video in minutes. │   player   │   │
+│  [ https://yourapp.com   ][Make a video] │            │   │
+│                                          └────────────┘   │
 ├───────────────────────────────────────────────────────────┤
-│  raw screen recording  ──▶  finished ad (before/after)    │
+│  raw screen recording  ──▶  edited video (before/after)   │
 └───────────────────────────────────────────────────────────┘
 
-Editor
-┌───────────────────────────────┬──────────────┐
-│          player (9:16)         │  inspector   │
-│                                │  segment text│
-├───────────────────────────────┤  captions    │
-│ [HOOK][ body 1 ][ body 2 ][CTA]│  footage     │
-└───────────────────────────────┴──────────────┘
+Project page
+┌───────────────────────────────────────────────────────────┐
+│ ← Projects   Launch video ✎            Saved   Delete     │
+│                      stage (player)                        │
+│ ▶ ■ ───────●────────────────  0:12.4 / 0:28.0  ⛶ 16:9 9:16│
+│ Clips  [1 Intro] Blur ▾ [2 Feature] Cut ▾ [3 Pricing] + Add│
+└───────────────────────────────────────────────────────────┘
 ```
 
 ### 12.5 Components (`src/shared/ui`)
 Use **default shadcn components and variants** from the **`base-vega`** style (`components.json`), styled only through the theme tokens in 12.2. Every button shows a pointer cursor. Every button that starts async work shows a `Spinner` and is disabled until the work finishes; navigation that looks like a button uses `LinkButton` (`src/shared/ui/link-button.tsx`), which shows a spinner while the next page loads. For forms, show pending state with `useFormStatus` (server actions) or an `onSubmit` handler; never set local loading state inside a `<form action={fn}>` function, because React defers it until the action finishes. Inputs prefilled from server data (e.g. an edit form) are controlled (`value` + `onChange`), never `defaultValue`: revalidation changes the prop after mount, which Base UI rejects. Change a component's source only when it is mandatory (accessibility, a lint failure, a missing capability), and log the reason in `docs/decisions.md`.
 
-Button (primary/ink, secondary/outline, ghost, danger/tally), Input, Textarea, Select, Tabs, Dialog, Sheet, Toast, Tooltip, Badge (status: draft/rendering/ready/failed), CreditCost (inline cost chip shown before any spend), ProgressRing, EmptyState, PhoneFrame, VideoPlayer, ContactSheet + FrameTile, SegmentTimeline, ComplianceFlag (inline, with rewrite action), StepWizard, DataTable (admin), Avatar, WorkspaceSwitcher.
+Button (primary/ink, secondary/outline, ghost, danger/tally), Input, Textarea, Select, Tabs, Dialog, AlertDialog, ConflictDialog ("changed somewhere else"), Sheet, Toast, Tooltip, Badge, Slider, ToggleGroup, Empty, Spinner, Avatar.
 
 Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 
@@ -703,10 +480,10 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 - Respect `prefers-reduced-motion` everywhere.
 
 ### 12.7 Voice & copy
-- Plain verbs, sentence case, no filler. A button says what happens: "Render 12 ads (12 credits)", then the toast says "Rendering 12 ads."
+- Plain verbs, sentence case, no filler. A button says what happens: "Export MP4", then the toast says "Exporting your video."
 - Name things by what users know: "ads," "hooks," "presenter," "footage" — not "variants payload" or "segment hash."
 - Errors say what happened and what to do: "Your footage is longer than 10 minutes. Trim it or upload a shorter clip."
-- Empty states invite action: "No campaigns yet. Create your first one from your brand kit."
+- Empty states invite action: "No projects yet. Start a project, then add clips from a brand kit's footage."
 
 ✏️ Owner notes (design system):
 >
@@ -717,15 +494,14 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 ## 13. Code style guide
 
 - TypeScript `strict: true`; no `any` (use `unknown` + Zod). No non-null assertions without a comment.
-- **Naming:** files `kebab-case.ts`; components `PascalCase`; functions `camelCase` verbs (`createCampaign`, `spendCredits`); booleans `is/has/can`.
+- **Naming:** files `kebab-case.ts`; components `PascalCase`; functions `camelCase` verbs (`createProject`, `saveProjectClips`); booleans `is/has/can`.
 - **Server actions:** always `validate (Zod) → authorize (role + workspace) → service → revalidatePath/Tag`. Return a typed `Result<T, AppError>`; never throw to the client. Wrap the body in `try/catch`, call `unstable_rethrow(error)` first in the catch so Next's redirects still work, then return `err(toResultError(error))`. Pages and actions authorize with `requireWorkspaceAccess(action)` and scope every query by the returned `workspace.id`.
 - **Errors:** `AppError` with `code` (`NOT_FOUND`, `FORBIDDEN`, `INSUFFICIENT_CREDITS`, `COMPLIANCE_BLOCKED`, `PROVIDER_FAILED`, `RATE_LIMITED`, `VALIDATION`) and a user-safe message.
 - **Data access:** only in `queries.ts`/`service.ts`; every query is scoped by `workspaceId`.
 - **Server vs client:** default to Server Components; add `"use client"` only for interactivity (editor, recorder, wizard steps).
-- **Money & credits:** `Decimal`, never floats. All credit changes via the billing ledger.
-- **Config over constants:** prices, limits, credit costs from `shared/config/plans.ts`.
+- **Config over constants:** limits from `shared/config/plans.ts`.
 - **Tests:** every `service.ts` has unit tests; each slice has at least one Playwright happy-path test.
-- **Commits:** Conventional Commits (`feat(campaigns): add script matrix`).
+- **Commits:** Conventional Commits (`feat(projects): join clips with transitions`).
 - **Formatting/linting:** Prettier + ESLint with boundary rules; CI must pass before merge.
 
 ---
@@ -737,18 +513,14 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
 | M1 ✅ | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo — **done 2026-09-25** (see 14.3) |
 | M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
-| M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5) |
+| M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5); frozen after the direction change |
 | M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
 | M3c ✅ | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **done 2026-09-27** (see 14.7) |
-| M4 | Scripts & compliance | campaigns wizard steps 1–3, scripts, compliance | Generate a compliant script matrix |
-| M5 | Previews | renders (PREVIEW), Remotion compositions | Free animatic previews for every variant |
-| M6 | Billing | billing, plans, ledger, Stripe | Subscribe, get credits, see balance |
-| M7 | HD renders | renders (HD), notifications | Spend credits, get HD ads, refunds on failure |
-| M8 | Editor | editor | Free edits + segment re-voice |
-| M9 | Library | library, export, review links | Export all ratios, share review link |
-| M10 | Try-it | try-it | Anonymous URL → preview → sign-up conversion |
-| M11 | Admin | admin | Users, costs, moderation, render health |
-| M12 | Launch polish | landing, pricing, legal, SEO, error/empty states, e2e | Public launch |
+| M4 ✅ | Projects | projects (§7.14), versioned saves, dashboard | Clips joined into one video; stale tabs can't overwrite — **done 2026-09-28** (see 14.8) |
+| M5 | Export & share | export jobs (Remotion renderer in the worker), share links (§7.15) | Download an MP4 in any shape; share a public link |
+| M6 | Templates | templates + AI first cut (§7.16) | One click from clips to a finished-looking video |
+| M7 | Try-it | try-it (§7.1) | Anonymous URL → recorded tour → edited preview → sign-up |
+| M8 | Launch polish | landing, legal, SEO, error/empty states, e2e sweep, deploy (Hostinger) | Public launch |
 
 ### 14.1 Definition of Done (every slice)
 - [ ] Prisma models + migration
@@ -872,6 +644,22 @@ Motion studio (§7.4b), owner-requested after M3b, built in parts A–I plus the
 
 Checked live with the real model: moment descriptions with pixel-accurate focus boxes; graphic choices ("Export CSV" click + label; "+18%" stat card); a whole-edit plan for a four-moment clip in 12.8s. Not yet: the final render (M5) — it uses the same `FootageStage` composition; fonts for the renderer are M5 work (the editor loads them through next/font). Owner to-do: confirm the Remotion licence (§17).
 
+### 14.8 M4 completion record (2026-09-28)
+Projects (§7.14), after the owner's direction change to a video editor.
+
+| Item | Evidence |
+|---|---|
+| Prisma + migration | `projects`, `project_clips` (cascade with their kit and their footage); `footage.presentationVersion` — migration `projects` |
+| Zod schemas | create, rename, delete; the clip list (`projectClipSchema`: footage + transition, up to 30) with `baseVersion`; clip presentation saves now carry `baseVersion` |
+| Logic with tests | `projectLayout`/`clipAt` (clips joined by transitions fitted to half of either clip), versioned saves (conflict on a stale version), kit/ready/workspace checks, lengths from each clip's edit, signed-link reuse (`shared/storage/url-cache`) — 457 unit/integration tests |
+| UI | Projects in the sidebar; dashboard with recent projects; `/projects` grid; project page with the `ProjectStage` player (transport, scrubber, full screen, shapes), clip strip (add, remove, reorder by buttons or drag, transition per join), inline rename, delete; "Edit clip" and back; "changed somewhere else" dialog in the project page and the clip editor |
+| States | empty (no kit / no projects / no clips / kit without ready footage), loading clips, saving/saved/not saved, conflict |
+| Accessible | axe on `/projects` and the project page (empty and filled); every control named ("Move Feature tour earlier", "Transition into clip 2"); Edit is a real link; Shift+arrows jump 1s on scrubbers |
+| Responsive | project page and dialogs at 375px (mobile e2e) |
+| Playwright | make a project from two clips, join, reorder, play through, reload, edit and back, rename, list, delete (desktop + mobile); two tabs: stale project and clip saves get the reload dialog (desktop) — 144 e2e checks in the suite |
+
+Also in M4: shared player hooks (Space, full screen) used by both editors; a browser-safe `@/features/footage/client` entry (the index exports server queries); the clip editor's "Saved" now waits for in-flight saves (a reload could lose the last change); a project join checked frame by frame on the GPU (no flashes).
+
 ## 15. Environment variables (`.env.example`)
 
 ```
@@ -920,31 +708,27 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 
 ## 16. Metrics to track from day one
 - Try-it → sign-up conversion.
-- Sign-up → first render (activation).
-- Free → paid conversion.
-- Renders per paying workspace per month; credits unused at period end.
-- Provider cost per HD ad; gross margin per plan.
-- Render failure rate and median render time.
-- Compliance blocks per 100 scripts.
+- Sign-up → first export (activation).
+- Projects per active workspace per month; exports and share-link views.
+- Export failure rate and median export time.
 
 ---
 
 ## 17. Open decisions (owner)
 - [ ] Final product name, domain, logo. `TODO(owner)`
-- [ ] Final prices and top-up price. `TODO(owner)`
+- [ ] Pricing, when billing returns (not in V1). `TODO(owner)`
 - [x] Jobs platform: own worker + pg-boss on Neon (2026-09-23).
 - [x] Render infra: Remotion in the same worker (2026-09-23).
-- [ ] Worker host (Railway, Fly.io or VPS) and Remotion company-license check (now needed from M3c: the editor preview uses Remotion Player). `TODO(owner)`
-- [x] Voice: self-hosted Kokoro (2026-09-23).
-- [ ] Avatar provider bake-off — `[V1.1]`.
-- [x] Stock presenter portraits (2026-09-25): AI-generated photoreal faces with a commercial licence (no real person). Placeholders (CC0 illustrations) until the owner supplies them — drop into `prisma/seed-assets/presenters/` and re-seed.
+- [ ] Worker host — needs ffmpeg and headless Chrome — and the Remotion company-license check (the editor already uses Remotion Player). Needed for M5. `TODO(owner)`
+- [x] Voice: self-hosted Kokoro (2026-09-23); presenters only.
+- [x] Stock presenter portraits (2026-09-25): placeholders until the owner supplies them.
 - [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
-- [ ] Legal review of Terms, Privacy, AI disclosure. `TODO(owner)`
+- [ ] Legal review of Terms and Privacy. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
-- [x] Hosting: Hostinger (Node.js), deployment after M12 (2026-09-25).
+- [x] Hosting: Hostinger (Node.js), deployment after M8 (2026-09-28).
 - [ ] Color tuning. `TODO(owner)`
-- [x] Storage setup moves into M1 for logo uploads (2026-09-25).
-- [x] Music dropped from the V1 editor; it arrives with the V1.1 music library (2026-09-25).
+- [x] Direction: a video editor, minimal scope; UGC ads, billing, admin, audio out of V1 (2026-09-28).
+- [x] Projects live inside a brand kit (its footage, fonts, colours, logo) (2026-09-28).
 
 ✏️ Owner notes (general):
 >

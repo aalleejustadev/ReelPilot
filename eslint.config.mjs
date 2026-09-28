@@ -8,9 +8,11 @@ const noAppImports = {
   message: "Nothing may import from src/app — routes are leaves.",
 };
 const noFeatureInternals = {
-  group: ["@/features/*/*"],
+  // client.ts: the browser-safe part of a slice's API, for other slices'
+  // client components (index.ts also exports server-only queries).
+  group: ["@/features/*/*", "!@/features/*/client"],
   message:
-    "Import other features only through their public API: '@/features/<name>' (index.ts).",
+    "Import other features only through their public API: '@/features/<name>' (index.ts), or '@/features/<name>/client' from client components.",
 };
 const noFeatures = {
   group: ["@/features", "@/features/*"],

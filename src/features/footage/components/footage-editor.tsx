@@ -57,12 +57,12 @@ import {
   type GraphicItem,
 } from "@/shared/motion"
 import type { StageFonts } from "@/remotion/components/TextLayer"
-import { adFonts, toAdFont } from "@/shared/config/ad-fonts"
-import { adFontFamily } from "@/shared/lib/ad-font-faces"
 import { Button } from "@/shared/ui/button"
 import { LinkButton } from "@/shared/ui/link-button"
 import { Spinner } from "@/shared/ui/spinner"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/shared/ui/tabs"
+import { useFullscreen, useSpaceToPlay } from "@/shared/hooks/use-player-keys"
+import { ConflictDialog } from "@/shared/ui/conflict-dialog"
 import { toast } from "@/shared/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/shared/ui/tooltip"
@@ -94,6 +94,7 @@ import { commit, createHistory, redo, undo, type History } from "../lib/history"
 import { applyLook, resetLook } from "../lib/looks"
 import { parseStoredInsight } from "../lib/insight"
 import { parseStoredShot } from "../lib/motion"
+import { stageFontsFor } from "../lib/stage-fonts"
 import { parseStoredRecording } from "../lib/recording"
 import type { FootageDetail } from "../queries"
 import { ClipTimeline, type OverlayBlock } from "./clip-timeline"
@@ -136,6 +137,7 @@ import {
 import { MomentsPanel } from "./moments-panel"
 import { MotionStage, stageAspects, type StageAspect } from "./motion-stage"
 import { stageFps } from "@/remotion/compositions/FootageStage"
+import { err, type Result } from "@/shared/lib/result"
 import { cn } from "@/shared/lib/utils"
 import { RefreshWhileProcessing } from "./refresh-while-processing"
 
@@ -192,25 +194,6 @@ const playerTime = (player: PlayerRef | null) =>
   player ? (player.getCurrentFrame() / stageFps) * 1000 : 0
 
 /** Where Space types a space: text fields, not buttons or sliders. */
-function isTypingText(target: EventTarget | null) {
-  const el = target as HTMLElement | null
-  if (!el) return false
-  if (el.closest("textarea, [contenteditable=true], [contenteditable='']"))
-    return true
-  const input = el.closest("input")
-  return Boolean(
-    input &&
-    ![
-      "checkbox",
-      "radio",
-      "range",
-      "button",
-      "submit",
-      "color",
-      "file",
-    ].includes(input.type)
-  )
-}
 
 /**
  * Signed links change on every server render (each refresh re-signs
@@ -298,6 +281,7 @@ export function FootageEditor({
   kitFonts,
   kitLogoUrl,
   kitSite,
+  backTo = null,
 }: {
   clip: FootageDetail
   videoUrl: string
@@ -313,6 +297,8 @@ export function FootageEditor({
   kitLogoUrl: string | null
   /** The kit's site, e.g. "acme.app". */
   kitSite: string
+  /** Opened from a project: back goes there instead of the footage. */
+  backTo?: { href: string; label: string } | null
 }) {
   const playerRef = useRef<PlayerRef>(null)
   const [links, renewLinks] = useStableLinks(clip.id, {
@@ -336,6 +322,16 @@ export function FootageEditor({
     "saved"
   )
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  const inFlight = useRef(0)
+  // Versioned saves: the edit's saved version, and this tab's presentation
+  // saves run one after another so they never race each other. A refused
+  // save (changed elsewhere) stops saving and offers a reload.
+  const presentationVersion = useRef(clip.presentationVersion)
+  const presentationQueue = useRef<Promise<unknown>>(Promise.resolve())
+  const [conflict, setConflict] = useState<"none" | "open" | "dismissed">(
+    "none"
+  )
+  const conflicted = useRef(false)
   const reduceMotion = useSyncExternalStore(
     subscribeReducedMotion,
     prefersReducedMotion,
@@ -463,7 +459,7 @@ export function FootageEditor({
 
   /** Saves after 500ms without further changes to the same thing. */
   const saveSoon = useCallback(
-    (key: string, save: () => Promise<{ ok: boolean }>) => {
+    (key: string, save: () => Promise<Result<unknown>>) => {
       const timers = saveTimers.current
       clearTimeout(timers.get(key))
       setSaveState("saving")
@@ -471,9 +467,18 @@ export function FootageEditor({
         key,
         setTimeout(async () => {
           timers.delete(key)
+          inFlight.current++
           const result = await save()
-          if (timers.size === 0) setSaveState(result.ok ? "saved" : "failed")
-          if (!result.ok) {
+          inFlight.current--
+          // "Saved" only once nothing waits or is still on its way (a
+          // reload then can't lose the last change).
+          if (!result.ok) setSaveState("failed")
+          else if (timers.size === 0 && inFlight.current === 0)
+            setSaveState("saved")
+          if (!result.ok && result.error.code === "CONFLICT") {
+            if (!conflicted.current) setConflict("open")
+            conflicted.current = true
+          } else if (!result.ok) {
             toast.add({
               type: "error",
               title: "We couldn’t save that change. Try again.",
@@ -505,12 +510,25 @@ export function FootageEditor({
       if (
         JSON.stringify(from.presentation) !== JSON.stringify(to.presentation)
       ) {
-        saveSoon("presentation", () =>
-          updateFootagePresentation({
-            footageId: clip.id,
-            presentation: to.presentation,
-          })
-        )
+        saveSoon("presentation", () => {
+          const run = presentationQueue.current.then(
+            async (): Promise<Result<unknown>> => {
+              // Once refused, nothing more saves from this stale copy.
+              if (conflicted.current) {
+                return err({ code: "CONFLICT", message: "Changed elsewhere" })
+              }
+              const result = await updateFootagePresentation({
+                footageId: clip.id,
+                presentation: to.presentation,
+                baseVersion: presentationVersion.current,
+              })
+              if (result.ok) presentationVersion.current = result.data.version
+              return result
+            }
+          )
+          presentationQueue.current = run.catch(() => {})
+          return run
+        })
       }
     },
     [clip.id, saveSoon]
@@ -609,16 +627,10 @@ export function FootageEditor({
 
   // ── Text ──
   const [selectedTextId, setSelectedTextId] = useState<string | null>(null)
-  const stageFonts = useMemo<StageFonts>(() => {
-    const heading = toAdFont(kitFonts.heading ?? "") ?? "Inter"
-    const body = toAdFont(kitFonts.body ?? "") ?? heading
-    return {
-      heading: `${adFontFamily[heading]}, system-ui, sans-serif`,
-      headingWeight:
-        adFonts.find((font) => font.name === heading)?.headingWeight ?? 700,
-      body: `${adFontFamily[body]}, system-ui, sans-serif`,
-    }
-  }, [kitFonts.heading, kitFonts.body])
+  const stageFonts = useMemo<StageFonts>(
+    () => stageFontsFor({ heading: kitFonts.heading, body: kitFonts.body }),
+    [kitFonts.heading, kitFonts.body]
+  )
   const swatches = useMemo(() => textSwatches(brandColors), [brandColors])
   const accents = useMemo(
     () => [...brandColors, ...(analysis?.palette.accents ?? [])],
@@ -1056,25 +1068,8 @@ export function FootageEditor({
     return () => window.removeEventListener("keydown", onKey)
   }, [readOnly, stepHistory, togglePlay])
 
-  // Space plays and pauses wherever focus is (a button, a tab, a select,
-  // the stage), except while typing text. Captured before anything else,
-  // and the keyup too: buttons would otherwise click on Space's keyup.
-  useEffect(() => {
-    const onSpace = (event: KeyboardEvent) => {
-      if (event.key !== " " || event.metaKey || event.ctrlKey || event.altKey)
-        return
-      if (isTypingText(event.target)) return
-      event.preventDefault()
-      event.stopPropagation()
-      if (event.type === "keydown" && !event.repeat) togglePlay()
-    }
-    window.addEventListener("keydown", onSpace, { capture: true })
-    window.addEventListener("keyup", onSpace, { capture: true })
-    return () => {
-      window.removeEventListener("keydown", onSpace, { capture: true })
-      window.removeEventListener("keyup", onSpace, { capture: true })
-    }
-  }, [togglePlay])
+  // Space plays and pauses wherever focus is, except while typing.
+  useSpaceToPlay(togglePlay)
 
   function addAtCurrentTime() {
     const atMs = Math.round(
@@ -1098,54 +1093,11 @@ export function FootageEditor({
   // look. Native full screen where the browser allows it on an element;
   // else (iPhone Safari) the stage fills the window.
   const stageBoxRef = useRef<HTMLDivElement>(null)
-  const [fullscreen, setFullscreen] = useState(false)
-  const enterFullscreen = useCallback(() => {
-    setFullscreen(true)
-    const box = stageBoxRef.current
-    if (box && document.fullscreenEnabled && !document.fullscreenElement) {
-      box.requestFullscreen().catch(() => {
-        // Refused (e.g. not from a user gesture): the window fill stays.
-      })
-    }
-  }, [])
-  // Exits we asked for: their "left full screen" event arrives later, and
-  // must not close a full screen entered again in the meantime (F right
-  // after Esc).
-  const ownExits = useRef(0)
-  const exitFullscreen = useCallback(() => {
-    setFullscreen(false)
-    if (document.fullscreenElement) {
-      ownExits.current++
-      document.exitFullscreen().catch(() => ownExits.current--)
-    }
-  }, [])
-  useEffect(() => {
-    // The browser leaving native full screen by itself (its Esc or its
-    // own control) closes ours too.
-    const onChange = () => {
-      if (document.fullscreenElement) return
-      if (ownExits.current > 0) ownExits.current--
-      else setFullscreen(false)
-    }
-    document.addEventListener("fullscreenchange", onChange)
-    return () => document.removeEventListener("fullscreenchange", onChange)
-  }, [])
-  useEffect(() => {
-    // F toggles full screen; Esc leaves the window fill.
-    const onKey = (event: KeyboardEvent) => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return
-      if (isTypingText(event.target)) return
-      if (event.key === "f" || event.key === "F") {
-        event.preventDefault()
-        if (fullscreen) exitFullscreen()
-        else enterFullscreen()
-      } else if (event.key === "Escape" && fullscreen) {
-        exitFullscreen()
-      }
-    }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
-  }, [fullscreen, enterFullscreen, exitFullscreen])
+  const {
+    fullscreen,
+    enter: enterFullscreen,
+    exit: exitFullscreen,
+  } = useFullscreen(stageBoxRef)
 
   // The timeline's height: null fits every layer; a drag on its top edge
   // sets one (kept per browser), and the layers scroll inside.
@@ -1276,12 +1228,16 @@ export function FootageEditor({
             built by the server and handed to this client component came
             back undefined after a server-action refresh, crashing it. */}
         <LinkButton
-          href={`/brand-kits/${kitId}/footage`}
+          href={backTo?.href ?? `/brand-kits/${kitId}/footage`}
           variant="ghost"
           icon={<ArrowLeftIcon />}
         >
-          <span className="hidden sm:inline">Footage</span>
-          <span className="sr-only sm:hidden">Back to footage</span>
+          <span className="hidden max-w-40 truncate sm:inline">
+            {backTo?.label ?? "Footage"}
+          </span>
+          <span className="sr-only sm:hidden">
+            Back to {backTo ? backTo.label : "footage"}
+          </span>
         </LinkButton>
         <div className="flex min-w-0 flex-col leading-tight">
           <h1 className="truncate text-sm font-semibold">{clip.name}</h1>
@@ -1337,12 +1293,29 @@ export function FootageEditor({
                 className="text-xs whitespace-nowrap text-muted-foreground sm:w-16"
                 aria-live="polite"
               >
-                {saveState === "saving"
-                  ? "Saving…"
-                  : saveState === "failed"
-                    ? "Not saved"
-                    : "Saved"}
+                {conflict !== "none"
+                  ? "Not saved"
+                  : saveState === "saving"
+                    ? "Saving…"
+                    : saveState === "failed"
+                      ? "Not saved"
+                      : "Saved"}
               </span>
+              {conflict === "dismissed" && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => window.location.reload()}
+                >
+                  Reload
+                </Button>
+              )}
+              <ConflictDialog
+                what="clip"
+                open={conflict === "open"}
+                onOpenChange={(open) => !open && setConflict("dismissed")}
+              />
             </>
           )}
           {!readOnly && (

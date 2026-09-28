@@ -279,44 +279,36 @@ export async function setMarkerShot(
   if (count === 0) throw new AppError("NOT_FOUND", "That marker is gone.")
 }
 
+/**
+ * Saves the clip's edit if it's still at `baseVersion`, and returns the
+ * new version. Another tab (or person) saving since gets a conflict
+ * instead of silently overwriting their work — last save no longer wins.
+ */
 export async function setFootagePresentation(
   workspaceId: string,
   footageId: string,
-  presentation: Presentation
+  presentation: Presentation,
+  baseVersion: number
 ) {
   const { count } = await db.footage.updateMany({
-    where: { id: footageId, workspaceId },
-    data: { presentation },
+    where: { id: footageId, workspaceId, presentationVersion: baseVersion },
+    data: { presentation, presentationVersion: { increment: 1 } },
   })
-  if (count === 0) throw footageNotFound()
+  if (count === 0) {
+    const exists = await db.footage.count({
+      where: { id: footageId, workspaceId },
+    })
+    if (!exists) throw footageNotFound()
+    throw changedElsewhere()
+  }
+  return baseVersion + 1
 }
 
-/**
- * Saves an AI direction in one go: the intro, and a shot per marker.
- * Markers not in this clip (or workspace) are ignored.
- */
-export async function applyMotionDirection(
-  workspaceId: string,
-  footageId: string,
-  direction: {
-    presentation: Presentation
-    shots: { markerId: string; shot: Shot }[]
-  }
-) {
-  await db.$transaction(async (tx) => {
-    const { count } = await tx.footage.updateMany({
-      where: { id: footageId, workspaceId },
-      data: { presentation: direction.presentation },
-    })
-    if (count === 0) throw footageNotFound()
-    for (const { markerId, shot } of direction.shots) {
-      await tx.footageMarker.updateMany({
-        where: { id: markerId, footageId },
-        data: { shot },
-      })
-    }
-  })
-}
+const changedElsewhere = () =>
+  new AppError(
+    "CONFLICT",
+    "This clip was changed in another tab or window. Reload to get the latest."
+  )
 
 /**
  * Moves a marker to `atMs` (dragged on the timeline). A moved marker is the
