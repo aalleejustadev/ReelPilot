@@ -3,13 +3,15 @@ import "server-only"
 import { db } from "@/shared/db"
 import { signedFileUrl } from "@/shared/storage"
 
-/** A kit's clips, newest first. */
-export async function listFootage(workspaceId: string, kitId: string) {
+/** A kit's clips (or, without a kit, the workspace's), newest first. */
+export async function listFootage(workspaceId: string, kitId?: string) {
   return db.footage.findMany({
     where: { workspaceId, brandKitId: kitId },
     orderBy: { createdAt: "desc" },
     select: {
       id: true,
+      brandKitId: true,
+      brandKit: { select: { name: true } },
       name: true,
       source: true,
       status: true,
@@ -20,6 +22,11 @@ export async function listFootage(workspaceId: string, kitId: string) {
       _count: { select: { markers: true } },
     },
   })
+}
+
+/** How many clips a kit has. */
+export async function countFootage(workspaceId: string, kitId: string) {
+  return db.footage.count({ where: { workspaceId, brandKitId: kitId } })
 }
 
 /** One clip with its markers in time order, or null if not in the workspace. */

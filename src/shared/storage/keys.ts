@@ -25,4 +25,3 @@ export function workspaceFileKey(workspaceId: string, ...segments: string[]) {
 export function isWorkspaceFileKey(key: string, workspaceId: string) {
   return key.startsWith(`workspaces/${workspaceId}/`)
 }
-

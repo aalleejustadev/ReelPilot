@@ -19,6 +19,7 @@ export async function listBrandKits(workspaceId: string) {
       description: true,
       logoKey: true,
       updatedAt: true,
+      _count: { select: { footage: true } },
     },
   })
 }

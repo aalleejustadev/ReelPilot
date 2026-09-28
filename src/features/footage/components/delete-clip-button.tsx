@@ -24,11 +24,12 @@ import { deleteFootage } from "../actions"
 export function DeleteClipButton({
   footageId,
   clipName,
-  kitId,
+  afterDeleteHref,
 }: {
   footageId: string
   clipName: string
-  kitId: string
+  /** Where to go once it's gone (the list the editor was opened from). */
+  afterDeleteHref: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -40,7 +41,7 @@ export function DeleteClipButton({
       if (result.ok) {
         toast.add({ type: "success", title: "Clip deleted" })
         setOpen(false)
-        router.push(`/brand-kits/${kitId}/footage`)
+        router.push(afterDeleteHref)
       } else {
         toast.add({ type: "error", title: result.error.message })
       }

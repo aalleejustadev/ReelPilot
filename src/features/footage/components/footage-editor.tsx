@@ -299,7 +299,7 @@ export function FootageEditor({
   kitLogoUrl: string | null
   /** The kit's site, e.g. "acme.app". */
   kitSite: string
-  /** Opened from a project: back goes there instead of the footage. */
+  /** Opened from a video or the Footage page: back goes there instead. */
   backTo?: { href: string; label: string } | null
   /**
    * Edited as part of a video. A one-clip video is edited right here, so
@@ -1342,7 +1342,7 @@ export function FootageEditor({
             <DeleteClipButton
               footageId={clip.id}
               clipName={clip.name}
-              kitId={kitId}
+              afterDeleteHref={backTo?.href ?? `/brand-kits/${kitId}/footage`}
             />
           )}
         </div>

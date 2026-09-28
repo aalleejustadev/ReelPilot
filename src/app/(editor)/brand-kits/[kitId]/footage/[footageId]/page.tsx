@@ -34,7 +34,7 @@ export default async function FootageEditorPage({
   searchParams,
 }: PageProps<"/brand-kits/[kitId]/footage/[footageId]">) {
   const { kitId, footageId } = await params
-  const { video: videoId } = await searchParams
+  const { video: videoId, from } = await searchParams
   const { workspace, role } = await requireWorkspaceAccess("workspace:view")
   const [kit, clip, project] = await Promise.all([
     getBrandKit(workspace.id, kitId),
@@ -44,12 +44,19 @@ export default async function FootageEditorPage({
   if (!kit || !clip || clip.brandKitId !== kitId) notFound()
   // Edited as part of a video. A one-clip video lives here: back goes to
   // Videos. From a longer video's clip list, back returns to that list.
+  // Opened from the Footage page, back returns there; else the kit's footage.
   const single = project?.clipCount === 1
   const backTo = project
     ? single
       ? { href: "/videos", label: "Videos" }
       : { href: `/videos/${project.id}`, label: project.name }
-    : null
+    : from === "footage"
+      ? { href: "/footage", label: "Footage" }
+      : null
+  const back = backTo ?? {
+    href: `/brand-kits/${kitId}/footage`,
+    label: "Footage",
+  }
   const video = project
     ? {
         name: project.name,
@@ -67,13 +74,11 @@ export default async function FootageEditorPage({
   const header = {
     start: (
       <>
-        <LinkButton
-          href={`/brand-kits/${kitId}/footage`}
-          variant="ghost"
-          icon={<ArrowLeftIcon />}
-        >
-          <span className="hidden sm:inline">Footage</span>
-          <span className="sr-only sm:hidden">Back to footage</span>
+        <LinkButton href={back.href} variant="ghost" icon={<ArrowLeftIcon />}>
+          <span className="hidden max-w-40 truncate sm:inline">
+            {back.label}
+          </span>
+          <span className="sr-only sm:hidden">Back to {back.label}</span>
         </LinkButton>
         <div className="flex min-w-0 flex-col leading-tight">
           <h1 className="truncate text-sm font-semibold">{clip.name}</h1>
@@ -89,7 +94,7 @@ export default async function FootageEditorPage({
       <DeleteClipButton
         footageId={clip.id}
         clipName={clip.name}
-        kitId={kitId}
+        afterDeleteHref={back.href}
       />
     ) : null,
   }

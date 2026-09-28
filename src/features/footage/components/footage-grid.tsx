@@ -83,13 +83,17 @@ function ClipDetails({ clip }: { clip: FootageCard }) {
   )
 }
 
-/** A kit's clips as cards; each opens the clip page. */
+/** Clips as cards; each opens the clip editor. */
 export function FootageGrid({
   clips,
-  kitId,
+  from,
+  showKit = false,
 }: {
   clips: FootageCard[]
-  kitId: string
+  /** Opened from the Footage page: the editor's back link returns there. */
+  from?: "footage"
+  /** Clips from several kits: name each one's kit. */
+  showKit?: boolean
 }) {
   return (
     <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -121,13 +125,18 @@ export function FootageGrid({
               <CardTitle className="line-clamp-2 leading-snug break-words">
                 {/* The link covers the whole card. */}
                 <Link
-                  href={`/brand-kits/${kitId}/footage/${clip.id}`}
+                  href={`/brand-kits/${clip.brandKitId}/footage/${clip.id}${from ? `?from=${from}` : ""}`}
                   className="outline-none after:absolute after:inset-0"
                 >
                   {clip.name}
                 </Link>
               </CardTitle>
               <ClipDetails clip={clip} />
+              {showKit && (
+                <p className="truncate text-sm text-muted-foreground">
+                  {clip.brandKit.name}
+                </p>
+              )}
             </CardHeader>
             {clip.status === "FAILED" && clip.errorMessage && (
               <CardContent className="pt-3">

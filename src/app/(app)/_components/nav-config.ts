@@ -1,5 +1,6 @@
 import {
   ClapperboardIcon,
+  FilmIcon,
   LayoutDashboardIcon,
   PaletteIcon,
   SettingsIcon,
@@ -12,6 +13,7 @@ import {
 export const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Videos", href: "/videos", icon: ClapperboardIcon },
+  { title: "Footage", href: "/footage", icon: FilmIcon },
   { title: "Brand kits", href: "/brand-kits", icon: PaletteIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
 ] as const
@@ -23,6 +25,7 @@ const pageTitles: { prefix: string; title: string }[] = [
   { prefix: "/settings", title: "Settings" },
   { prefix: "/dashboard", title: "Dashboard" },
   { prefix: "/videos", title: "Videos" },
+  { prefix: "/footage", title: "Footage" },
   { prefix: "/brand-kits", title: "Brand kits" },
 ]
 

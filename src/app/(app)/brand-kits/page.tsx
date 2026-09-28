@@ -1,4 +1,4 @@
-import { ImageIcon, PaletteIcon } from "lucide-react"
+import { FileTextIcon, ImageIcon, PaletteIcon } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
 
@@ -11,10 +11,12 @@ import {
 import { can, requireWorkspaceAccess } from "@/features/workspaces"
 import { plans } from "@/shared/config/plans"
 import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert"
+import { LinkButton } from "@/shared/ui/link-button"
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/shared/ui/card"
@@ -47,8 +49,8 @@ export default async function BrandKitsPage() {
           Brand kits
         </h1>
         <p className="text-muted-foreground">
-          Everything ReelPilot knows about your product: what it does, who it’s
-          for and what your ads may claim.
+          Your product’s look and details. Open a kit to record, upload and edit
+          its footage.
         </p>
       </div>
 
@@ -98,9 +100,10 @@ export default async function BrandKitsPage() {
                       </div>
                       <div className="flex min-w-0 flex-col gap-1">
                         <CardTitle className="truncate">
-                          {/* The link covers the whole card. */}
+                          {/* The link covers the whole card and opens the
+                              kit's footage, where editing starts. */}
                           <Link
-                            href={`/brand-kits/${kit.id}`}
+                            href={`/brand-kits/${kit.id}/footage`}
                             className="outline-none after:absolute after:inset-0"
                           >
                             {kit.name}
@@ -118,6 +121,23 @@ export default async function BrandKitsPage() {
                         </p>
                       </CardContent>
                     )}
+                    <CardFooter className="mt-auto justify-between gap-3">
+                      <span className="text-sm text-muted-foreground">
+                        {kit._count.footage}{" "}
+                        {kit._count.footage === 1 ? "clip" : "clips"}
+                      </span>
+                      {/* Above the card's link. */}
+                      <LinkButton
+                        href={`/brand-kits/${kit.id}`}
+                        variant="ghost"
+                        size="sm"
+                        icon={<FileTextIcon />}
+                        className="relative"
+                        aria-label={`${kit.name} details`}
+                      >
+                        Details
+                      </LinkButton>
+                    </CardFooter>
                   </Card>
                 </li>
               )

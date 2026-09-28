@@ -23,6 +23,7 @@ test.describe("signed in", () => {
   for (const path of [
     "/dashboard",
     "/videos",
+    "/footage",
     "/brand-kits",
     "/settings/profile",
     "/settings/workspace",

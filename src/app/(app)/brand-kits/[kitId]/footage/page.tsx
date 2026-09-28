@@ -97,7 +97,7 @@ export default async function FootagePage({
           </EmptyHeader>
         </Empty>
       ) : (
-        <FootageGrid clips={clips} kitId={kitId} />
+        <FootageGrid clips={clips} />
       )}
     </div>
   )

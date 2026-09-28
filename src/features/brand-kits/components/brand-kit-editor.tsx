@@ -138,7 +138,7 @@ export function BrandKitEditor({
         <p className="text-muted-foreground">
           {readOnly
             ? "You can view this brand kit. Ask an owner for editor access to change it."
-            : "What ReelPilot knows about your product. Every ad is written from this."}
+            : "What ReelPilot knows about your product. The AI edits and writes from this."}
         </p>
         {!readOnly && (
           <div className="flex gap-2">
@@ -154,7 +154,7 @@ export function BrandKitEditor({
             <CardHeader>
               <CardTitle>Product</CardTitle>
               <CardDescription>
-                The basics every script starts from.
+                The basics every video starts from.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -240,7 +240,7 @@ export function BrandKitEditor({
             <CardHeader>
               <CardTitle>Allowed claims</CardTitle>
               <CardDescription>
-                Numbers and promises your ads may use. Scripts can only make
+                Numbers and promises your videos may use. The AI only writes
                 claims listed here.
               </CardDescription>
             </CardHeader>

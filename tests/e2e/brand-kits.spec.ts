@@ -75,7 +75,7 @@ test("create, edit, save and delete a brand kit", async ({
   await expect(page.getByText("Brand kit saved")).toBeVisible()
   // Saving returns to the list; the changes are there when reopened.
   await expect(page).toHaveURL(/\/brand-kits$/)
-  await page.getByRole("link", { name: "Acme" }).click()
+  await page.getByRole("link", { name: "Acme details" }).click()
   await expect(
     page.getByRole("heading", { level: 1, name: "Acme" })
   ).toBeVisible()
@@ -93,16 +93,20 @@ test("create, edit, save and delete a brand kit", async ({
   ).toContainText("Bebas Neue")
   await noSidewaysScroll(page)
 
-  // The list shows it, and the Free plan's one kit is used up.
+  // The list shows it, and the Free plan's one kit is used up. The card
+  // opens the kit's footage; "Details" opens this form.
   await page.goto("/brand-kits")
-  await expect(page.getByRole("link", { name: "Acme" })).toBeVisible()
+  await expect(
+    page.getByRole("link", { name: "Acme", exact: true })
+  ).toHaveAttribute("href", /\/brand-kits\/[^/]+\/footage$/)
+  await expect(page.getByText("0 clips")).toBeVisible()
   await expect(
     page.getByText("You’ve used every brand kit on your plan")
   ).toBeVisible()
   await noSidewaysScroll(page)
 
   // Delete asks first, then returns to the empty list.
-  await page.getByRole("link", { name: "Acme" }).click()
+  await page.getByRole("link", { name: "Acme details" }).click()
   await page.getByRole("button", { name: "Delete", exact: true }).click()
   await expect(
     page.getByRole("alertdialog", { name: "Delete Acme?" })

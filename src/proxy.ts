@@ -18,6 +18,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/videos/:path*",
+    "/footage/:path*",
     "/brand-kits/:path*",
     "/settings/:path*",
   ],

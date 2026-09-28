@@ -155,6 +155,7 @@ reelpilot/
 │   │   ├── (app)/                    # app shell: sidebar, top bar
 │   │   │   ├── dashboard/page.tsx        # recent videos
 │   │   │   ├── videos/page.tsx           # M4
+│   │   │   ├── footage/page.tsx          # every clip; record/upload from here
 │   │   │   ├── brand-kits/
 │   │   │   │   ├── page.tsx
 │   │   │   │   └── [kitId]/{page,footage/page}.tsx
@@ -411,7 +412,7 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
-- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Videos, Brand kits, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
+- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Videos, Footage, Brand kits, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
 - **Editors** (clip editor, a video's clip list) are full screen without the sidebar: a top bar (back, name, save state, actions), the stage on `--projector`, a transport, and the timeline or clip strip below.
 - **Landing:** left-aligned hero with the URL input (try-it); to the right, a player looping a real edited video; below, one before/after (raw screen recording → edited video).
 
