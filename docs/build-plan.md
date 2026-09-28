@@ -3,7 +3,7 @@
 > **Working name:** ReelPilot (placeholder — check domain and trademark before launch).
 > **One-liner:** A browser video editor for product videos: record or upload your app, let the AI make the first cut, refine it in a real editor, then export an MP4 or share a link.
 > **Audience:** SaaS and app founders (solo and small teams) who need launch videos, feature demos, walkthroughs and social ads of their product.
-> **Status:** In build (M0–M4 done). This document is the single source of truth for the build agent.
+> **Status:** **V1 complete (2026-09-28)** — M0–M5 done; the owner closed V1 at M5 (templates, try-it and launch polish/deploy moved to Later, §3.2). This document is the single source of truth for the build agent.
 > **Direction change (owner, 2026-09-28):** ReelPilot is now a **video editor**, not a UGC ad platform. Campaigns, scripts, compliance, presenter-led ads, credits/billing, admin and audio are out of V1; everything is kept as minimal as possible. Sections below reflect the new direction; the completion records in §14 are history.
 
 Markers used in this doc:
@@ -37,14 +37,13 @@ Founders need polished product videos all the time — launches, feature announc
 | Editing takes skill and time | AI analyses the footage and directs a first cut; templates give a finished style in one click |
 | Desktop editors are heavy | Everything runs in the browser, projects save as you go |
 | Getting the video out | Export an MP4 in every shape (16:9, 9:16, 1:1, 4:5) or share a link anyone can watch |
-| "Show me before I sign up" | Try-it: paste your site's URL, get an edited video of it |
+| "Show me before I sign up" | Try-it (Later, §3.2): paste your site's URL, get an edited video of it |
 
 ### 1.3 Core user journey (V1)
-1. Visitor pastes their app URL on the landing page → we record a short tour of the site and hand back an edited, watermarked preview (no account).
-2. Signs up (Google / GitHub / email) and creates a **brand kit** (colours, fonts, logo — drafted from the site).
-3. Adds **footage**: records their app or uploads recordings; the analysis finds key moments.
-4. Starts a **video** and records or uploads straight into it (or picks clips it already has). A one-clip video opens right in the editor; "Add clip" joins more, one after another. A **template** or the AI makes the first cut; the owner refines it.
-5. **Exports** an MP4 or **shares** a public link.
+1. Signs up (Google / GitHub / email) and creates a **brand kit** (colours, fonts, logo — drafted from the site).
+2. Adds **footage**: records their app or uploads recordings; the analysis finds key moments.
+3. Starts a **video** and records or uploads straight into it (or picks clips it already has). A one-clip video opens right in the editor; "Add clip" joins more, one after another. The AI director can make the first cut; the owner refines it.
+4. **Exports** an MP4 or **shares** a public link.
 
 ---
 
@@ -62,15 +61,14 @@ Founders need polished product videos all the time — launches, feature announc
 - **Footage:** upload or in-browser recording, key moments, smart analysis. ✅
 - **Motion studio:** camera, cuts/speed/transitions, text, motion graphics, layouts, lens, AI director, full-screen preview. ✅
 - **Videos** (projects in code): one or more clips in order, joined by transitions; one-clip videos open straight in the editor; versioned saves. ✅ (M4)
-- **Export & share:** MP4 in each shape; a public share link anyone can watch, revocable. (M5)
-- **Templates & AI first cut.** (M6)
-- **Try-it:** URL → recorded site tour → edited preview → sign-up. (M7)
-- **Launch polish:** landing, legal pages, SEO, error/empty states, deploy. (M8)
+- **Export & share:** MP4 in each shape; a public share link anyone can watch, revocable. ✅ (M5)
+
+V1 closed at M5 (owner, 2026-09-28). Templates & AI first cut (old M6), Try-it (old M7) and launch polish + deploy (old M8) moved to Later.
 
 Presenters (M3: stock portraits + Kokoro voices) were removed on 2026-09-28 (owner: not needed).
 
 ### 3.2 Later (not scheduled)
-Audio (voiceover, music, sound effects, auto captions), recorder upgrades (microphone, webcam bubble, click tracking via a Chrome extension), billing and plans, admin, team invites, avatars and lip-sync, variants, localisation, ad-account publishing. Don't scaffold any of these.
+Templates & AI first cut (§7.16), Try-it (§7.1), launch polish (landing, legal pages, SEO, e2e sweep) and deployment to Hostinger (§17). Audio (voiceover, music, sound effects, auto captions), recorder upgrades (microphone, webcam bubble, click tracking via a Chrome extension), billing and plans, admin, team invites, avatars and lip-sync, variants, localisation, ad-account publishing. Don't scaffold any of these.
 
 ✏️ Owner notes (scope):
 >
@@ -96,7 +94,7 @@ Audio (voiceover, music, sound effects, auto captions), recorder upgrades (micro
 | Validation | Zod | All inputs at the boundary |
 | Testing | Vitest (unit), Playwright (e2e) | |
 | Observability | Sentry + structured logs | |
-| Hosting | **Hostinger** (Node.js) | Deployment after M8 (launch polish); until then, development only |
+| Hosting | **Hostinger** (Node.js) | Deployment not scheduled (V1 closed at M5); development only for now |
 
 ---
 
@@ -147,7 +145,7 @@ reelpilot/
 │   ├── app/
 │   │   ├── (marketing)/
 │   │   │   ├── page.tsx                  # landing + try-it input
-│   │   │   ├── try/[trialId]/page.tsx    # anonymous try-it result (M7)
+│   │   │   ├── try/[trialId]/page.tsx    # anonymous try-it result (Later)
 │   │   │   └── legal/{terms,privacy}/page.tsx
 │   │   ├── (auth)/
 │   │   │   ├── sign-in/page.tsx
@@ -172,7 +170,7 @@ reelpilot/
 │   │   ├── footage/          # upload, recording, analysis, the clip editor (motion studio)
 │   │   ├── projects/         # videos: clips joined into one (M4; "videos" in the UI)
 │   │   ├── exports/          # MP4 export jobs and share links (M5)
-│   │   └── try-it/           # anonymous URL → recorded tour → preview (M7)
+│   │   └── try-it/           # anonymous URL → recorded tour → preview (Later)
 │   ├── worker/               # our own job worker: pg-boss + ffmpeg + Remotion (own Dockerfile)
 │   ├── remotion/
 │   │   ├── compositions/     # FootageStage (a clip), ProjectStage (a project)
@@ -202,7 +200,7 @@ reelpilot/
 
 Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 
-### 7.1 try-it (M7)
+### 7.1 try-it (Later — not in V1)
 - **Purpose:** An anonymous visitor sees their own site as an edited video before signing up.
 - **Flow:** validate the URL → the worker records a ~30s tour of the public page in headless Chrome (scroll through its sections, as the Stripe and Apple demos were made) → processing + analysis → AI first cut with a template → a watermarked share page.
 - **Guards:** public pages only (no logins, no form filling); rate limit per visitor (Postgres rate-limit table); trials expire after 7 days; on sign-up the trial becomes the user's first brand kit and project.
@@ -261,12 +259,12 @@ Stock presenters (a still portrait + a Kokoro voice) were built in M3 and remove
 - **The Footage tab** on a brand kit stays the library: uploads there don't create videos.
 - **Acceptance:** start a video, record or upload into it and edit it right away; add clips, reorder, set transitions, kept after a reload; it plays through its joins; delete from its card; a stale tab can't overwrite.
 
-### 7.15 export & share (M5)
+### 7.15 export & share (M5 ✅)
 - **Export:** "Export" in the clip editor and the video editor opens *Export and share*: pick Landscape 16:9, Portrait 9:16 or Square 1:1 (the stage's shapes), "Export MP4" renders it at 1080p in the worker with the same composition the preview plays (a clip is rendered as a one-clip video), with progress, then "Download MP4" (named after the clip or video). Only the newest file per shape is kept; an edit since then shows "You've edited this since the last export" and offers "Export again" (a hash of what was rendered). A one-clip video's editor exports the video.
 - **Share:** "Anyone with the link can watch" makes one link per clip or video (`/v/[token]`), which plays its newest finished export, signed out, not indexed; off, it 404s; on again, the same link returns.
 - **Acceptance:** the export matches the preview; share links work signed out and stop working when turned off.
 
-### 7.16 templates & AI first cut (M6)
+### 7.16 templates & AI first cut (Later — not in V1)
 - **Templates:** launch video, feature demo, social ad (9:16), walkthrough — each a preset of look, text style, lens, transitions, an intro slide and an end card.
 - **AI first cut:** pick a template; the AI director (§7.4b H) edits every clip of the project in that style, as one undoable change.
 - **Acceptance:** applying a template gives a finished-looking video; it can be undone.
@@ -507,9 +505,8 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M3c ✅ | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **done 2026-09-27** (see 14.7) |
 | M4 ✅ | Videos | projects in code (§7.14), versioned saves, dashboard | Record or upload into a video and edit it; clips joined with transitions; stale tabs can't overwrite — **done 2026-09-28** (see 14.8) |
 | M5 ✅ | Export & share | export jobs (Remotion renderer in the worker), share links (§7.15) | Download an MP4 in any shape; share a public link — **done 2026-09-28** (see 14.9) |
-| M6 | Templates | templates + AI first cut (§7.16) | One click from clips to a finished-looking video |
-| M7 | Try-it | try-it (§7.1) | Anonymous URL → recorded tour → edited preview → sign-up |
-| M8 | Launch polish | landing, legal, SEO, error/empty states, e2e sweep, deploy (Hostinger) | Public launch |
+
+**V1 is complete (owner, 2026-09-28).** The former M6 Templates (§7.16), M7 Try-it (§7.1) and M8 Launch polish + deploy were moved to Later (§3.2); nothing further is scheduled.
 
 ### 14.1 Definition of Done (every slice)
 - [ ] Prisma models + migration
@@ -736,7 +733,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
 - [ ] Legal review of Terms and Privacy. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
-- [x] Hosting: Hostinger (Node.js), deployment after M8 (2026-09-28).
+- [x] Hosting: Hostinger (Node.js) (2026-09-28); deployment is not scheduled (V1 closed at M5).
 - [ ] Color tuning. `TODO(owner)`
 - [x] Direction: a video editor, minimal scope; UGC ads, billing, admin, audio out of V1 (2026-09-28).
 - [x] Projects live inside a brand kit (its footage, fonts, colours, logo) (2026-09-28).
