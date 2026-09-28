@@ -51,10 +51,13 @@ const noSubscribe = () => () => {}
  */
 export function ScreenRecorder({
   kitId,
+  onUploaded,
   maxBytes,
   maxDurationSeconds,
 }: {
   kitId: string
+  /** The recording is in storage and processing (e.g. to add it to a video). */
+  onUploaded?: (footageId: string) => Promise<void> | void
   maxBytes: number
   maxDurationSeconds: number
 }) {
@@ -230,7 +233,7 @@ export function ScreenRecorder({
     if (stage.name !== "review") return
     const { blob, url } = stage
     setStage({ name: "uploading", progress: 0 })
-    const error = await sendFootage({
+    const sent = await sendFootage({
       kitId,
       file: blob,
       contentType: videoTypeOf(blob),
@@ -241,11 +244,12 @@ export function ScreenRecorder({
       onProgress: (progress) => setStage({ name: "uploading", progress }),
     })
     URL.revokeObjectURL(url)
-    if (error) {
-      toast.add({ type: "error", title: error })
+    if ("error" in sent) {
+      toast.add({ type: "error", title: sent.error })
       setStage({ name: "intro" })
       return
     }
+    await onUploaded?.(sent.footageId)
     toast.add({
       type: "success",
       title: "Recording uploaded",

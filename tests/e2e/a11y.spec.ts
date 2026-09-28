@@ -22,7 +22,7 @@ test.describe("signed in", () => {
 
   for (const path of [
     "/dashboard",
-    "/projects",
+    "/videos",
     "/brand-kits",
     "/presenters",
     "/settings/profile",

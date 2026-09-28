@@ -11,7 +11,7 @@ import { toast } from "@/shared/ui/toast"
 
 import { renameProject } from "../actions"
 
-/** The project's name as the page heading, renamed in place. */
+/** The video's name as the page heading, renamed in place. */
 export function RenameProject({
   projectId,
   name,
@@ -54,7 +54,7 @@ export function RenameProject({
         }}
       >
         <Input
-          aria-label="Project name"
+          aria-label="Video name"
           autoFocus
           value={draft}
           maxLength={projectLimits.name}
@@ -87,7 +87,7 @@ export function RenameProject({
           type="button"
           size="icon-xs"
           variant="ghost"
-          aria-label="Rename project"
+          aria-label="Rename video"
           onClick={() => {
             setDraft(shown)
             setEditing(true)

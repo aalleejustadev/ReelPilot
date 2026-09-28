@@ -20,7 +20,7 @@ import { LinkButton } from "@/shared/ui/link-button"
 
 export const metadata: Metadata = { title: "Dashboard" }
 
-/** How many recent projects the dashboard shows. */
+/** How many recent videos the dashboard shows. */
 const recent = 6
 
 export default async function DashboardPage() {
@@ -58,20 +58,23 @@ export default async function DashboardPage() {
         >
           <div className="flex items-center justify-between gap-4">
             <h2 id="recent-heading" className="text-lg font-semibold">
-              Recent projects
+              Recent videos
             </h2>
             {projects.length > recent && (
               <LinkButton
-                href="/projects"
+                href="/videos"
                 variant="ghost"
                 icon={<ArrowRightIcon />}
                 iconPosition="end"
               >
-                All projects
+                All videos
               </LinkButton>
             )}
           </div>
-          <ProjectsGrid projects={projects.slice(0, recent)} />
+          <ProjectsGrid
+            projects={projects.slice(0, recent)}
+            canDelete={can(role, "content:edit")}
+          />
         </section>
       ) : (
         <Empty className="flex-1 border">
@@ -86,7 +89,7 @@ export default async function DashboardPage() {
             </EmptyTitle>
             <EmptyDescription>
               {kits.length > 0
-                ? "Start a project, add your clips and join them into one video."
+                ? "Record or upload your app, and turn it into a polished video."
                 : "Paste your app’s website: we’ll pick up its colours, fonts and logo for your videos."}
             </EmptyDescription>
           </EmptyHeader>

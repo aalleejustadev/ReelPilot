@@ -12,7 +12,12 @@ import {
 import { useRouter } from "next/navigation"
 import { useCallback, useMemo, useRef, useState } from "react"
 
-import { formatDuration, stageFontsFor } from "@/features/footage/client"
+import {
+  FootageUploader,
+  formatDuration,
+  ScreenRecorder,
+  stageFontsFor,
+} from "@/features/footage/client"
 import { projectSlots } from "@/remotion/compositions/ProjectStage"
 import { cn } from "@/shared/lib/utils"
 import { err, type Result } from "@/shared/lib/result"
@@ -36,6 +41,7 @@ import {
   EmptyTitle,
 } from "@/shared/ui/empty"
 import { LinkButton } from "@/shared/ui/link-button"
+import { Spinner } from "@/shared/ui/spinner"
 import {
   Select,
   SelectContent,
@@ -47,7 +53,7 @@ import {
 import { toast } from "@/shared/ui/toast"
 import { ToggleGroup, ToggleGroupItem } from "@/shared/ui/toggle-group"
 
-import { saveProjectClips } from "../actions"
+import { appendProjectClip, saveProjectClips } from "../actions"
 import type { ProjectDetail } from "../queries"
 import { AddClipsDialog, type KitClip } from "./add-clips-dialog"
 import { DeleteProjectButton } from "./delete-project-button"
@@ -68,19 +74,23 @@ const directionLabels = {
 } as const
 
 /**
- * A project: its clips in order, played as one video, with a transition
- * at every join. Each clip is edited in the clip editor; here the owner
- * picks, orders and joins them. Changes save at once, versioned: a stale
- * tab is told to reload instead of overwriting newer work.
+ * A video's clips (in code: a project): its clips in order, played as one
+ * video, with a transition at every join. Clips are recorded or uploaded
+ * right here, or chosen from the brand kit's footage; each is edited in
+ * the clip editor. Changes save at once, versioned: a stale tab is told to
+ * reload instead of overwriting newer work.
  */
 export function ProjectEditor({
   project,
   kitClips,
+  footage,
   readOnly,
 }: {
   project: ProjectDetail
-  /** The brand kit's clips, for "Add clips". */
+  /** The brand kit's clips, for "Choose from footage". */
   kitClips: KitClip[]
+  /** Recording and uploading into the video. */
+  footage: { maxBytes: number; maxDurationSeconds: number; canAdd: boolean }
   readOnly: boolean
 }) {
   const router = useRouter()
@@ -203,6 +213,44 @@ export function ProjectEditor({
     )
   }
 
+  /**
+   * A clip just recorded or uploaded here joins the video at its end at
+   * once (in the same queue as other saves, so versions stay in step), and
+   * plays once processed — the page refreshes itself until then.
+   */
+  const appendUploaded = useCallback(
+    async (footageId: string) => {
+      pending.current++
+      setSaveState("saving")
+      const run = queue.current.then(async (): Promise<Result<unknown>> => {
+        if (conflicted.current) {
+          return err({ code: "CONFLICT", message: "Changed elsewhere" })
+        }
+        const result = await appendProjectClip({
+          projectId: project.id,
+          footageId,
+        })
+        if (result.ok) version.current = result.data.version
+        return result
+      })
+      queue.current = run.catch(() => {})
+      const result = await run
+      pending.current--
+      if (!result.ok) {
+        setSaveState("failed")
+        toast.add({ type: "error", title: result.error.message })
+        return
+      }
+      setEntries((current) => [
+        ...current,
+        { key: newKey(), footageId, transition: defaultClipTransition },
+      ])
+      if (pending.current === 0) setSaveState("saved")
+      router.refresh()
+    },
+    [project.id, router]
+  )
+
   // What plays: the clips whose media we have, in order.
   const { playable, stageClips } = useMemo(() => {
     const playable = entries.flatMap((entry) => {
@@ -262,13 +310,26 @@ export function ProjectEditor({
   )
 
   const readyInKit = kitClips.filter((clip) => clip.status === "READY")
+  const statuses = entries.map(
+    (entry) => media.get(entry.footageId)?.status ?? "PROCESSING"
+  )
+  const anyProcessing = statuses.some((s) => s !== "READY" && s !== "FAILED")
+  const addButtons = (
+    <AddFootage
+      kitId={project.kit.id}
+      footage={footage}
+      canChoose={readyInKit.length > 0 && entries.length < projectLimits.clips}
+      onChoose={() => setAdding(true)}
+      onUploaded={appendUploaded}
+    />
+  )
 
   return (
     <div className="flex min-h-dvh flex-col bg-background lg:h-dvh">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-card px-2 sm:gap-3 sm:px-4">
-        <LinkButton href="/projects" variant="ghost" icon={<ArrowLeftIcon />}>
-          <span className="hidden sm:inline">Projects</span>
-          <span className="sr-only sm:hidden">Back to projects</span>
+        <LinkButton href="/videos" variant="ghost" icon={<ArrowLeftIcon />}>
+          <span className="hidden sm:inline">Videos</span>
+          <span className="sr-only sm:hidden">Back to videos</span>
         </LinkButton>
         <div className="flex min-w-0 flex-1 flex-col leading-tight">
           <RenameProject
@@ -306,7 +367,7 @@ export function ProjectEditor({
               </Button>
             )}
             <ConflictDialog
-              what="project"
+              what="video"
               open={conflict === "open"}
               onOpenChange={(open) => !open && setConflict("dismissed")}
             />
@@ -328,35 +389,30 @@ export function ProjectEditor({
           />
         ) : (
           <div className="flex flex-1 items-center justify-center bg-muted/60 p-6">
-            <Empty className="max-w-lg border bg-background">
+            <Empty className="max-w-xl border bg-background">
               <EmptyHeader>
                 <EmptyMedia variant="icon">
-                  <FilmIcon />
+                  {anyProcessing ? <Spinner /> : <FilmIcon />}
                 </EmptyMedia>
                 <EmptyTitle>
-                  {entries.length > 0 ? "Loading your clips" : "No clips yet"}
+                  {entries.length === 0
+                    ? "Add your first clip"
+                    : anyProcessing
+                      ? "Processing your clip"
+                      : "This clip couldn’t be used"}
                 </EmptyTitle>
                 <EmptyDescription>
                   {readOnly
                     ? "An owner or editor can add clips."
-                    : readyInKit.length > 0
-                      ? `Add clips from ${project.kit.name}’s footage. They play one after another, each with its own edit.`
-                      : `${project.kit.name} has no ready footage yet. Record or upload some first.`}
+                    : entries.length === 0
+                      ? "Record your app or upload a screen recording. Add more clips any time; they play one after another, joined by transitions."
+                      : anyProcessing
+                        ? "We’re converting it and finding key moments. This usually takes under a minute; this page updates on its own."
+                        : "Remove it below and add another."}
                 </EmptyDescription>
               </EmptyHeader>
               {!readOnly && entries.length === 0 && (
-                <EmptyContent>
-                  {readyInKit.length > 0 ? (
-                    <Button type="button" onClick={() => setAdding(true)}>
-                      <PlusIcon data-icon="inline-start" />
-                      Add clips
-                    </Button>
-                  ) : (
-                    <LinkButton href={`/brand-kits/${project.kit.id}/footage`}>
-                      Go to footage
-                    </LinkButton>
-                  )}
-                </EmptyContent>
+                <EmptyContent>{addButtons}</EmptyContent>
               )}
             </Empty>
           </div>
@@ -365,27 +421,15 @@ export function ProjectEditor({
 
       {entries.length > 0 && (
         <footer className="shrink-0 border-t bg-card px-3 py-3 sm:px-4">
-          <div className="mb-2 flex items-center gap-3">
+          <div className="mb-2 flex flex-wrap items-center gap-3">
             <h2 className="flex items-center gap-2 text-sm font-medium">
               <FilmIcon aria-hidden className="size-4" />
               Clips
             </h2>
-            {!readOnly && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="ml-auto"
-                disabled={entries.length >= projectLimits.clips}
-                onClick={() => setAdding(true)}
-              >
-                <PlusIcon data-icon="inline-start" />
-                Add clips
-              </Button>
-            )}
+            {!readOnly && <div className="ml-auto">{addButtons}</div>}
           </div>
           <ol
-            aria-label="Clips in the project"
+            aria-label="Clips in the video"
             className="flex items-stretch gap-2 overflow-x-auto pb-2"
           >
             {entries.map((entry, index) => {
@@ -415,11 +459,13 @@ export function ProjectEditor({
                     name={name}
                     posterUrl={clip?.posterUrl ?? info?.posterUrl ?? null}
                     lengthMs={clip?.lengthMs ?? null}
+                    status={statuses[index]!}
+                    errorMessage={clip?.errorMessage ?? null}
                     isCurrent={entry.key === currentKey}
                     isFirst={index === 0}
                     isLast={index === entries.length - 1}
                     readOnly={readOnly}
-                    editHref={`/brand-kits/${project.kit.id}/footage/${entry.footageId}?project=${project.id}`}
+                    editHref={`/brand-kits/${project.kit.id}/footage/${entry.footageId}?video=${project.id}`}
                     onJump={() =>
                       slot && seekRef.current?.(slot.startMs + slot.inMs)
                     }
@@ -454,6 +500,48 @@ export function ProjectEditor({
   )
 }
 
+/** Record or upload a clip into the video, or choose one from the kit. */
+function AddFootage({
+  kitId,
+  footage,
+  canChoose,
+  onChoose,
+  onUploaded,
+}: {
+  kitId: string
+  footage: { maxBytes: number; maxDurationSeconds: number; canAdd: boolean }
+  canChoose: boolean
+  onChoose: () => void
+  onUploaded: (footageId: string) => Promise<void>
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-2">
+      {footage.canAdd && (
+        <>
+          <ScreenRecorder
+            kitId={kitId}
+            maxBytes={footage.maxBytes}
+            maxDurationSeconds={footage.maxDurationSeconds}
+            onUploaded={onUploaded}
+          />
+          <FootageUploader
+            kitId={kitId}
+            maxBytes={footage.maxBytes}
+            disabled={false}
+            onUploaded={onUploaded}
+          />
+        </>
+      )}
+      {canChoose && (
+        <Button type="button" variant="outline" onClick={onChoose}>
+          <PlusIcon data-icon="inline-start" />
+          Choose from footage
+        </Button>
+      )}
+    </div>
+  )
+}
+
 /** "https://www.acme.app/pricing" → "acme.app" (for end cards). */
 function siteLabelFor(url: string) {
   try {
@@ -468,6 +556,8 @@ function ClipCard({
   name,
   posterUrl,
   lengthMs,
+  status,
+  errorMessage,
   isCurrent,
   isFirst,
   isLast,
@@ -483,6 +573,8 @@ function ClipCard({
   posterUrl: string | null
   /** Its edited length; null until its media arrives. */
   lengthMs: number | null
+  status: string
+  errorMessage: string | null
   isCurrent: boolean
   isFirst: boolean
   isLast: boolean
@@ -534,7 +626,7 @@ function ClipCard({
       <button
         type="button"
         onClick={onJump}
-        disabled={lengthMs === null}
+        disabled={lengthMs === null || status !== "READY"}
         aria-label={`Play from clip ${index + 1}: ${name}`}
         className="relative aspect-video w-full overflow-hidden bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
       >
@@ -555,13 +647,27 @@ function ClipCard({
         <span className="absolute top-1 left-1 rounded bg-background/85 px-1.5 font-mono text-xs">
           {index + 1}
         </span>
+        {status !== "READY" && status !== "FAILED" && (
+          <span className="absolute inset-0 flex items-center justify-center bg-background/60">
+            <Spinner />
+          </span>
+        )}
       </button>
       <div className="flex flex-col gap-1 p-2">
         <span className="truncate text-sm font-medium" title={name}>
           {name}
         </span>
-        <span className="font-mono text-xs text-muted-foreground">
-          {lengthMs === null ? "Loading…" : formatDuration(lengthMs)}
+        <span
+          className="font-mono text-xs text-muted-foreground"
+          title={errorMessage ?? undefined}
+        >
+          {status === "FAILED"
+            ? "Couldn’t be used"
+            : status !== "READY"
+              ? "Processing…"
+              : lengthMs === null
+                ? "Loading…"
+                : formatDuration(lengthMs)}
         </span>
         {!readOnly && (
           <div className="flex items-center gap-0.5">
@@ -585,21 +691,23 @@ function ClipCard({
             >
               <ChevronRightIcon />
             </Button>
-            <LinkButton
-              href={editHref}
-              variant="ghost"
-              size="icon-sm"
-              aria-label={`Edit ${name}`}
-              title="Edit this clip"
-            >
-              <PencilIcon />
-            </LinkButton>
+            {status === "READY" && (
+              <LinkButton
+                href={editHref}
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Edit ${name}`}
+                title="Edit this clip"
+              >
+                <PencilIcon />
+              </LinkButton>
+            )}
             <Button
               type="button"
               variant="ghost"
               size="icon-sm"
               className="ml-auto"
-              aria-label={`Remove ${name} from the project`}
+              aria-label={`Remove ${name} from the video`}
               onClick={onRemove}
             >
               <XIcon />

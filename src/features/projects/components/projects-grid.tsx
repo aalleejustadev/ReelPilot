@@ -5,22 +5,40 @@ import { formatDuration } from "@/features/footage"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/shared/ui/card"
 
 import type { ProjectListItem } from "../queries"
+import { DeleteProjectButton } from "./delete-project-button"
 
 const updated = new Intl.DateTimeFormat("en", {
   day: "numeric",
   month: "short",
 })
 
-/** Projects as cards; each opens its project page. */
-export function ProjectsGrid({ projects }: { projects: ProjectListItem[] }) {
+/** Videos as cards; each opens its video (the clip editor for one clip). */
+export function ProjectsGrid({
+  projects,
+  canDelete = false,
+}: {
+  projects: ProjectListItem[]
+  canDelete?: boolean
+}) {
   return (
     <ul
-      aria-label="Projects"
+      aria-label="Videos"
       className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
     >
       {projects.map((project) => (
         <li key={project.id} className="flex">
           <Card className="relative w-full gap-0 overflow-hidden pt-0 transition-shadow hover:shadow-md has-[a:focus-visible]:ring-3 has-[a:focus-visible]:ring-ring/50">
+            {canDelete && (
+              // Above the card's link (it covers the whole card).
+              <div className="absolute top-2 right-2 z-10">
+                <DeleteProjectButton
+                  projectId={project.id}
+                  name={project.name}
+                  compact
+                  afterDelete="refresh"
+                />
+              </div>
+            )}
             <div className="flex aspect-video items-center justify-center bg-muted">
               {project.posterUrl ? (
                 // Signed, short-lived storage URL (see brand-kits LogoField).
@@ -41,7 +59,7 @@ export function ProjectsGrid({ projects }: { projects: ProjectListItem[] }) {
               <CardTitle className="line-clamp-2 leading-snug break-words">
                 {/* The link covers the whole card. */}
                 <Link
-                  href={`/projects/${project.id}`}
+                  href={`/videos/${project.id}`}
                   className="outline-none after:absolute after:inset-0"
                 >
                   {project.name}

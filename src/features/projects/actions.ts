@@ -9,6 +9,7 @@ import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
 
 import {
+  appendClipSchema,
   createProjectSchema,
   projectIdSchema,
   renameProjectSchema,
@@ -29,7 +30,7 @@ function invalid(error: z.ZodError, message: string) {
 }
 
 function refreshProjects() {
-  revalidatePath("/projects")
+  revalidatePath("/videos")
   revalidatePath("/dashboard")
 }
 
@@ -38,7 +39,7 @@ export async function createProject(
 ): Promise<Result<{ projectId: string }>> {
   try {
     const parsed = createProjectSchema.safeParse(input)
-    if (!parsed.success) throw invalid(parsed.error, "Check the project.")
+    if (!parsed.success) throw invalid(parsed.error, "Check the video.")
     const { workspace } = await requireWorkspaceAccess("content:create")
     const { id } = await service.createProject(workspace.id, parsed.data)
     refreshProjects()
@@ -70,7 +71,7 @@ export async function renameProject(input: unknown): Promise<Result<null>> {
 export async function deleteProject(input: unknown): Promise<Result<null>> {
   try {
     const parsed = projectIdSchema.safeParse(input)
-    if (!parsed.success) throw invalid(parsed.error, "Check the project.")
+    if (!parsed.success) throw invalid(parsed.error, "Check the video.")
     const { workspace } = await requireWorkspaceAccess("content:edit")
     await service.deleteProject(workspace.id, parsed.data.projectId)
     refreshProjects()
@@ -97,6 +98,52 @@ export async function saveProjectClips(
     // already shows this.
     refreshProjects()
     return ok({ version })
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+/**
+ * Adds a clip just recorded or uploaded into a video at its end. Returns
+ * the new version (the page that added it carries on from there).
+ */
+export async function appendProjectClip(
+  input: unknown
+): Promise<Result<{ version: number }>> {
+  try {
+    const parsed = appendClipSchema.safeParse(input)
+    if (!parsed.success) throw invalid(parsed.error, "Check the clip.")
+    const { workspace } = await requireWorkspaceAccess("content:edit")
+    const version = await service.appendClip(
+      workspace.id,
+      parsed.data.projectId,
+      parsed.data.footageId
+    )
+    refreshProjects()
+    return ok({ version })
+  } catch (error) {
+    unstable_rethrow(error)
+    return err(toResultError(error))
+  }
+}
+
+/**
+ * Where each of a video's clips is in processing (cheap: read by the page
+ * every few seconds while any clip is still working).
+ */
+export async function projectClipStatuses(
+  input: unknown
+): Promise<Result<{ statuses: string[] }>> {
+  try {
+    const parsed = projectIdSchema.safeParse(input)
+    if (!parsed.success) throw invalid(parsed.error, "Check the video.")
+    const { workspace } = await requireWorkspaceAccess("workspace:view")
+    const statuses = await service.clipStatuses(
+      workspace.id,
+      parsed.data.projectId
+    )
+    return ok({ statuses })
   } catch (error) {
     unstable_rethrow(error)
     return err(toResultError(error))

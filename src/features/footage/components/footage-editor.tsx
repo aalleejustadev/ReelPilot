@@ -9,6 +9,7 @@ import {
   PaletteIcon,
   MaximizeIcon,
   PauseIcon,
+  PlusIcon,
   PlayIcon,
   Redo2Icon,
   ScissorsIcon,
@@ -282,6 +283,7 @@ export function FootageEditor({
   kitLogoUrl,
   kitSite,
   backTo = null,
+  video = null,
 }: {
   clip: FootageDetail
   videoUrl: string
@@ -299,6 +301,12 @@ export function FootageEditor({
   kitSite: string
   /** Opened from a project: back goes there instead of the footage. */
   backTo?: { href: string; label: string } | null
+  /**
+   * Edited as part of a video. A one-clip video is edited right here, so
+   * it's titled with the video's name; "Add clip" opens its clip list.
+   * "Delete clip" is hidden (it would delete the video's recording).
+   */
+  video?: { name: string; single: boolean; addClipHref: string } | null
 }) {
   const playerRef = useRef<PlayerRef>(null)
   const [links, renewLinks] = useStableLinks(clip.id, {
@@ -1240,9 +1248,11 @@ export function FootageEditor({
           </span>
         </LinkButton>
         <div className="flex min-w-0 flex-col leading-tight">
-          <h1 className="truncate text-sm font-semibold">{clip.name}</h1>
+          <h1 className="truncate text-sm font-semibold">
+            {video?.single ? video.name : clip.name}
+          </h1>
           <p className="truncate font-mono text-xs text-muted-foreground">
-            {kitName}
+            {video?.single ? clip.name : kitName}
             {clip.durationMs !== null &&
               ` · ${formatDuration(clip.durationMs)}`}
           </p>
@@ -1318,7 +1328,17 @@ export function FootageEditor({
               />
             </>
           )}
-          {!readOnly && (
+          {!readOnly && video && (
+            <LinkButton
+              href={video.addClipHref}
+              variant="outline"
+              icon={<PlusIcon />}
+              aria-label="Add clip"
+            >
+              <span className="hidden sm:inline">Add clip</span>
+            </LinkButton>
+          )}
+          {!readOnly && !video && (
             <DeleteClipButton
               footageId={clip.id}
               clipName={clip.name}

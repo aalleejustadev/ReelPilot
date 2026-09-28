@@ -12,7 +12,7 @@ import {
  */
 export const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
-  { title: "Projects", href: "/projects", icon: ClapperboardIcon },
+  { title: "Videos", href: "/videos", icon: ClapperboardIcon },
   { title: "Brand kits", href: "/brand-kits", icon: PaletteIcon },
   { title: "Presenters", href: "/presenters", icon: UsersIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
@@ -24,7 +24,7 @@ const pageTitles: { prefix: string; title: string }[] = [
   { prefix: "/settings/workspace", title: "Workspace" },
   { prefix: "/settings", title: "Settings" },
   { prefix: "/dashboard", title: "Dashboard" },
-  { prefix: "/projects", title: "Projects" },
+  { prefix: "/videos", title: "Videos" },
   { prefix: "/brand-kits", title: "Brand kits" },
   { prefix: "/presenters", title: "Presenters" },
 ]

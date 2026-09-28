@@ -11,7 +11,8 @@ import { uploadToStorage } from "./upload-to-storage"
 /**
  * The whole upload, for files and recordings: ask for a signed upload,
  * send the file to storage, then confirm so the worker starts. If sending
- * fails, the half-made clip is removed. Returns an error message or null.
+ * fails, the half-made clip is removed. Returns the new clip's id, or an
+ * error message.
  */
 export async function sendFootage(input: {
   kitId: string
@@ -25,7 +26,7 @@ export async function sendFootage(input: {
   recording?: RecordingInfo
   onProgress: (fraction: number) => void
   signal?: AbortSignal
-}): Promise<string | null> {
+}): Promise<{ footageId: string } | { error: string }> {
   const requested = await requestFootageUpload({
     kitId: input.kitId,
     name: input.name,
@@ -33,7 +34,7 @@ export async function sendFootage(input: {
     contentType: input.contentType,
     source: input.source,
   })
-  if (!requested.ok) return requested.error.message
+  if (!requested.ok) return { error: requested.error.message }
   const { footageId, upload } = requested.data
 
   try {
@@ -44,9 +45,11 @@ export async function sendFootage(input: {
   } catch (error) {
     await deleteFootage(footageId)
     if (error instanceof DOMException && error.name === "AbortError") {
-      return "Upload cancelled."
+      return { error: "Upload cancelled." }
     }
-    return "The upload was interrupted. Check your connection and try again."
+    return {
+      error: "The upload was interrupted. Check your connection and try again.",
+    }
   }
 
   const completed = await completeFootageUpload({
@@ -54,5 +57,5 @@ export async function sendFootage(input: {
     recordedMarksMs: input.recordedMarksMs ?? [],
     recording: input.recording,
   })
-  return completed.ok ? null : completed.error.message
+  return completed.ok ? { footageId } : { error: completed.error.message }
 }

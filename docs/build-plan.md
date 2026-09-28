@@ -43,7 +43,7 @@ Founders need polished product videos all the time — launches, feature announc
 1. Visitor pastes their app URL on the landing page → we record a short tour of the site and hand back an edited, watermarked preview (no account).
 2. Signs up (Google / GitHub / email) and creates a **brand kit** (colours, fonts, logo — drafted from the site).
 3. Adds **footage**: records their app or uploads recordings; the analysis finds key moments.
-4. Starts a **project**, adds clips, picks a **template** or lets the AI make the first cut, and refines each clip in the editor.
+4. Starts a **video** and records or uploads straight into it (or picks clips it already has). A one-clip video opens right in the editor; "Add clip" joins more, one after another. A **template** or the AI makes the first cut; the owner refines it.
 5. **Exports** an MP4 or **shares** a public link.
 
 ---
@@ -61,7 +61,7 @@ Founders need polished product videos all the time — launches, feature announc
 - **Brand kits:** colours, fonts, logo, drafted from a URL. ✅
 - **Footage:** upload or in-browser recording, key moments, smart analysis. ✅
 - **Motion studio:** camera, cuts/speed/transitions, text, motion graphics, layouts, lens, AI director, full-screen preview. ✅
-- **Projects:** a video made of clips in order, joined by transitions; versioned saves. ✅ (M4)
+- **Videos** (projects in code): one or more clips in order, joined by transitions; one-clip videos open straight in the editor; versioned saves. ✅ (M4)
 - **Export & share:** MP4 in each shape; a public share link anyone can watch, revocable. (M5)
 - **Templates & AI first cut.** (M6)
 - **Try-it:** URL → recorded site tour → edited preview → sign-up. (M7)
@@ -155,8 +155,8 @@ reelpilot/
 │   │   │   ├── sign-in/page.tsx
 │   │   │   └── sign-up/page.tsx
 │   │   ├── (app)/                    # app shell: sidebar, top bar
-│   │   │   ├── dashboard/page.tsx        # recent projects
-│   │   │   ├── projects/page.tsx         # M4
+│   │   │   ├── dashboard/page.tsx        # recent videos
+│   │   │   ├── videos/page.tsx           # M4
 │   │   │   ├── brand-kits/
 │   │   │   │   ├── page.tsx
 │   │   │   │   └── [kitId]/{page,footage/page}.tsx
@@ -164,7 +164,7 @@ reelpilot/
 │   │   │   └── settings/{profile,workspace}/page.tsx
 │   │   ├── (editor)/                 # full-screen editors, no sidebar
 │   │   │   ├── brand-kits/[kitId]/footage/[footageId]/page.tsx   # clip editor
-│   │   │   └── projects/[projectId]/page.tsx                     # project page (M4)
+│   │   │   └── videos/[videoId]/page.tsx                         # a video's clips (M4)
 │   │   ├── v/[token]/page.tsx        # public share link (M5)
 │   │   └── api/auth/[...all]/route.ts    # Better Auth
 │   ├── features/
@@ -173,7 +173,7 @@ reelpilot/
 │   │   ├── brand-kits/       # extraction, visual identity
 │   │   ├── footage/          # upload, recording, analysis, the clip editor (motion studio)
 │   │   ├── presenters/       # stock library (frozen)
-│   │   ├── projects/         # clips joined into a video (M4)
+│   │   ├── projects/         # videos: clips joined into one (M4; "videos" in the UI)
 │   │   ├── exports/          # MP4 export jobs and share links (M5)
 │   │   └── try-it/           # anonymous URL → recorded tour → preview (M7)
 │   ├── worker/               # our own job worker: pg-boss + Remotion + Kokoro (own Dockerfile)
@@ -255,12 +255,15 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 ### 7.5 presenters (built in M3, frozen)
 Stock presenters (a still portrait + a Kokoro voice) exist from M3. No further presenter work is planned in V1.
 
-### 7.14 projects (M4 ✅)
-- **Purpose:** A video: a brand kit's clips in order, each played with its own edit (the motion studio's presentation and camera shots), joined by transitions.
-- **Where:** Projects in the sidebar and on the dashboard (recent projects); `/projects` lists them; `/projects/[projectId]` is the full-screen project page. A project belongs to one brand kit and uses its footage, fonts, colours and logo.
-- **Project page:** the whole video playing (`ProjectStage`, the composition M5 exports) with play/stop, a scrubber, full screen and 16:9 / 9:16 / 1:1; a clip strip to add (from the kit's ready footage), remove and reorder clips (buttons or drag), a transition on every join (cut, push, whip, zoom through, blur dissolve, circle reveal); "Edit clip" opens the clip editor, whose back link returns to the project.
-- **Versioned saves:** projects and clip edits carry a version; a save must name the version it started from, so a stale tab gets "changed somewhere else — reload" instead of overwriting newer work.
-- **Acceptance:** create, rename, delete; add, reorder, remove clips and set transitions, kept after a reload; the project plays through its joins; a stale tab can't overwrite.
+### 7.14 videos — "projects" in code (M4 ✅)
+- **Purpose:** A video: one or more of a brand kit's clips in order, each played with its own edit (the motion studio's presentation and camera shots), joined by transitions. Owner decision (2026-09-28): projects stay invisible — users only ever see **videos**.
+- **Where:** Videos in the sidebar; the dashboard shows recent videos; `/videos` lists them (delete from a card); `/videos/[videoId]` is a video. A video belongs to one brand kit and uses its footage, fonts, colours and logo.
+- **Flow:** "New video" (a name is optional: "Untitled video"; the brand kit) → an empty video offering **Record your screen**, **Upload video** and **Choose from footage**. A clip recorded or uploaded here joins the video at once and plays once processed (the page checks the clips' status every few seconds and refreshes once one changes).
+- **One clip:** the video opens straight in the clip editor — titled with the video's name, back to Videos, with **Add clip** (which opens its clip list); "Delete clip" is hidden there (it would delete the video's recording).
+- **Two or more clips:** `/videos/[videoId]` is the clip list: the whole video playing (`ProjectStage`, the composition M5 exports) with play/stop, a scrubber, full screen and shapes; a strip to record, upload or choose more, remove and reorder clips (buttons or drag), a transition on every join (cut, push, whip, zoom through, blur dissolve, circle reveal); "Edit clip" and back; rename and delete.
+- **Versioned saves:** videos and clip edits carry a version; a save must name the version it started from, so a stale tab gets "changed somewhere else — reload" instead of overwriting newer work.
+- **The Footage tab** on a brand kit stays the library: uploads there don't create videos.
+- **Acceptance:** start a video, record or upload into it and edit it right away; add clips, reorder, set transitions, kept after a reload; it plays through its joins; delete from its card; a stale tab can't overwrite.
 
 ### 7.15 export & share (M5)
 - **Export:** "Export MP4" renders the project (or a single clip) in the chosen shape — 16:9, 9:16, 1:1, 4:5 — at 1080p in the worker with Remotion, reusing the preview's compositions; progress on the page, then download.
@@ -424,8 +427,8 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
-- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Projects, Brand kits, Presenters, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
-- **Editors** (clip editor, project page) are full screen without the sidebar: a top bar (back, name, save state, actions), the stage on `--projector`, a transport, and the timeline or clip strip below.
+- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Videos, Brand kits, Presenters, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
+- **Editors** (clip editor, a video's clip list) are full screen without the sidebar: a top bar (back, name, save state, actions), the stage on `--projector`, a transport, and the timeline or clip strip below.
 - **Landing:** left-aligned hero with the URL input (try-it); to the right, a player looping a real edited video; below, one before/after (raw screen recording → edited video).
 
 ```
@@ -441,12 +444,13 @@ Landing (desktop)
 │  raw screen recording  ──▶  edited video (before/after)   │
 └───────────────────────────────────────────────────────────┘
 
-Project page
+A video's clips (two or more)
 ┌───────────────────────────────────────────────────────────┐
-│ ← Projects   Launch video ✎            Saved   Delete     │
+│ ← Videos   Launch video ✎            Saved   Delete video  │
 │                      stage (player)                        │
 │ ▶ ■ ───────●────────────────  0:12.4 / 0:28.0  ⛶ 16:9 9:16│
-│ Clips  [1 Intro] Blur ▾ [2 Feature] Cut ▾ [3 Pricing] + Add│
+│ Clips  [1 Intro] Blur ▾ [2 Feature] Cut ▾ [3 Pricing]      │
+│              [Record your screen] [Upload video] [Choose…] │
 └───────────────────────────────────────────────────────────┘
 ```
 
@@ -483,7 +487,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 - Plain verbs, sentence case, no filler. A button says what happens: "Export MP4", then the toast says "Exporting your video."
 - Name things by what users know: "ads," "hooks," "presenter," "footage" — not "variants payload" or "segment hash."
 - Errors say what happened and what to do: "Your footage is longer than 10 minutes. Trim it or upload a shorter clip."
-- Empty states invite action: "No projects yet. Start a project, then add clips from a brand kit's footage."
+- Empty states invite action: "No videos yet. Start a video, then record or upload your app."
 
 ✏️ Owner notes (design system):
 >
@@ -516,7 +520,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5); frozen after the direction change |
 | M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
 | M3c ✅ | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **done 2026-09-27** (see 14.7) |
-| M4 ✅ | Projects | projects (§7.14), versioned saves, dashboard | Clips joined into one video; stale tabs can't overwrite — **done 2026-09-28** (see 14.8) |
+| M4 ✅ | Videos | projects in code (§7.14), versioned saves, dashboard | Record or upload into a video and edit it; clips joined with transitions; stale tabs can't overwrite — **done 2026-09-28** (see 14.8) |
 | M5 | Export & share | export jobs (Remotion renderer in the worker), share links (§7.15) | Download an MP4 in any shape; share a public link |
 | M6 | Templates | templates + AI first cut (§7.16) | One click from clips to a finished-looking video |
 | M7 | Try-it | try-it (§7.1) | Anonymous URL → recorded tour → edited preview → sign-up |
@@ -657,6 +661,8 @@ Projects (§7.14), after the owner's direction change to a video editor.
 | Accessible | axe on `/projects` and the project page (empty and filled); every control named ("Move Feature tour earlier", "Transition into clip 2"); Edit is a real link; Shift+arrows jump 1s on scrubbers |
 | Responsive | project page and dialogs at 375px (mobile e2e) |
 | Playwright | make a project from two clips, join, reorder, play through, reload, edit and back, rename, list, delete (desktop + mobile); two tabs: stale project and clip saves get the reload dialog (desktop) — 144 e2e checks in the suite |
+
+Reworked the same day (owner: "do we need projects?"): projects became invisible — **Videos** everywhere, record/upload straight into a video (clips may join while processing), one-clip videos open in the editor with "Add clip", delete from a card. A latent build issue surfaced and was fixed: `global-error` declared its own Geist font, so Turbopack emitted a second Geist stylesheet that every page preloaded unused (a console warning on every page); both now share `src/app/fonts.ts`.
 
 Also in M4: shared player hooks (Space, full screen) used by both editors; a browser-safe `@/features/footage/client` entry (the index exports server queries); the clip editor's "Saved" now waits for in-flight saves (a reload could lose the last change); a project join checked frame by frame on the GPU (no flashes).
 

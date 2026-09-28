@@ -20,6 +20,7 @@ const clipFields = {
   id: true,
   name: true,
   status: true,
+  errorMessage: true,
   durationMs: true,
   width: true,
   height: true,
@@ -40,12 +41,18 @@ function editedLength(presentation: Presentation, durationMs: number) {
   return Math.round(outputDuration(presentation.edit, durationMs))
 }
 
-/** A project's name, for a link back to it (null if not in the workspace). */
+/**
+ * A project's name and clip count, for the clip editor opened from it
+ * (null if not in the workspace).
+ */
 export async function getProjectName(workspaceId: string, projectId: string) {
-  return db.project.findFirst({
+  const project = await db.project.findFirst({
     where: { id: projectId, workspaceId },
-    select: { id: true, name: true },
+    select: { id: true, name: true, _count: { select: { clips: true } } },
   })
+  return project
+    ? { id: project.id, name: project.name, clipCount: project._count.clips }
+    : null
 }
 
 /** The workspace's projects, most recently changed first. */
@@ -131,15 +138,21 @@ export async function getProject(workspaceId: string, projectId: string) {
         return shot ? [{ atMs: marker.atMs, shot }] : []
       })
       const [videoUrl, posterUrl] = await Promise.all([
-        clip.videoKey ? signedFileUrl(clip.videoKey, hour) : null,
+        clip.videoKey && clip.status === "READY"
+          ? signedFileUrl(clip.videoKey, hour)
+          : null,
         clip.posterKey ? signedFileUrl(clip.posterKey, hour) : null,
       ])
+      const ready = clip.status === "READY"
       return {
         footageId: clip.id,
         name: clip.name,
+        status: clip.status,
+        errorMessage: clip.errorMessage,
         transition: storedTransition(entry.transition),
         durationMs: clip.durationMs ?? 1,
-        lengthMs: editedLength(presentation, clip.durationMs ?? 1),
+        // Plays once processed; until then it takes no time.
+        lengthMs: ready ? editedLength(presentation, clip.durationMs ?? 1) : 0,
         videoWidth: clip.width ?? 1920,
         videoHeight: clip.height ?? 1080,
         presentation,

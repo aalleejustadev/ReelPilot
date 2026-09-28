@@ -29,7 +29,7 @@ import { Spinner } from "@/shared/ui/spinner"
 
 import { createProject } from "../actions"
 
-/** "New project": a name and the brand kit it uses, then its page. */
+/** "New video": a name (optional) and the brand kit it uses, then its page. */
 export function NewProjectButton({
   kits,
   defaultKitId,
@@ -50,7 +50,7 @@ export function NewProjectButton({
     startCreate(async () => {
       const result = await createProject({ name, kitId })
       if (result.ok) {
-        router.push(`/projects/${result.data.projectId}`)
+        router.push(`/videos/${result.data.projectId}`)
         return
       }
       setErrors(result.error.fieldErrors ?? { form: [result.error.message] })
@@ -68,7 +68,7 @@ export function NewProjectButton({
     >
       <DialogTrigger render={<Button type="button" variant={variant} />}>
         <PlusIcon data-icon="inline-start" />
-        New project
+        New video
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <form
@@ -79,9 +79,9 @@ export function NewProjectButton({
           }}
         >
           <DialogHeader>
-            <DialogTitle>New project</DialogTitle>
+            <DialogTitle>New video</DialogTitle>
             <DialogDescription>
-              A video made from a brand kit’s clips. You add the clips next.
+              Next, record or upload your app — or pick clips you already have.
             </DialogDescription>
           </DialogHeader>
           <FieldGroup>
@@ -91,7 +91,7 @@ export function NewProjectButton({
                 id="project-name"
                 value={name}
                 maxLength={projectLimits.name}
-                placeholder="Launch video"
+                placeholder="Untitled video"
                 autoFocus
                 aria-invalid={errors.name ? true : undefined}
                 onChange={(event) => setName(event.target.value)}
@@ -125,7 +125,7 @@ export function NewProjectButton({
           <DialogFooter>
             <Button type="submit" disabled={isCreating}>
               {isCreating && <Spinner data-icon="inline-start" />}
-              Create project
+              Create video
             </Button>
           </DialogFooter>
         </form>

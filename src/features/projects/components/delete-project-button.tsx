@@ -24,9 +24,15 @@ import { deleteProject } from "../actions"
 export function DeleteProjectButton({
   projectId,
   name,
+  compact = false,
+  afterDelete = "list",
 }: {
   projectId: string
   name: string
+  /** An icon-only button (on a card). */
+  compact?: boolean
+  /** Go to the videos list, or (already there) refresh it. */
+  afterDelete?: "list" | "refresh"
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -36,9 +42,10 @@ export function DeleteProjectButton({
     startDelete(async () => {
       const result = await deleteProject({ projectId })
       if (result.ok) {
-        toast.add({ type: "success", title: "Project deleted" })
+        toast.add({ type: "success", title: "Video deleted" })
         setOpen(false)
-        router.push("/projects")
+        if (afterDelete === "list") router.push("/videos")
+        else router.refresh()
       } else {
         toast.add({ type: "error", title: result.error.message })
       }
@@ -52,18 +59,23 @@ export function DeleteProjectButton({
     >
       <AlertDialogTrigger
         render={
-          <Button type="button" variant="outline" aria-label="Delete project" />
+          <Button
+            type="button"
+            variant={compact ? "secondary" : "outline"}
+            size={compact ? "icon-sm" : "default"}
+            aria-label={compact ? `Delete ${name}` : "Delete video"}
+          />
         }
       >
-        <TrashIcon data-icon="inline-start" />
-        <span className="hidden sm:inline">Delete project</span>
+        <TrashIcon data-icon={compact ? undefined : "inline-start"} />
+        {!compact && <span className="hidden sm:inline">Delete video</span>}
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>Delete {name}?</AlertDialogTitle>
           <AlertDialogDescription>
-            This deletes the project. Its clips and their edits stay in the
-            brand kit’s footage. It can’t be undone.
+            This deletes the video. Its clips and their edits stay in the brand
+            kit’s footage. It can’t be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -74,7 +86,7 @@ export function DeleteProjectButton({
             disabled={isDeleting}
           >
             {isDeleting && <Spinner data-icon="inline-start" />}
-            Delete project
+            Delete video
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

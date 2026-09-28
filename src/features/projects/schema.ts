@@ -7,11 +7,16 @@ const idSchema = z.string().min(1).max(64)
 const nameSchema = z
   .string()
   .trim()
-  .min(1, "Give the project a name.")
+  .min(1, "Give the video a name.")
   .max(projectLimits.name, `Keep it under ${projectLimits.name} characters.`)
 
 export const createProjectSchema = z.object({
-  name: nameSchema,
+  // Optional when starting a video: renamed any time.
+  name: z
+    .string()
+    .trim()
+    .max(projectLimits.name, `Keep it under ${projectLimits.name} characters.`)
+    .transform((name) => name || "Untitled video"),
   kitId: idSchema,
 })
 
@@ -34,6 +39,11 @@ export const saveProjectClipsSchema = z.object({
     .array(projectClipSchema)
     .max(
       projectLimits.clips,
-      `A project holds up to ${projectLimits.clips} clips.`
+      `A video holds up to ${projectLimits.clips} clips.`
     ),
+})
+
+export const appendClipSchema = z.object({
+  projectId: idSchema,
+  footageId: idSchema,
 })

@@ -20,10 +20,13 @@ export function FootageUploader({
   kitId,
   maxBytes,
   disabled,
+  onUploaded,
 }: {
   kitId: string
   maxBytes: number
   disabled: boolean
+  /** The clip is in storage and processing (e.g. to add it to a video). */
+  onUploaded?: (footageId: string) => Promise<void> | void
 }) {
   const router = useRouter()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -50,7 +53,7 @@ export function FootageUploader({
 
     const controller = new AbortController()
     setUpload({ name: file.name, progress: 0, controller })
-    const error = await sendFootage({
+    const sent = await sendFootage({
       kitId,
       file,
       contentType: type,
@@ -61,9 +64,10 @@ export function FootageUploader({
         setUpload((current) => current && { ...current, progress }),
     })
     setUpload(null)
-    if (error) {
-      toast.add({ type: "error", title: error })
+    if ("error" in sent) {
+      toast.add({ type: "error", title: sent.error })
     } else {
+      await onUploaded?.(sent.footageId)
       toast.add({
         type: "success",
         title: "Clip uploaded",

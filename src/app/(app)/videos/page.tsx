@@ -18,9 +18,9 @@ import {
 } from "@/shared/ui/empty"
 import { LinkButton } from "@/shared/ui/link-button"
 
-export const metadata: Metadata = { title: "Projects" }
+export const metadata: Metadata = { title: "Videos" }
 
-export default async function ProjectsPage() {
+export default async function VideosPage() {
   const { workspace, role } = await requireWorkspaceAccess("workspace:view")
   const [projects, kits] = await Promise.all([
     listProjects(workspace.id),
@@ -33,10 +33,10 @@ export default async function ProjectsPage() {
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex flex-col gap-2">
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            Projects
+            Videos
           </h1>
           <p className="text-muted-foreground">
-            Videos made from your clips, each played with its own edit.
+            Record your app, and it turns into a polished video.
           </p>
         </div>
         {/* With no projects the empty state offers it instead. */}
@@ -46,20 +46,23 @@ export default async function ProjectsPage() {
       </div>
 
       {projects.length > 0 ? (
-        <ProjectsGrid projects={projects} />
+        <ProjectsGrid
+          projects={projects}
+          canDelete={can(role, "content:edit")}
+        />
       ) : (
         <Empty className="flex-1 border">
           <EmptyHeader>
             <EmptyMedia variant="icon">
               {kits.length > 0 ? <ClapperboardIcon /> : <PaletteIcon />}
             </EmptyMedia>
-            <EmptyTitle>No projects yet</EmptyTitle>
+            <EmptyTitle>No videos yet</EmptyTitle>
             <EmptyDescription>
               {kits.length === 0
-                ? "Projects use a brand kit’s footage, fonts and colours. Create a brand kit first."
+                ? "Videos use a brand kit’s colours, fonts and logo. Create a brand kit first."
                 : canCreate
-                  ? "Start a project, then add clips from a brand kit’s footage."
-                  : "An owner or editor can start a project."}
+                  ? "Start a video, then record or upload your app."
+                  : "An owner or editor can start a video."}
             </EmptyDescription>
           </EmptyHeader>
           {canCreate && (

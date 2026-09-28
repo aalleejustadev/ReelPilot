@@ -34,19 +34,28 @@ export default async function FootageEditorPage({
   searchParams,
 }: PageProps<"/brand-kits/[kitId]/footage/[footageId]">) {
   const { kitId, footageId } = await params
-  const { project: projectId } = await searchParams
+  const { video: videoId } = await searchParams
   const { workspace, role } = await requireWorkspaceAccess("workspace:view")
   const [kit, clip, project] = await Promise.all([
     getBrandKit(workspace.id, kitId),
     getFootage(workspace.id, footageId),
-    typeof projectId === "string"
-      ? getProjectName(workspace.id, projectId)
-      : null,
+    typeof videoId === "string" ? getProjectName(workspace.id, videoId) : null,
   ])
   if (!kit || !clip || clip.brandKitId !== kitId) notFound()
-  // Opened from a project's clip strip: back returns to it.
+  // Edited as part of a video. A one-clip video lives here: back goes to
+  // Videos. From a longer video's clip list, back returns to that list.
+  const single = project?.clipCount === 1
   const backTo = project
-    ? { href: `/projects/${project.id}`, label: project.name }
+    ? single
+      ? { href: "/videos", label: "Videos" }
+      : { href: `/videos/${project.id}`, label: project.name }
+    : null
+  const video = project
+    ? {
+        name: project.name,
+        single,
+        addClipHref: `/videos/${project.id}?clips=1`,
+      }
     : null
 
   const canEdit = can(role, "content:edit")
@@ -103,6 +112,7 @@ export default async function FootageEditorPage({
           kitLogoUrl={await logoUrlFor(kit.logoKey)}
           kitSite={siteLabelFor(kit.url)}
           backTo={backTo}
+          video={video}
         />
       )
     }

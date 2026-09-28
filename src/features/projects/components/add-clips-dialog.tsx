@@ -68,7 +68,7 @@ export function AddClipsDialog({
     >
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>Add clips</DialogTitle>
+          <DialogTitle>Choose from footage</DialogTitle>
           <DialogDescription>
             Pick clips from {kitName}’s footage, in the order they should play.
             Each keeps its own edit.
@@ -140,7 +140,7 @@ export function AddClipsDialog({
         )}
         <DialogFooter className="sm:justify-between">
           <LinkButton href={`/brand-kits/${kitId}/footage`} variant="ghost">
-            Record or upload footage
+            Open the footage library
           </LinkButton>
           <Button
             type="button"

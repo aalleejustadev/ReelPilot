@@ -124,11 +124,16 @@ describe.runIf(hasDatabase)("projects", () => {
     expect(await db.project.count({ where: { id: projectId } })).toBe(0)
   })
 
-  it("needs a name and one of the workspace's kits", async () => {
-    expect(await actions.createProject({ name: " ", kitId })).toMatchObject({
-      ok: false,
-      error: { code: "VALIDATION", fieldErrors: { name: expect.any(Array) } },
-    })
+  it("names an unnamed video, and needs one of the workspace's kits", async () => {
+    const created = await actions.createProject({ name: " ", kitId })
+    if (!created.ok) throw new Error(created.error.message)
+    expect(
+      (
+        await db.project.findUniqueOrThrow({
+          where: { id: created.data.projectId },
+        })
+      ).name
+    ).toBe("Untitled video")
     expect(
       await actions.createProject({ name: "X", kitId: "not-a-kit" })
     ).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } })
@@ -193,22 +198,66 @@ describe.runIf(hasDatabase)("projects", () => {
     expect(await db.projectClip.count({ where: { projectId } })).toBe(1)
   })
 
-  it("only takes this kit's ready clips", async () => {
+  it("only takes this kit's clips (still processing is fine)", async () => {
     const projectId = await newProject()
     const elsewhere = await clip(otherKitId)
     const processing = await clip(kitId, { status: "PROCESSING" })
-    for (const footageId of [elsewhere, processing, "missing"]) {
+    expect(
+      await actions.saveProjectClips({
+        projectId,
+        baseVersion: 0,
+        clips: [{ footageId: processing, transition: cut }],
+      })
+    ).toEqual({ ok: true, data: { version: 1 } })
+    for (const footageId of [elsewhere, "missing"]) {
       expect(
         await actions.saveProjectClips({
           projectId,
-          baseVersion: 0,
+          baseVersion: 1,
           clips: [{ footageId, transition: cut }],
         })
       ).toMatchObject({ ok: false, error: { code: "VALIDATION" } })
     }
     expect(
       (await db.project.findUniqueOrThrow({ where: { id: projectId } })).version
-    ).toBe(0)
+    ).toBe(1)
+    // A clip still processing is in the video but plays (and counts) once ready.
+    const video = await queries.getProject(workspaceId, projectId)
+    expect(video?.clips[0]).toMatchObject({
+      status: "PROCESSING",
+      lengthMs: 0,
+      videoUrl: null,
+    })
+  })
+
+  it("adds a clip recorded into a video at its end", async () => {
+    const projectId = await newProject()
+    await actions.saveProjectClips({
+      projectId,
+      baseVersion: 0,
+      clips: [{ footageId: clipA, transition: blur }],
+    })
+    const recorded = await clip(kitId, { status: "UPLOADING", name: "Take 2" })
+    expect(
+      await actions.appendProjectClip({ projectId, footageId: recorded })
+    ).toEqual({ ok: true, data: { version: 2 } })
+    expect(
+      (await queries.getProject(workspaceId, projectId))?.clips.map((c) => [
+        c.name,
+        c.transition.kind,
+      ])
+    ).toEqual([
+      ["Intro", "blur"],
+      ["Take 2", "cut"],
+    ])
+    expect(
+      await actions.appendProjectClip({
+        projectId,
+        footageId: await clip(otherKitId),
+      })
+    ).toMatchObject({ ok: false, error: { code: "NOT_FOUND" } })
+    const names = await queries.getProjectName(workspaceId, projectId)
+    expect(names).toMatchObject({ clipCount: 2 })
   })
 
   it("lists projects with their length and clip count, newest change first", async () => {
