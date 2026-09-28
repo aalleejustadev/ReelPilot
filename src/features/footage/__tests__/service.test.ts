@@ -1,7 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import type { Plan } from "@/shared/db"
-
 // Needs a database; skipped when DATABASE_URL is unset.
 const hasDatabase = Boolean(process.env.DATABASE_URL)
 
@@ -22,8 +20,8 @@ describe.runIf(hasDatabase)("footage service", () => {
     workspaceIds.length = 0
   })
 
-  async function kitIn(plan: Plan = "FREE") {
-    const workspace = await db.workspace.create({ data: { name: "T", plan } })
+  async function kitIn() {
+    const workspace = await db.workspace.create({ data: { name: "T" } })
     workspaceIds.push(workspace.id)
     const kit = await db.brandKit.create({
       data: {
@@ -63,19 +61,19 @@ describe.runIf(hasDatabase)("footage service", () => {
     })
   })
 
-  it("refuses files over the plan's size cap", async () => {
-    const { workspaceId, kitId } = await kitIn("FREE")
+  it("refuses files over the size cap (1 GB)", async () => {
+    const { workspaceId, kitId } = await kitIn()
 
     await expect(
       service.createFootageUpload(
         workspaceId,
-        upload(kitId, { sizeBytes: 300 * 1024 * 1024 })
+        upload(kitId, { sizeBytes: 1024 * 1024 * 1024 + 1 })
       )
     ).rejects.toMatchObject({ code: "VALIDATION" })
   })
 
-  it("holds the clips-per-kit limit under parallel uploads", async () => {
-    const { workspaceId, kitId } = await kitIn("FREE") // 5 clips per kit
+  it("takes any number of clips in a kit (free for now)", async () => {
+    const { workspaceId, kitId } = await kitIn()
 
     const results = await Promise.allSettled(
       Array.from({ length: 7 }, () =>
@@ -83,8 +81,8 @@ describe.runIf(hasDatabase)("footage service", () => {
       )
     )
 
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(5)
-    expect(await db.footage.count({ where: { brandKitId: kitId } })).toBe(5)
+    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(7)
+    expect(await db.footage.count({ where: { brandKitId: kitId } })).toBe(7)
   })
 
   it("never creates a clip in another workspace's kit", async () => {

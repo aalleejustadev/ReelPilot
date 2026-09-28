@@ -203,14 +203,14 @@ describe.runIf(hasStorage)("processFootage job", () => {
     })
   })
 
-  it("fails a clip longer than the plan allows, with the plan's message", async () => {
+  it("fails a clip longer than the 10-minute cap, saying so", async () => {
     const file = join(dir, "long.mp4")
     await media.runFfmpeg(
       [
         "-f",
         "lavfi",
         "-i",
-        "color=c=blue:duration=185:size=64x64:rate=1",
+        "color=c=blue:duration=605:size=64x64:rate=1",
         "-c:v",
         "libx264",
         "-pix_fmt",
@@ -219,7 +219,7 @@ describe.runIf(hasStorage)("processFootage job", () => {
       ],
       { timeoutMs: 60_000 }
     )
-    const footageId = await clipFrom(file) // Free plan: 3 minutes
+    const footageId = await clipFrom(file)
 
     await processFootage({ footageId }, attempt)
 
@@ -227,7 +227,7 @@ describe.runIf(hasStorage)("processFootage job", () => {
       (await db.footage.findUniqueOrThrow({ where: { id: footageId } }))
         .errorMessage
     ).toBe(
-      "Your footage is longer than 3 minutes. Trim it or upload a shorter clip."
+      "Your footage is longer than 10 minutes. Trim it or upload a shorter clip."
     )
   })
 

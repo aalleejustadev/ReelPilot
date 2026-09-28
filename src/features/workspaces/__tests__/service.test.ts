@@ -38,7 +38,6 @@ describe.runIf(hasDatabase)("personal workspaces", () => {
     const { workspace, role } = await ensurePersonalWorkspace(user)
 
     expect(workspace.name).toBe("Ada’s workspace")
-    expect(workspace.plan).toBe("FREE")
     expect(workspace.personalOwnerId).toBe(user.id)
     expect(role).toBe("OWNER")
   })

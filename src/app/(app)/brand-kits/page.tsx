@@ -2,15 +2,8 @@ import { FileTextIcon, ImageIcon, PaletteIcon } from "lucide-react"
 import type { Metadata } from "next"
 import Link from "next/link"
 
-import {
-  brandKitLimit,
-  CreateKitForm,
-  listBrandKits,
-  logoUrlFor,
-} from "@/features/brand-kits"
+import { CreateKitForm, listBrandKits, logoUrlFor } from "@/features/brand-kits"
 import { can, requireWorkspaceAccess } from "@/features/workspaces"
-import { plans } from "@/shared/config/plans"
-import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert"
 import { LinkButton } from "@/shared/ui/link-button"
 import {
   Card,
@@ -35,12 +28,7 @@ export default async function BrandKitsPage() {
   const { workspace, role } = await requireWorkspaceAccess("workspace:view")
   const kits = await listBrandKits(workspace.id)
   const logos = await Promise.all(kits.map((kit) => logoUrlFor(kit.logoKey)))
-
-  const limit = brandKitLimit(workspace.plan)
-  const planName = plans[workspace.plan].name
   const canCreate = can(role, "content:create")
-  const hasRoom = kits.length < limit
-  const usage = `${kits.length} of ${limit} brand ${limit === 1 ? "kit" : "kits"} on the ${planName} plan`
 
   return (
     <div className="flex flex-1 flex-col gap-8">
@@ -144,27 +132,19 @@ export default async function BrandKitsPage() {
             })}
           </ul>
 
-          {canCreate &&
-            (hasRoom ? (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add a brand kit</CardTitle>
-                  <CardDescription>{usage}.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <CreateKitForm />
-                </CardContent>
-              </Card>
-            ) : (
-              <Alert>
-                <AlertTitle>
-                  You’ve used every brand kit on your plan
-                </AlertTitle>
-                <AlertDescription>
-                  {usage}. Delete one to add another.
-                </AlertDescription>
-              </Alert>
-            ))}
+          {canCreate && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add a brand kit</CardTitle>
+                <CardDescription>
+                  One for each product you make videos for.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <CreateKitForm />
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

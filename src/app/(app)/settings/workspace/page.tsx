@@ -1,7 +1,6 @@
 import type { Metadata } from "next"
 
 import { getCurrentWorkspace, RenameWorkspaceForm } from "@/features/workspaces"
-import { plans } from "@/shared/config/plans"
 import { Badge } from "@/shared/ui/badge"
 import {
   Card,
@@ -31,7 +30,6 @@ export default async function WorkspaceSettingsPage() {
           <Badge variant="secondary">
             You’re the {roleLabel[role].toLowerCase()}
           </Badge>
-          <Badge variant="outline">{plans[workspace.plan].name} plan</Badge>
         </div>
         <RenameWorkspaceForm currentName={workspace.name} />
       </CardContent>

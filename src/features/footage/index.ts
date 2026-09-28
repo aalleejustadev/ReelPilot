@@ -8,7 +8,7 @@ export { FootageUploader } from "./components/footage-uploader"
 export { RefreshWhileProcessing } from "./components/refresh-while-processing"
 export { ScreenRecorder } from "./components/screen-recorder"
 export { formatDuration, formatTimecode } from "./lib/format"
-export { footageLimitsFor, footageUsage } from "./lib/limits"
+export { clipLimits, footageUsage } from "./lib/limits"
 export { parseStoredShot, presentationFor } from "./lib/motion"
 export {
   clipMediaUrls,

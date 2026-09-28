@@ -84,7 +84,7 @@ export function ScreenRecorder({
   const cursor = useRef<ReturnType<typeof trackCursor> | null>(null)
   const recording = useRef<RecordingInfo | null>(null)
 
-  // Tick the timer; stop at the plan's length.
+  // Tick the timer; stop at the length cap.
   useEffect(() => {
     if (stage.name !== "recording") return
     const timer = setInterval(() => {
@@ -181,7 +181,7 @@ export function ScreenRecorder({
       if (event.data.size === 0) return
       chunks.push(event.data)
       bytes.current += event.data.size
-      // Leave headroom under the plan's size cap.
+      // Leave headroom under the size cap.
       if (bytes.current > maxBytes * 0.95) stopRecording()
     }
     rec.onstop = () => {

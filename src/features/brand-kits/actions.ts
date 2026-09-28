@@ -5,7 +5,7 @@ import { unstable_rethrow } from "next/navigation"
 import { z } from "zod"
 
 import { requireWorkspaceAccess } from "@/features/workspaces"
-import { aiLimits } from "@/shared/config/plans"
+import { aiLimits } from "@/shared/config/limits"
 import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
 import { consumeRateLimit } from "@/shared/rate-limit"
@@ -55,7 +55,6 @@ export async function createBrandKitFromUrl(
     if (!parsed.success) throw invalid(parsed.error, "Check the address.")
 
     const { workspace } = await requireWorkspaceAccess("content:create")
-    await service.assertRoomForBrandKit(workspace)
     await consumeRateLimit({
       key: `brand-kit-draft:${workspace.id}`,
       limit: aiLimits.brandKitDraftsPerDay,

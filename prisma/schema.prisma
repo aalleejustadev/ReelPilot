@@ -16,13 +16,6 @@ enum UserRole {
   ADMIN
 }
 
-enum Plan {
-  FREE
-  STARTER
-  GROWTH
-  AGENCY
-}
-
 enum MemberRole {
   OWNER
   EDITOR
@@ -115,7 +108,6 @@ model RateLimit {
 model Workspace {
   id              String   @id @default(cuid())
   name            String
-  plan            Plan     @default(FREE)
   // Set on a user's personal workspace. Unique: at most one per user, even
   // when two requests create it at once. Deleted with the user.
   personalOwnerId String?  @unique

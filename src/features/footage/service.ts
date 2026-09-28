@@ -1,11 +1,11 @@
 import "server-only"
 
-import { db, Prisma, type Plan } from "@/shared/db"
+import { db, Prisma } from "@/shared/db"
 import type { Presentation, Shot } from "@/shared/motion"
 import { AppError } from "@/shared/lib/errors"
 
 import { footageFileKey, footageFolder, originalFileName } from "./lib/keys"
-import { assertCanAddFootage, assertFootageSize } from "./lib/limits"
+import { assertFootageSize } from "./lib/limits"
 import type { FootageAnalysis } from "./lib/analysis"
 import type { MomentInsight } from "./lib/insight"
 import type { RecordingInfo } from "./lib/recording"
@@ -20,27 +20,19 @@ const footageNotFound = () =>
   )
 
 /**
- * Creates the clip row (status UPLOADING) and its storage key, if the plan
- * allows another clip of this size in the kit. The kit row is locked for the
- * check, so parallel uploads can't pass the limit together.
+ * Creates the clip row (status UPLOADING) and its storage key, if the kit is
+ * the workspace's and the file isn't over the size cap.
  */
 export async function createFootageUpload(
   workspaceId: string,
   input: RequestUploadInput
 ) {
   return db.$transaction(async (tx) => {
-    const [kit] = await tx.$queryRaw<{ plan: Plan }[]>`
-      SELECT w.plan FROM brand_kits k
-      JOIN workspaces w ON w.id = k."workspaceId"
-      WHERE k.id = ${input.kitId} AND k."workspaceId" = ${workspaceId}
-      FOR UPDATE OF k`
-    if (!kit) throw kitNotFound()
-
-    assertFootageSize(kit.plan, input.sizeBytes)
-    const clipCount = await tx.footage.count({
-      where: { brandKitId: input.kitId },
+    const kit = await tx.brandKit.count({
+      where: { id: input.kitId, workspaceId },
     })
-    assertCanAddFootage(kit.plan, clipCount)
+    if (!kit) throw kitNotFound()
+    assertFootageSize(input.sizeBytes)
 
     const created = await tx.footage.create({
       data: {
@@ -64,7 +56,7 @@ export async function createFootageUpload(
       where: { id: created.id },
       data: { originalKey },
     })
-    return { footageId: created.id, originalKey, plan: kit.plan }
+    return { footageId: created.id, originalKey }
   })
 }
 
@@ -122,7 +114,6 @@ export async function getFootageForProcessing(footageId: string) {
       brandKitId: true,
       status: true,
       originalKey: true,
-      workspace: { select: { plan: true } },
     },
   })
 }

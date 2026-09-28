@@ -8,7 +8,7 @@ import { enqueue } from "@/shared/jobs"
 import { MediaToolError, probeVideo, runFfmpeg } from "@/shared/media"
 import { downloadToFile, uploadFromFile } from "@/shared/storage"
 
-import { footageLimitsFor, tooLongMessage } from "../lib/limits"
+import { clipLimits, tooLongMessage } from "../lib/limits"
 import {
   parseSceneLog,
   pickAutoMarkers,
@@ -62,13 +62,13 @@ export async function processFootage(
 
     const info = await probeVideo(original, { signal })
     if (!info) throw new UnusableFootage(messages.notVideo)
-    const { maxDurationSeconds } = footageLimitsFor(clip.workspace.plan)
+    const { maxDurationSeconds } = clipLimits
     // A second of slack for container rounding.
     const isTooLong = (ms: number) => ms > maxDurationSeconds * 1000 + 1000
     // Browser recordings (MediaRecorder WebM) often carry no duration, so
     // the length is checked again on the converted file below.
     if (isTooLong(info.durationMs)) {
-      throw new UnusableFootage(tooLongMessage(clip.workspace.plan))
+      throw new UnusableFootage(tooLongMessage())
     }
 
     const video = join(dir, "video.mp4")
@@ -76,7 +76,7 @@ export async function processFootage(
     const converted = await probeVideo(video, { signal })
     if (!converted) throw new UnusableFootage(messages.convertFailed)
     if (isTooLong(converted.durationMs)) {
-      throw new UnusableFootage(tooLongMessage(clip.workspace.plan))
+      throw new UnusableFootage(tooLongMessage())
     }
     if (converted.durationMs < 1000) {
       throw new UnusableFootage(messages.tooShort)

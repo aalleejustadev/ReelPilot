@@ -6,7 +6,7 @@ import { z } from "zod"
 
 import { getBrandKit } from "@/features/brand-kits"
 import { requireWorkspaceAccess } from "@/features/workspaces"
-import { aiLimits } from "@/shared/config/plans"
+import { aiLimits } from "@/shared/config/limits"
 import { enqueue } from "@/shared/jobs"
 import { AppError } from "@/shared/lib/errors"
 import { err, ok, toResultError, type Result } from "@/shared/lib/result"
@@ -435,9 +435,7 @@ export async function suggestMomentGraphic(
  * signed for an hour). The editor asks before they expire, and when a
  * video fails to load, so long sessions never stall on a dead link.
  */
-export async function freshFootageLinks(
-  footageId: unknown
-): Promise<
+export async function freshFootageLinks(footageId: unknown): Promise<
   Result<{
     videoUrl: string | null
     posterUrl: string | null

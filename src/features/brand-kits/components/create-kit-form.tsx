@@ -25,8 +25,8 @@ import {
  * Paste a website → AI drafts the kit → open it in the editor.
  *
  * Navigation happens in the submit handler, not an effect on the action's
- * result: creating the last kit the plan allows re-renders the list without
- * this form, so an effect would never run.
+ * result: creating the first kit re-renders the page (the empty state goes),
+ * so an effect would never run.
  */
 export function CreateKitForm() {
   const router = useRouter()
@@ -57,9 +57,8 @@ export function CreateKitForm() {
     error?.fieldErrors?.url?.[0] ??
     (error?.code === "VALIDATION" ? error.message : undefined)
   // Reading the site failed (or the daily AI limit was hit): offer a way on.
-  // A plan limit or missing permission would fail the same way, so not then.
-  const canFillManually =
-    error !== null && error.code !== "PLAN_LIMIT" && error.code !== "FORBIDDEN"
+  // A missing permission would fail the same way, so not then.
+  const canFillManually = error !== null && error.code !== "FORBIDDEN"
 
   function createManually() {
     startManual(async () => {

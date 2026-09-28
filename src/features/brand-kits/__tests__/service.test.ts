@@ -1,7 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest"
 
-import type { Plan } from "@/shared/db"
-
 import { brandKitFieldsSchema, type BrandKitFields } from "../schema"
 
 // Needs a database; skipped when DATABASE_URL is unset. App modules are
@@ -41,9 +39,9 @@ describe.runIf(hasDatabase)("brand kits service", () => {
 
   const workspaceIds: string[] = []
 
-  async function createWorkspace(plan: Plan = "FREE") {
+  async function createWorkspace() {
     const workspace = await db.workspace.create({
-      data: { name: "Test workspace", plan },
+      data: { name: "Test workspace" },
     })
     workspaceIds.push(workspace.id)
     return workspace.id
@@ -76,42 +74,22 @@ describe.runIf(hasDatabase)("brand kits service", () => {
     })
   })
 
-  it("enforces the plan's kit limit", async () => {
-    const workspaceId = await createWorkspace("FREE")
-    await service.createBrandKit(workspaceId, fields())
+  it("holds any number of kits (free for now)", async () => {
+    const workspaceId = await createWorkspace()
 
-    await expect(
-      service.createBrandKit(workspaceId, fields({ name: "Second" }))
-    ).rejects.toMatchObject({ code: "PLAN_LIMIT" })
-  })
-
-  it("creates exactly one kit under concurrent creates at the limit", async () => {
-    const workspaceId = await createWorkspace("FREE")
-
-    const results = await Promise.allSettled(
-      Array.from({ length: 4 }, (_, i) =>
-        service.createBrandKit(workspaceId, fields({ name: `Kit ${i}` }))
+    await Promise.all(
+      ["One", "Two", "Three", "Four"].map((name) =>
+        service.createBrandKit(workspaceId, fields({ name }))
       )
     )
 
-    expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1)
-    for (const result of results) {
-      if (result.status === "rejected") {
-        expect(result.reason).toMatchObject({ code: "PLAN_LIMIT" })
-      }
-    }
-    expect(await db.brandKit.count({ where: { workspaceId } })).toBe(1)
-  })
-
-  it("lets a bigger plan hold more kits", async () => {
-    const workspaceId = await createWorkspace("GROWTH")
-
-    for (const name of ["One", "Two", "Three"]) {
-      await service.createBrandKit(workspaceId, fields({ name }))
-    }
-
     const kits = await queries.listBrandKits(workspaceId)
-    expect(kits.map((kit) => kit.name)).toEqual(["One", "Two", "Three"])
+    expect(kits.map((kit) => kit.name).sort()).toEqual([
+      "Four",
+      "One",
+      "Three",
+      "Two",
+    ])
   })
 
   it("updates every field and replaces claims in the new order", async () => {
@@ -183,16 +161,13 @@ describe.runIf(hasDatabase)("brand kits service", () => {
     ).rejects.toThrow(/outside the workspace/)
   })
 
-  it("deletes the kit with its claims and frees the plan slot", async () => {
-    const workspaceId = await createWorkspace("FREE")
+  it("deletes the kit with its claims", async () => {
+    const workspaceId = await createWorkspace()
     const { id } = await service.createBrandKit(workspaceId, fields())
     const logoKey = `workspaces/${workspaceId}/brand-kits/${id}/logo.png`
     await service.setBrandKitLogo(workspaceId, id, logoKey)
 
     expect(await service.deleteBrandKit(workspaceId, id)).toEqual({ logoKey })
     expect(await db.allowedClaim.count({ where: { brandKitId: id } })).toBe(0)
-    await expect(
-      service.createBrandKit(workspaceId, fields())
-    ).resolves.toHaveProperty("id")
   })
 })

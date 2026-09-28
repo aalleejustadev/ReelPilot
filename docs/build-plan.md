@@ -20,7 +20,7 @@ Markers used in this doc:
 3. Build in **vertical slices** (Section 5). Finish one slice end to end (DB → server → UI → tests) before starting the next, following the order in Section 14.
 4. Every slice must meet the Definition of Done (Section 14.1) before moving on.
 5. When a decision is ambiguous, pick the simplest option that fits this doc, write it down in `docs/decisions.md` (one line: date, decision, reason), and continue.
-6. Never hardcode secrets, limits, or provider names in feature code. Per-plan limits live in `src/shared/config/plans.ts`; providers live behind adapters (Section 10).
+6. Never hardcode secrets, limits, or provider names in feature code. App-wide limits live in `src/shared/config/limits.ts`; providers live behind adapters (Section 10).
 7. Follow the design system (Section 12) and code style guide (Section 13) exactly. If a component you need isn't in the design system, add it to `src/shared/ui` first, then use it.
 
 ---
@@ -49,7 +49,7 @@ Founders need polished product videos all the time — launches, feature announc
 
 ## 2. Pricing
 
-**Not in V1 (owner, 2026-09-28): no billing, credits or paid plans.** `src/shared/config/plans.ts` stays as the one place for per-plan limits (footage caps, brand kits); every workspace is on Free until pricing is decided. `TODO(owner)`: pricing model when billing returns (export minutes, resolution and AI actions were the suggested levers).
+**Not in V1 (owner, 2026-09-28): no billing, credits or plans — ReelPilot is free.** Plans were removed the same day: any number of brand kits and clips; the only caps are app-wide safety limits in `src/shared/config/limits.ts` (1 GB and 10 minutes per clip, and the daily AI and export budgets). `TODO(owner)`: pricing model when billing returns (export minutes, resolution and AI actions were the suggested levers).
 
 ---
 
@@ -178,7 +178,7 @@ reelpilot/
 │   └── shared/
 │       ├── ui/               # design system components (Section 12)
 │       ├── config/
-│       │   ├── plans.ts      # per-plan limits — single source of truth
+│       │   ├── limits.ts     # app-wide caps (clip size/length, AI budgets)
 │       │   ├── site.ts       # name, URLs, copy constants
 │       │   └── env.ts        # typed, validated env vars
 │       ├── db/               # Prisma client
@@ -292,7 +292,6 @@ model User {
 model Workspace {
   id             String   @id @default(cuid())
   name           String
-  plan           Plan     @default(FREE)  // FREE | STARTER | GROWTH | AGENCY
   personalOwnerId String? @unique          // set on a user's personal workspace; cascades on user delete
   stripeCustomerId String?
   memberships    Membership[]
@@ -486,7 +485,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 - **Errors:** `AppError` with `code` (`NOT_FOUND`, `FORBIDDEN`, `INSUFFICIENT_CREDITS`, `COMPLIANCE_BLOCKED`, `PROVIDER_FAILED`, `RATE_LIMITED`, `VALIDATION`) and a user-safe message.
 - **Data access:** only in `queries.ts`/`service.ts`; every query is scoped by `workspaceId`.
 - **Server vs client:** default to Server Components; add `"use client"` only for interactivity (editor, recorder, wizard steps).
-- **Config over constants:** limits from `shared/config/plans.ts`.
+- **Config over constants:** limits from `shared/config/limits.ts`.
 - **Tests:** every `service.ts` has unit tests; each slice has at least one Playwright happy-path test.
 - **Commits:** Conventional Commits (`feat(projects): join clips with transitions`).
 - **Formatting/linting:** Prettier + ESLint with boundary rules; CI must pass before merge.
@@ -730,7 +729,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [ ] Remotion licence: free for individuals and companies of up to 3 people; larger companies need a company licence (set `REMOTION_LICENSE_KEY`). `TODO(owner)`: confirm which applies.
 - [x] Share links play the newest export (2026-09-28), not one link per export.
 - [x] Voice and presenters: removed (2026-09-28); no voice in V1.
-- [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
+- [x] No plans (2026-09-28): free for now — unlimited brand kits and clips; every clip up to 1 GB and 10 minutes.
 - [ ] Legal review of Terms and Privacy. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).
 - [x] Hosting: Hostinger (Node.js) (2026-09-28); deployment is not scheduled (V1 closed at M5).

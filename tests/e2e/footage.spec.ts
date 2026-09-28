@@ -13,7 +13,7 @@ test.skip(
 // Uploads go to a real bucket: Neon locally, the S3 server in CI.
 const hasStorage = Boolean(process.env.NEON_BRANCH || process.env.STORAGE_TESTS)
 
-test("footage tab starts empty and shows the plan's limits", async ({
+test("footage tab starts empty and shows the clip limits", async ({
   page,
   signedInUser: _user,
   consoleProblems,
@@ -24,9 +24,7 @@ test("footage tab starts empty and shows the plan's limits", async ({
   await expect(page).toHaveURL(/\/footage$/)
   await expect(page.getByText("No footage yet")).toBeVisible()
   await expect(
-    page.getByText(
-      "0 of 5 clips on the Free plan, up to 200 MB and 3 minutes each."
-    )
+    page.getByText("Up to 1 GB and 10 minutes per clip.", { exact: false })
   ).toBeVisible()
   await expect(page.getByRole("button", { name: "Upload video" })).toBeVisible()
   expect(consoleProblems).toEqual([])
@@ -44,7 +42,7 @@ test("the recorder explains what to do before capturing", async ({
 
   const dialog = page.getByRole("dialog", { name: "Record your screen" })
   await expect(
-    dialog.getByText("Up to 3 minutes. No sound is recorded")
+    dialog.getByText("Up to 10 minutes. No sound is recorded")
   ).toBeVisible()
   await expect(
     dialog.getByText("Open your app in another tab or window first.")

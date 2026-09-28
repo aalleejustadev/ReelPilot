@@ -12,7 +12,7 @@ import {
   vi,
 } from "vitest"
 
-import { aiLimits } from "@/shared/config/plans"
+import { aiLimits } from "@/shared/config/limits"
 
 import { brandKitFieldsSchema } from "../schema"
 
@@ -160,16 +160,6 @@ describe.runIf(hasDatabase)("brand kit actions", () => {
           fieldErrors: { url: [expect.any(String)] },
         },
       })
-      expect(draftKitFromUrl).not.toHaveBeenCalled()
-    })
-
-    it("checks the plan limit before spending an AI call", async () => {
-      await createKit()
-      draftKitFromUrl.mockClear()
-
-      const result = await fromUrl("acme.app")
-
-      expect(result).toMatchObject({ ok: false, error: { code: "PLAN_LIMIT" } })
       expect(draftKitFromUrl).not.toHaveBeenCalled()
     })
 

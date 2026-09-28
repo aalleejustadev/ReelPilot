@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest"
 
 import {
-  assertCanAddFootage,
   assertFootageSize,
+  footageUsage,
   formatBytes,
   formatMinutes,
   tooLongMessage,
@@ -16,28 +16,17 @@ describe("footage limits", () => {
     expect(formatMinutes(60)).toBe("1 minute")
   })
 
-  it("caps file size by plan", () => {
-    expect(() => assertFootageSize("FREE", 200 * 1024 * 1024)).not.toThrow()
-    expect(() => assertFootageSize("FREE", 200 * 1024 * 1024 + 1)).toThrow(
-      "Your footage is larger than 200 MB. Trim it or upload a smaller clip."
-    )
-    expect(() => assertFootageSize("GROWTH", 900 * 1024 * 1024)).not.toThrow()
-  })
-
-  it("caps clips per kit by plan", () => {
-    expect(() => assertCanAddFootage("FREE", 4)).not.toThrow()
-    expect(() => assertCanAddFootage("FREE", 5)).toThrow(
-      expect.objectContaining({
-        code: "PLAN_LIMIT",
-        message:
-          "Your Free plan includes 5 clips per brand kit. Delete one to add another.",
-      })
+  it("caps file size at 1 GB", () => {
+    expect(() => assertFootageSize(1024 * 1024 * 1024)).not.toThrow()
+    expect(() => assertFootageSize(1024 * 1024 * 1024 + 1)).toThrow(
+      "Your footage is larger than 1 GB. Trim it or upload a smaller clip."
     )
   })
 
-  it("explains the length cap in the plan's terms", () => {
-    expect(tooLongMessage("STARTER")).toBe(
-      "Your footage is longer than 5 minutes. Trim it or upload a shorter clip."
+  it("explains the caps, with no plans involved", () => {
+    expect(tooLongMessage()).toBe(
+      "Your footage is longer than 10 minutes. Trim it or upload a shorter clip."
     )
+    expect(footageUsage()).toBe("Up to 1 GB and 10 minutes per clip.")
   })
 })

@@ -93,16 +93,14 @@ test("create, edit, save and delete a brand kit", async ({
   ).toContainText("Bebas Neue")
   await noSidewaysScroll(page)
 
-  // The list shows it, and the Free plan's one kit is used up. The card
-  // opens the kit's footage; "Details" opens this form.
+  // The list shows it, and another can be added (no plans, no limit).
+  // The card opens the kit's footage; "Details" opens this form.
   await page.goto("/brand-kits")
   await expect(
     page.getByRole("link", { name: "Acme", exact: true })
   ).toHaveAttribute("href", /\/brand-kits\/[^/]+\/footage$/)
   await expect(page.getByText("0 clips")).toBeVisible()
-  await expect(
-    page.getByText("You’ve used every brand kit on your plan")
-  ).toBeVisible()
+  await expect(page.getByText("Add a brand kit")).toBeVisible()
   await noSidewaysScroll(page)
 
   // Delete asks first, then returns to the empty list.
@@ -115,6 +113,24 @@ test("create, edit, save and delete a brand kit", async ({
   await expect(page).toHaveURL(/\/brand-kits$/)
   await expect(page.getByText("No brand kits yet")).toBeVisible()
   expect(consoleProblems).toEqual([])
+})
+
+test("any number of brand kits (free for now)", async ({
+  page,
+  signedInUser: _user,
+}) => {
+  await createKitByHand(page, "first-e2e.invalid")
+  await createKitByHand(page, "second-e2e.invalid")
+  await createKitByHand(page, "third-e2e.invalid")
+  await page.goto("/brand-kits")
+  for (const name of [
+    "first-e2e.invalid",
+    "second-e2e.invalid",
+    "third-e2e.invalid",
+  ]) {
+    await expect(page.getByRole("link", { name, exact: true })).toBeVisible()
+  }
+  await expect(page.getByText(/plan/i)).toHaveCount(0)
 })
 
 test("a private address is refused with a clear message", async ({

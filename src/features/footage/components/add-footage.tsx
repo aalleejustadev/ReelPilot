@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 
-import { Field, FieldDescription, FieldLabel } from "@/shared/ui/field"
+import { Field, FieldLabel } from "@/shared/ui/field"
 import {
   Select,
   SelectContent,
@@ -17,21 +17,18 @@ import { ScreenRecorder } from "./screen-recorder"
 
 /**
  * Record or upload, from anywhere in the workspace. With more than one
- * brand kit, a picker says which kit the clip joins (the one with room
- * first); a kit that's full can't take another clip.
+ * brand kit, a picker says which kit the clip joins.
  */
 export function AddFootage({
   kits,
   maxBytes,
   maxDurationSeconds,
 }: {
-  kits: { id: string; name: string; full: boolean }[]
+  kits: { id: string; name: string }[]
   maxBytes: number
   maxDurationSeconds: number
 }) {
-  const [kitId, setKitId] = useState(
-    (kits.find((kit) => !kit.full) ?? kits[0])?.id ?? ""
-  )
+  const [kitId, setKitId] = useState(kits[0]?.id ?? "")
   const kit = kits.find((each) => each.id === kitId)
   if (!kit) return null
 
@@ -58,28 +55,16 @@ export function AddFootage({
               </SelectGroup>
             </SelectContent>
           </Select>
-          {kit.full && (
-            <FieldDescription>
-              This kit has every clip your plan allows. Pick another kit or
-              delete a clip.
-            </FieldDescription>
-          )}
         </Field>
       )}
-      {!kit.full && (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <ScreenRecorder
-            kitId={kit.id}
-            maxBytes={maxBytes}
-            maxDurationSeconds={maxDurationSeconds}
-          />
-          <FootageUploader
-            kitId={kit.id}
-            maxBytes={maxBytes}
-            disabled={false}
-          />
-        </div>
-      )}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <ScreenRecorder
+          kitId={kit.id}
+          maxBytes={maxBytes}
+          maxDurationSeconds={maxDurationSeconds}
+        />
+        <FootageUploader kitId={kit.id} maxBytes={maxBytes} disabled={false} />
+      </div>
     </div>
   )
 }

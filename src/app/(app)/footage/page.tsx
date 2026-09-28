@@ -5,14 +5,12 @@ import { listBrandKits } from "@/features/brand-kits"
 import {
   AddFootage,
   FootageGrid,
-  footageLimitsFor,
+  clipLimits,
   listFootage,
   RefreshWhileProcessing,
   withPosterUrls,
 } from "@/features/footage"
 import { can, requireWorkspaceAccess } from "@/features/workspaces"
-import { plans } from "@/shared/config/plans"
-import { Alert, AlertDescription, AlertTitle } from "@/shared/ui/alert"
 import {
   Card,
   CardContent,
@@ -43,17 +41,11 @@ export default async function AllFootagePage() {
     listFootage(workspace.id).then(withPosterUrls),
   ])
 
-  const limits = footageLimitsFor(workspace.plan)
   const canAdd = can(role, "content:create")
   const isWorking = clips.some(
     (clip) => clip.status === "UPLOADING" || clip.status === "PROCESSING"
   )
-  const kitChoices = kits.map((kit) => ({
-    id: kit.id,
-    name: kit.name,
-    full: kit._count.footage >= limits.clipsPerBrandKit,
-  }))
-  const allFull = kitChoices.every((kit) => kit.full)
+  const kitChoices = kits.map((kit) => ({ id: kit.id, name: kit.name }))
 
   return (
     <div className="flex flex-1 flex-col gap-8">
@@ -93,34 +85,24 @@ export default async function AllFootagePage() {
         </Empty>
       ) : (
         <>
-          {canAdd &&
-            (allFull ? (
-              <Alert>
-                <AlertTitle>You’ve used every clip on your plan</AlertTitle>
-                <AlertDescription>
-                  Each brand kit holds up to {limits.clipsPerBrandKit} clips on
-                  the {plans[workspace.plan].name} plan. Delete one to add
-                  another.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Add footage</CardTitle>
-                  <CardDescription>
-                    Record your app or upload a screen recording. We find the
-                    key moments, then it’s ready to edit.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AddFootage
-                    kits={kitChoices}
-                    maxBytes={limits.maxBytes}
-                    maxDurationSeconds={limits.maxDurationSeconds}
-                  />
-                </CardContent>
-              </Card>
-            ))}
+          {canAdd && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add footage</CardTitle>
+                <CardDescription>
+                  Record your app or upload a screen recording. We find the key
+                  moments, then it’s ready to edit.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AddFootage
+                  kits={kitChoices}
+                  maxBytes={clipLimits.maxBytes}
+                  maxDurationSeconds={clipLimits.maxDurationSeconds}
+                />
+              </CardContent>
+            </Card>
+          )}
 
           {clips.length === 0 ? (
             <Empty className="border">

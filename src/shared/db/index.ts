@@ -4,7 +4,6 @@ export {
   FootageStatus,
   MarkerSource,
   MemberRole,
-  Plan,
   Prisma,
   UserRole,
 } from "./generated/client"

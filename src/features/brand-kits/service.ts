@@ -1,10 +1,9 @@
 import "server-only"
 
-import { db, type Plan } from "@/shared/db"
+import { db } from "@/shared/db"
 import { AppError } from "@/shared/lib/errors"
 import { isWorkspaceFileKey } from "@/shared/storage"
 
-import { assertCanAddBrandKit } from "./lib/kit-limit"
 import { toClaimRows, toKitColumns } from "./lib/kit-record"
 import type { BrandKitFields } from "./schema"
 
@@ -14,44 +13,18 @@ const kitNotFound = () =>
     "We couldn’t find that brand kit. It may have been deleted."
   )
 
-/**
- * Cheap early check before costly work (the AI draft). Not race-safe on its
- * own: createBrandKit re-checks under a lock.
- */
-export async function assertRoomForBrandKit(workspace: {
-  id: string
-  plan: Plan
-}) {
-  const kitCount = await db.brandKit.count({
-    where: { workspaceId: workspace.id },
-  })
-  assertCanAddBrandKit(workspace.plan, kitCount)
-}
-
-/**
- * Creates a kit if the workspace's plan allows another. The workspace row is
- * locked for the check, so concurrent creates can't both pass the limit.
- */
+/** Creates a kit. Any number are allowed (ReelPilot is free for now). */
 export async function createBrandKit(
   workspaceId: string,
   fields: BrandKitFields
 ) {
-  return db.$transaction(async (tx) => {
-    const [workspace] = await tx.$queryRaw<{ plan: Plan }[]>`
-      SELECT plan FROM workspaces WHERE id = ${workspaceId} FOR UPDATE`
-    if (!workspace) throw new AppError("NOT_FOUND", "Workspace not found.")
-
-    const kitCount = await tx.brandKit.count({ where: { workspaceId } })
-    assertCanAddBrandKit(workspace.plan, kitCount)
-
-    return tx.brandKit.create({
-      data: {
-        workspaceId,
-        ...toKitColumns(fields),
-        claims: { create: toClaimRows(fields.claims) },
-      },
-      select: { id: true },
-    })
+  return db.brandKit.create({
+    data: {
+      workspaceId,
+      ...toKitColumns(fields),
+      claims: { create: toClaimRows(fields.claims) },
+    },
+    select: { id: true },
   })
 }
 

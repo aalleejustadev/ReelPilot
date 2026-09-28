@@ -1,11 +1,7 @@
 import type { Metadata } from "next"
 import { notFound, redirect } from "next/navigation"
 
-import {
-  footageLimitsFor,
-  listFootage,
-  withPosterUrls,
-} from "@/features/footage"
+import { clipLimits, listFootage, withPosterUrls } from "@/features/footage"
 import {
   getProject,
   ProjectEditor,
@@ -37,7 +33,6 @@ export default async function VideoPage({
   const kitClips = await withPosterUrls(
     await listFootage(workspace.id, video.kit.id)
   )
-  const limits = footageLimitsFor(workspace.plan)
 
   return (
     <>
@@ -56,11 +51,9 @@ export default async function VideoPage({
           posterUrl: clip.posterUrl,
         }))}
         footage={{
-          maxBytes: limits.maxBytes,
-          maxDurationSeconds: limits.maxDurationSeconds,
-          canAdd:
-            can(role, "content:create") &&
-            kitClips.length < limits.clipsPerBrandKit,
+          maxBytes: clipLimits.maxBytes,
+          maxDurationSeconds: clipLimits.maxDurationSeconds,
+          canAdd: can(role, "content:create"),
         }}
         readOnly={!can(role, "content:edit")}
       />

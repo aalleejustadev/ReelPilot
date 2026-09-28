@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { env } from "@/shared/config/env"
-import { aiLimits } from "@/shared/config/plans"
+import { aiLimits } from "@/shared/config/limits"
 import type { LanguageModel } from "@/shared/ai"
 import { AppError } from "@/shared/lib/errors"
 import { runFfmpeg } from "@/shared/media"

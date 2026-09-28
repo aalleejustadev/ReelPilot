@@ -1,9 +1,7 @@
-import { plans, type PlanKey } from "@/shared/config/plans"
+import { clipLimits } from "@/shared/config/limits"
 import { AppError } from "@/shared/lib/errors"
 
-export function footageLimitsFor(plan: PlanKey) {
-  return plans[plan].footage
-}
+export { clipLimits }
 
 /** 200 MB, 1 GB (binary units, as file managers show them). */
 export function formatBytes(bytes: number) {
@@ -18,33 +16,20 @@ export function formatMinutes(seconds: number) {
   return `${minutes} ${minutes === 1 ? "minute" : "minutes"}`
 }
 
-export function assertCanAddFootage(plan: PlanKey, clipCount: number) {
-  const { clipsPerBrandKit } = footageLimitsFor(plan)
-  if (clipCount < clipsPerBrandKit) return
-  throw new AppError(
-    "PLAN_LIMIT",
-    `Your ${plans[plan].name} plan includes ${clipsPerBrandKit} clips per brand kit. Delete one to add another.`
-  )
-}
-
-export function assertFootageSize(plan: PlanKey, sizeBytes: number) {
-  const { maxBytes } = footageLimitsFor(plan)
-  if (sizeBytes <= maxBytes) return
+export function assertFootageSize(sizeBytes: number) {
+  if (sizeBytes <= clipLimits.maxBytes) return
   throw new AppError(
     "VALIDATION",
-    `Your footage is larger than ${formatBytes(maxBytes)}. Trim it or upload a smaller clip.`
+    `Your footage is larger than ${formatBytes(clipLimits.maxBytes)}. Trim it or upload a smaller clip.`
   )
 }
 
 /** Build plan §12.7's example message. */
-export function tooLongMessage(plan: PlanKey) {
-  const { maxDurationSeconds } = footageLimitsFor(plan)
-  return `Your footage is longer than ${formatMinutes(maxDurationSeconds)}. Trim it or upload a shorter clip.`
+export function tooLongMessage() {
+  return `Your footage is longer than ${formatMinutes(clipLimits.maxDurationSeconds)}. Trim it or upload a shorter clip.`
 }
 
-/** "2 of 5 clips on the Free plan, up to 200 MB and 3 minutes each." */
-export function footageUsage(plan: PlanKey, clipCount: number) {
-  const { clipsPerBrandKit, maxBytes, maxDurationSeconds } =
-    footageLimitsFor(plan)
-  return `${clipCount} of ${clipsPerBrandKit} clips on the ${plans[plan].name} plan, up to ${formatBytes(maxBytes)} and ${formatMinutes(maxDurationSeconds)} each.`
+/** "Up to 1 GB and 10 minutes per clip." */
+export function footageUsage() {
+  return `Up to ${formatBytes(clipLimits.maxBytes)} and ${formatMinutes(clipLimits.maxDurationSeconds)} per clip.`
 }
