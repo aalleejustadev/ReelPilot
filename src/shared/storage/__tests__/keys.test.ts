@@ -35,18 +35,3 @@ describe("isWorkspaceFileKey", () => {
     expect(isWorkspaceFileKey("workspaces/ws_10/logo.png", "ws_1")).toBe(false)
   })
 })
-
-describe("sharedFileKey", async () => {
-  const { sharedFileKey } = await import("../keys")
-
-  it("puts shared files under shared/", () => {
-    expect(sharedFileKey("presenters", "maya", "portrait.png")).toBe(
-      "shared/presenters/maya/portrait.png"
-    )
-  })
-
-  it("rejects unsafe segments", () => {
-    expect(() => sharedFileKey("..", "x")).toThrow(/Invalid/)
-    expect(() => sharedFileKey()).toThrow()
-  })
-})

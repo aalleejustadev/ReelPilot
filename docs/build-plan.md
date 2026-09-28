@@ -67,7 +67,7 @@ Founders need polished product videos all the time — launches, feature announc
 - **Try-it:** URL → recorded site tour → edited preview → sign-up. (M7)
 - **Launch polish:** landing, legal pages, SEO, error/empty states, deploy. (M8)
 
-Presenters (M3: stock portraits + Kokoro voices) stay as built; no further presenter work is planned.
+Presenters (M3: stock portraits + Kokoro voices) were removed on 2026-09-28 (owner: not needed).
 
 ### 3.2 Later (not scheduled)
 Audio (voiceover, music, sound effects, auto captions), recorder upgrades (microphone, webcam bubble, click tracking via a Chrome extension), billing and plans, admin, team invites, avatars and lip-sync, variants, localisation, ad-account publishing. Don't scaffold any of these.
@@ -90,7 +90,6 @@ Audio (voiceover, music, sound effects, auto captions), recorder upgrades (micro
 | Background jobs | **pg-boss** (job queue stored in Neon Postgres), run by our own worker in `src/worker` | No extra service; code against the `src/shared/jobs` wrapper. Worker connects via `DATABASE_URL_UNPOOLED` |
 | Video composition | **Remotion** (compositions in `src/remotion`): `FootageStage` (one clip) and `ProjectStage` (a project); the editor previews them in `@remotion/player` | `TODO(owner)`: review Remotion's license terms for commercial use |
 | Render infra | Remotion renderer inside the same worker (one Docker image), from M5 | `TODO(owner)`: worker host — it needs ffmpeg and headless Chrome (try-it recording too), which plain Node hosting may not allow |
-| Voice | **Kokoro** (open-source TTS, Apache-2.0) self-hosted in the worker via `kokoro-js`, behind the `VoiceProvider` adapter | No API key, no per-ad cost; stock voices only |
 | Storage | **Neon Object Storage** (S3-compatible, branches with the database) via the Files SDK `neon` adapter | Signed URLs only; credentials come from `neon env pull` |
 | Email | Resend + React Email | |
 | Rate limiting | Postgres (Neon) table in `src/shared/rate-limit`; Better Auth's database rate-limit storage | No Redis service |
@@ -142,8 +141,7 @@ reelpilot/
 │   ├── decisions.md              # one-line architecture decisions log
 │   └── build-plan.md             # this file
 ├── prisma/
-│   ├── schema.prisma
-│   └── seed.ts                   # stock presenters, angle templates, demo data
+│   └── schema.prisma
 ├── public/
 ├── src/
 │   ├── app/
@@ -160,7 +158,6 @@ reelpilot/
 │   │   │   ├── brand-kits/
 │   │   │   │   ├── page.tsx
 │   │   │   │   └── [kitId]/{page,footage/page}.tsx
-│   │   │   ├── presenters/page.tsx
 │   │   │   └── settings/{profile,workspace}/page.tsx
 │   │   ├── (editor)/                 # full-screen editors, no sidebar
 │   │   │   ├── brand-kits/[kitId]/footage/[footageId]/page.tsx   # clip editor
@@ -172,11 +169,10 @@ reelpilot/
 │   │   ├── workspaces/       # workspaces, roles
 │   │   ├── brand-kits/       # extraction, visual identity
 │   │   ├── footage/          # upload, recording, analysis, the clip editor (motion studio)
-│   │   ├── presenters/       # stock library (frozen)
 │   │   ├── projects/         # videos: clips joined into one (M4; "videos" in the UI)
 │   │   ├── exports/          # MP4 export jobs and share links (M5)
 │   │   └── try-it/           # anonymous URL → recorded tour → preview (M7)
-│   ├── worker/               # our own job worker: pg-boss + Remotion + Kokoro (own Dockerfile)
+│   ├── worker/               # our own job worker: pg-boss + ffmpeg + Remotion (own Dockerfile)
 │   ├── remotion/
 │   │   ├── compositions/     # FootageStage (a clip), ProjectStage (a project)
 │   │   └── components/       # player footage, text, graphics, layouts
@@ -188,7 +184,6 @@ reelpilot/
 │       │   └── env.ts        # typed, validated env vars
 │       ├── db/               # Prisma client
 │       ├── ai/               # AI SDK provider registry
-│       ├── providers/        # voice (Kokoro) and storage (Neon) adapters (Section 10)
 │       ├── jobs/             # job client wrapper
 │       ├── storage/          # signed URL helpers
 │       ├── rate-limit/
@@ -252,8 +247,8 @@ Each slice lists purpose, routes, key actions/jobs, and acceptance criteria.
 - **H. AI director v2:** plans the whole edit from the analysis and brand kit, explained and undoable.
 - **Acceptance:** each part ships with tests and axe checks; the preview is the composition M5 renders.
 
-### 7.5 presenters (built in M3, frozen)
-Stock presenters (a still portrait + a Kokoro voice) exist from M3. No further presenter work is planned in V1.
+### 7.5 presenters (removed)
+Stock presenters (a still portrait + a Kokoro voice) were built in M3 and removed on 2026-09-28: the page, slice, `presenters` table, seed, portraits and the Kokoro engine are gone.
 
 ### 7.14 videos — "projects" in code (M4 ✅)
 - **Purpose:** A video: one or more of a brand kit's clips in order, each played with its own edit (the motion studio's presentation and camera shots), joined by transitions. Owner decision (2026-09-28): projects stay invisible — users only ever see **videos**.
@@ -282,7 +277,7 @@ Campaigns and scripts (old 7.6), compliance (7.7), variant renders (7.8), the se
 
 ## 8. Data model (Prisma sketch)
 
-`prisma/schema.prisma` is the source of truth. Built: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, `Workspace`, `Membership` (M0); `BrandKit`, `AllowedClaim` (M1); `Footage`, `FootageMarker` (M2, with the motion studio's presentation, analysis and insight JSON); `Presenter` (M3); `Project`, `ProjectClip` (M4). Models of dropped slices (campaigns, scripts, variants, segments, renders, compliance, credits, review links, audit log, avatars) were removed from this sketch with the 2026-09-28 direction change; M5's export and share models are defined when M5 is planned.
+`prisma/schema.prisma` is the source of truth. Built: Better Auth's `User`/`Session`/`Account`/`Verification`/`RateLimit`, `Workspace`, `Membership` (M0); `BrandKit`, `AllowedClaim` (M1); `Footage`, `FootageMarker` (M2, with the motion studio's presentation, analysis and insight JSON); `Project`, `ProjectClip` (M4). Models of dropped slices (presenters, campaigns, scripts, variants, segments, renders, compliance, credits, review links, audit log, avatars) were removed from this sketch with the 2026-09-28 changes; M5's export and share models are defined when M5 is planned.
 
 ```prisma
 model User {
@@ -339,17 +334,6 @@ model Footage {
 }
 model FootageMarker { id String @id @default(cuid()) footageId String atMs Int label String? source MarkerSource } // AUTO | MANUAL
 
-model Presenter {
-  id String @id @default(cuid())
-  kind PresenterKind      // STOCK | FOUNDER
-  workspaceId String?     // null for stock
-  name String
-  providerRef String?
-  stillUrl String
-  previewUrl String?
-  status PresenterStatus  // PENDING_CONSENT | PROCESSING | IN_REVIEW | APPROVED | REJECTED | REVOKED
-}
-
 model Project {           // M4
   id String @id @default(cuid())
   workspaceId String
@@ -375,7 +359,7 @@ model ProjectClip { id String @id @default(cuid()) projectId String footageId St
 
 ## 10. Provider adapters
 
-External AI and media providers sit behind interfaces in `src/shared/providers` and `src/shared/ai`; feature code never imports a vendor SDK directly. In use: the Vercel AI SDK registry (text and vision), Kokoro (`VoiceProvider`, self-hosted, stock voices; used by presenters only). No avatar or voice-cloning providers are planned.
+External AI providers sit behind the registry in `src/shared/ai`; feature code never imports a vendor SDK directly. In use: the Vercel AI SDK registry (text and vision). No voice, avatar or voice-cloning providers are planned.
 
 ---
 
@@ -427,7 +411,7 @@ Contrast rule: all text meets WCAG AA; `--chroma` is never used for body text on
 Tailwind's default type scale. Line length ≤ 72ch for prose. Sentence case everywhere; no all-caps labels.
 
 ### 12.4 Layout
-- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Videos, Brand kits, Presenters, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
+- **App shell:** shadcn `Sidebar` (sidebar-07 pattern: collapses to icons, sheet on mobile) with the workspace name in the header, nav items, and the user menu in the footer; top bar with the sidebar toggle and page title; content on `--stage`. Nav shows only built pages (Dashboard, Videos, Brand kits, Settings) — add pages as they ship (`src/app/(app)/_components/nav-config.ts`, plus the `src/proxy.ts` matcher).
 - **Editors** (clip editor, a video's clip list) are full screen without the sidebar: a top bar (back, name, save state, actions), the stage on `--projector`, a transport, and the timeline or clip strip below.
 - **Landing:** left-aligned hero with the URL input (try-it); to the right, a player looping a real edited video; below, one before/after (raw screen recording → edited video).
 
@@ -485,7 +469,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 
 ### 12.7 Voice & copy
 - Plain verbs, sentence case, no filler. A button says what happens: "Export MP4", then the toast says "Exporting your video."
-- Name things by what users know: "ads," "hooks," "presenter," "footage" — not "variants payload" or "segment hash."
+- Name things by what users know: "videos," "clips," "footage" — not "variants payload" or "segment hash."
 - Errors say what happened and what to do: "Your footage is longer than 10 minutes. Trim it or upload a shorter clip."
 - Empty states invite action: "No videos yet. Start a video, then record or upload your app."
 
@@ -517,7 +501,7 @@ Radius and shadows: shadcn defaults (`--radius: 0.625rem`).
 | M0 ✅ | Foundation | repo, env, db, auth, shared/ui tokens, app shell | Sign in, see empty dashboard with design system applied — **done 2026-09-25** (see 14.2) |
 | M1 ✅ | Brand kit | brand-kits (+ URL extraction), Neon Object Storage + `shared/storage` (logo uploads) | Create and edit a kit from a URL, upload a logo — **done 2026-09-25** (see 14.3) |
 | M2 ✅ | Footage | footage (reuses M1 storage), job worker (pg-boss + ffmpeg) | Upload/record footage with markers — **done 2026-09-25** (see 14.4) |
-| M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5); frozen after the direction change |
+| M3 ✅ | Presenters | presenters (stock), Kokoro voice (`VoiceProvider`) | Choose a stock presenter and hear its voice — **done 2026-09-25** (see 14.5); removed 2026-09-28 |
 | M3b ✅ | Footage motion (owner-added) | footage motion (§7.4a), `shared/motion` | 3D camera shots on markers, backgrounds, AI direction, live preview — **done 2026-09-25** (see 14.6) |
 | M3c ✅ | Motion studio (owner-added) | footage analysis, Remotion player, camera rules, transitions, text, motion graphics, editor, AI director (§7.4b) | Professional motion editing in parts A–I — **done 2026-09-27** (see 14.7) |
 | M4 ✅ | Videos | projects in code (§7.14), versioned saves, dashboard | Record or upload into a video and edit it; clips joined with transitions; stale tabs can't overwrite — **done 2026-09-28** (see 14.8) |
@@ -726,8 +710,7 @@ All env vars are validated at startup in `src/shared/config/env.ts`.
 - [x] Jobs platform: own worker + pg-boss on Neon (2026-09-23).
 - [x] Render infra: Remotion in the same worker (2026-09-23).
 - [ ] Worker host — needs ffmpeg and headless Chrome — and the Remotion company-license check (the editor already uses Remotion Player). Needed for M5. `TODO(owner)`
-- [x] Voice: self-hosted Kokoro (2026-09-23); presenters only.
-- [x] Stock presenter portraits: Avataaars illustrations (Pablo Stanley, free for commercial use), each set by hand to match its name (2026-09-28); real portraits can replace them any time.
+- [x] Voice and presenters: removed (2026-09-28); no voice in V1.
 - [x] Footage caps per plan (2026-09-25): Free 200 MB / 3 min / 5 clips per kit; Starter 500 MB / 5 min / 20; Growth and Agency 1 GB / 10 min / 50.
 - [ ] Legal review of Terms and Privacy. `TODO(owner)`
 - [x] Typeface: Geist + Geist Mono (2026-09-25).

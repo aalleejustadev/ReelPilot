@@ -24,7 +24,6 @@ test.describe("signed in", () => {
     "/dashboard",
     "/videos",
     "/brand-kits",
-    "/presenters",
     "/settings/profile",
     "/settings/workspace",
   ]) {

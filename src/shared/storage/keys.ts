@@ -26,16 +26,3 @@ export function isWorkspaceFileKey(key: string, workspaceId: string) {
   return key.startsWith(`workspaces/${workspaceId}/`)
 }
 
-/**
- * Object key for a file shared by every workspace (stock presenters):
- * `shared/<...segments>`. Same segment rules as workspace keys.
- */
-export function sharedFileKey(...segments: string[]) {
-  if (segments.length === 0) throw new Error("A file key needs a segment")
-  for (const part of segments) {
-    if (!segmentPattern.test(part) || part.includes("..")) {
-      throw new Error(`Invalid storage key segment: ${JSON.stringify(part)}`)
-    }
-  }
-  return `shared/${segments.join("/")}`
-}

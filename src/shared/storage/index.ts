@@ -8,4 +8,4 @@ export {
   signedFileUrl,
   uploadFromFile,
 } from "./files"
-export { isWorkspaceFileKey, sharedFileKey, workspaceFileKey } from "./keys"
+export { isWorkspaceFileKey, workspaceFileKey } from "./keys"

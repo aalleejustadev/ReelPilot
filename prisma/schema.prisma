@@ -1,5 +1,5 @@
 // Each slice adds its own models in its own migration (M0: auth, workspaces;
-// M1: brand kits, rate limit buckets; M2: footage; M3: presenters).
+// M1: brand kits, rate limit buckets; M2: footage; M4: projects).
 // Models are PascalCase; tables are lowercase plurals via @@map.
 
 generator client {
@@ -355,30 +355,4 @@ model ProjectClip {
   @@index([projectId, position])
   @@index([footageId])
   @@map("project_clips")
-}
-
-// ─── Presenters ─────────────────────────────────────────────────────────────
-// Stock presenters (build plan §7.5): a portrait and a default voice, shared
-// by every workspace. Founder avatars and consent are V1.1.
-
-model Presenter {
-  id               String   @id @default(cuid())
-  // Stable id used by the seed and in URLs, e.g. "maya".
-  slug             String   @unique
-  name             String
-  // One of src/shared/config/voices.ts.
-  voiceId          String
-  // e.g. ["Warm", "American"]
-  tags             String[]
-  // Keys in the media bucket (shared/presenters/<slug>/...).
-  portraitKey      String?
-  sampleKey        String?
-  sampleDurationMs Int?
-  sortOrder        Int
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  @@index([isActive, sortOrder])
-  @@map("presenters")
 }

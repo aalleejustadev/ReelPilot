@@ -19,7 +19,6 @@ export const config = {
     "/dashboard/:path*",
     "/videos/:path*",
     "/brand-kits/:path*",
-    "/presenters/:path*",
     "/settings/:path*",
   ],
 }

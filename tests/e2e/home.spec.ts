@@ -7,7 +7,7 @@ test("home page shows the hero and auth buttons", async ({ page }) => {
   await expect(
     page.getByRole("heading", {
       level: 1,
-      name: "Your app, in ads that sell it.",
+      name: "Your product, in videos that show it off.",
     })
   ).toBeVisible()
   const header = page.getByRole("banner")

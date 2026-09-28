@@ -3,7 +3,6 @@ import {
   LayoutDashboardIcon,
   PaletteIcon,
   SettingsIcon,
-  UsersIcon,
 } from "lucide-react"
 
 /**
@@ -14,7 +13,6 @@ export const navItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboardIcon },
   { title: "Videos", href: "/videos", icon: ClapperboardIcon },
   { title: "Brand kits", href: "/brand-kits", icon: PaletteIcon },
-  { title: "Presenters", href: "/presenters", icon: UsersIcon },
   { title: "Settings", href: "/settings", icon: SettingsIcon },
 ] as const
 
@@ -26,7 +24,6 @@ const pageTitles: { prefix: string; title: string }[] = [
   { prefix: "/dashboard", title: "Dashboard" },
   { prefix: "/videos", title: "Videos" },
   { prefix: "/brand-kits", title: "Brand kits" },
-  { prefix: "/presenters", title: "Presenters" },
 ]
 
 export function titleFor(pathname: string) {

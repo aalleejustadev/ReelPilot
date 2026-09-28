@@ -44,5 +44,3 @@ next-env.d.ts
 /src/shared/db/generated/
 .neon
 
-# Downloaded ML models (Kokoro voice)
-/.cache/
